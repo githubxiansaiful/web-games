@@ -49,15 +49,11 @@ export class Props {
         head.position.set(0, 7.2, 1.8);
         lightGroup.add(head);
 
-        const bulb = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.6), bulbMat);
+        const bulbMatDay = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.4 });
+        const bulb = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.6), bulbMatDay);
         bulb.rotation.x = Math.PI / 2;
         bulb.position.set(0, 7.05, 1.8);
         lightGroup.add(bulb);
-
-        // Warm street illumination light
-        const pointLight = new THREE.PointLight(0xfef08a, 0.85, 22);
-        pointLight.position.set(0, 6.8, 1.8);
-        lightGroup.add(pointLight);
 
         this.group.add(lightGroup);
       } else if (p.type === 'tree') {

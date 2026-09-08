@@ -16,11 +16,13 @@ export class World {
     this.scene = scene;
     this.bounds = { minX: -200, maxX: 200, minZ: -200, maxZ: 200 };
 
-    // 1. Atmosphere and Fog (Moody Cyberpunk Twilight City)
-    this.scene.background = new THREE.Color(0x0a0f1d);
-    this.scene.fog = new THREE.FogExp2(0x0a0f1d, 0.007);
+    // 1. Atmosphere and Fog (Clear Daytime Sky)
+    const skyColor = new THREE.Color(0x60a5fa); // Bright Clear Sky Blue
+    const horizonColor = new THREE.Color(0xbae6fd); // Soft Horizon Blue
+    this.scene.background = skyColor;
+    this.scene.fog = new THREE.FogExp2(0xbae6fd, 0.0032);
 
-    // 2. Lighting
+    // 2. Daytime Sunlight & Atmospheric Lighting
     this.setupLighting();
 
     // 3. Ground Plane
@@ -41,35 +43,36 @@ export class World {
   }
 
   private setupLighting(): void {
-    // Ambient moon / city light
-    const ambientLight = new THREE.AmbientLight(0x2d3748, 1.2);
+    // Soft natural daylight ambient fill
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
     this.scene.add(ambientLight);
 
-    // Hemisphere sky bounce
-    const hemiLight = new THREE.HemisphereLight(0x38bdf8, 0x0f172a, 0.7);
+    // Sky and ground color bounce
+    const hemiLight = new THREE.HemisphereLight(0x7dd3fc, 0x94a3b8, 1.15);
+    hemiLight.position.set(0, 100, 0);
     this.scene.add(hemiLight);
 
-    // Main moonlight / street directional light
-    const dirLight = new THREE.DirectionalLight(0x93c5fd, 1.8);
-    dirLight.position.set(80, 120, 60);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
-    dirLight.shadow.camera.near = 10;
-    dirLight.shadow.camera.far = 300;
-    dirLight.shadow.camera.left = -160;
-    dirLight.shadow.camera.right = 160;
-    dirLight.shadow.camera.top = 160;
-    dirLight.shadow.camera.bottom = -160;
-    dirLight.shadow.bias = -0.0005;
-    this.scene.add(dirLight);
+    // Bright Golden Sun Directional Light
+    const sunLight = new THREE.DirectionalLight(0xfffaed, 2.2);
+    sunLight.position.set(100, 160, 75);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 10;
+    sunLight.shadow.camera.far = 320;
+    sunLight.shadow.camera.left = -160;
+    sunLight.shadow.camera.right = 160;
+    sunLight.shadow.camera.top = 160;
+    sunLight.shadow.camera.bottom = -160;
+    sunLight.shadow.bias = -0.0003;
+    this.scene.add(sunLight);
   }
 
   private createGround(): THREE.Mesh {
     const groundGeo = new THREE.PlaneGeometry(420, 420, 32, 32);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x0f172a,
-      roughness: 0.9,
+      color: 0x334155, // Clean urban ground / asphalt foundation
+      roughness: 0.85,
       metalness: 0.1,
     });
     const ground = new THREE.Mesh(groundGeo, groundMat);

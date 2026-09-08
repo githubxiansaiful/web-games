@@ -134,20 +134,26 @@ export class Buildings {
     canvas.height = 128;
     const ctx = canvas.getContext('2d')!;
 
-    ctx.fillStyle = '#1e293b';
+    // Concrete facade background
+    ctx.fillStyle = '#334155';
     ctx.fillRect(0, 0, 128, 128);
 
-    // Draw grid of illuminated and dark windows
+    // Draw grid of daytime reflective windows
     const cols = 4;
     const rows = 4;
-    const winW = 16;
-    const winH = 20;
+    const winW = 18;
+    const winH = 22;
 
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        const isLit = (r + c * 3) % 2 === 0;
-        ctx.fillStyle = isLit ? '#fef08a' : '#0f172a';
-        ctx.fillRect(10 + c * 28, 8 + r * 28, winW, winH);
+        // Daytime sky reflection gradient
+        const isSkyReflect = (r + c) % 2 === 0;
+        ctx.fillStyle = isSkyReflect ? '#38bdf8' : '#0284c7';
+        ctx.fillRect(8 + c * 28, 6 + r * 28, winW, winH);
+
+        // Window white specular glare / frame
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.fillRect(8 + c * 28, 6 + r * 28, winW, 3);
       }
     }
 
