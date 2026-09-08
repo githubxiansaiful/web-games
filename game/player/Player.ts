@@ -41,6 +41,7 @@ export class Player implements Damageable {
   public fbxModel: THREE.Group | null = null;
   private mixer: THREE.AnimationMixer | null = null;
   private walkAction: THREE.AnimationAction | null = null;
+  private idleAction: THREE.AnimationAction | null = null;
   public isFbxLoaded: boolean = false;
 
   private world: World;
@@ -160,6 +161,25 @@ export class Player implements Damageable {
                 this.walkAction.clampWhenFinished = false;
                 this.walkAction.play();
                 this.walkAction.setEffectiveWeight(0);
+
+                // Check and load Idle animation if available
+                loader.load(
+                  '/models/character/idle.fbx',
+                  (idleFbx) => {
+                    if (idleFbx.animations.length > 0 && this.mixer) {
+                      const idleClip = idleFbx.animations[0];
+                      idleClip.name = 'idle';
+                      this.idleAction = this.mixer.clipAction(idleClip);
+                      this.idleAction.setLoop(THREE.LoopRepeat, Infinity);
+                      this.idleAction.play();
+                      this.idleAction.setEffectiveWeight(1.0);
+                    }
+                  },
+                  undefined,
+                  () => {
+                    // Idle animation not downloaded yet
+                  }
+                );
               }
             },
             undefined,
@@ -345,12 +365,22 @@ export class Player implements Damageable {
 
       if (this.walkAction) {
         if (this.isGrounded && horizontalSpeed > 0.3) {
-          const curWeight = this.walkAction.getEffectiveWeight();
-          this.walkAction.setEffectiveWeight(THREE.MathUtils.lerp(curWeight, 1.0, 12 * deltaTime));
+          const curWalk = this.walkAction.getEffectiveWeight();
+          this.walkAction.setEffectiveWeight(THREE.MathUtils.lerp(curWalk, 1.0, 12 * deltaTime));
           this.walkAction.timeScale = horizontalSpeed > 6.0 ? 1.6 : 1.1;
+
+          if (this.idleAction) {
+            const curIdle = this.idleAction.getEffectiveWeight();
+            this.idleAction.setEffectiveWeight(THREE.MathUtils.lerp(curIdle, 0.0, 12 * deltaTime));
+          }
         } else {
-          const curWeight = this.walkAction.getEffectiveWeight();
-          this.walkAction.setEffectiveWeight(THREE.MathUtils.lerp(curWeight, 0.0, 10 * deltaTime));
+          const curWalk = this.walkAction.getEffectiveWeight();
+          this.walkAction.setEffectiveWeight(THREE.MathUtils.lerp(curWalk, 0.0, 10 * deltaTime));
+
+          if (this.idleAction) {
+            const curIdle = this.idleAction.getEffectiveWeight();
+            this.idleAction.setEffectiveWeight(THREE.MathUtils.lerp(curIdle, 1.0, 10 * deltaTime));
+          }
         }
       }
     } else {
