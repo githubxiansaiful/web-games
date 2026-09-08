@@ -17,15 +17,25 @@ export class VehicleManager {
   }
 
   private spawnInitialVehicles(): void {
-    // 1. Player's Cyan Apex GT-99 parked near downtown plaza
-    const gtCar = new Vehicle(
-      VEHICLE_CONFIGS.gt_coupe,
+    // 1. Player's 2026 Lamborghini Fenomeno parked right in downtown plaza
+    const lambo = new Vehicle(
+      VEHICLE_CONFIGS.lamborghini_fenomeno,
       new THREE.Vector3(6, 0, 15),
       0, // Facing North
       this.world
     );
+    this.vehicles.push(lambo);
+    this.playerVehicle = lambo;
+    this.scene.add(lambo.mesh);
+
+    // 2. Cyan Apex GT-99 sports car
+    const gtCar = new Vehicle(
+      VEHICLE_CONFIGS.gt_coupe,
+      new THREE.Vector3(26, 0, 15),
+      0,
+      this.world
+    );
     this.vehicles.push(gtCar);
-    this.playerVehicle = gtCar;
     this.scene.add(gtCar.mesh);
 
     // 2. Metro Police Interceptor parked near Police Station HQ

@@ -29,6 +29,16 @@ export class Vehicle implements Damageable {
   private sirenLight: THREE.PointLight | null = null;
   private sirenTimer: number = 0;
 
+  // Custom 3D Vehicle Model (GLTF / GLB)
+  public customModel: THREE.Object3D | null = null;
+  public isCustomModelLoaded: boolean = false;
+  private proceduralRig: THREE.Group | null = null;
+  private frontWheelBones: THREE.Bone[] = [];
+  private rearWheelBones: THREE.Bone[] = [];
+  private steeringWheelBone: THREE.Bone | null = null;
+  private spoilerBone: THREE.Bone | null = null;
+  private wheelSpinAngle: number = 0;
+
   private soundManager: SoundManager;
   private world: World;
 
@@ -42,9 +52,75 @@ export class Vehicle implements Damageable {
     this.world = world;
     this.soundManager = SoundManager.getInstance();
 
-    this.mesh = this.buildVehicleMesh();
+    this.mesh = new THREE.Group();
+    this.mesh.name = `Vehicle_${config.id}`;
     this.mesh.position.copy(this.position);
     this.mesh.rotation.y = this.heading;
+
+    // 1. Build Procedural Rig (immediate visual fallback while 3D model loads)
+    this.proceduralRig = this.buildVehicleMesh();
+    this.mesh.add(this.proceduralRig);
+
+    // 2. Asynchronously load high-detail 3D car model if configured
+    if (this.config.modelPath) {
+      this.loadCustomModel(this.config.modelPath);
+    }
+  }
+
+  private loadCustomModel(path: string): void {
+    if (typeof window === 'undefined') return;
+
+    import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoader }) => {
+      const loader = new GLTFLoader();
+      loader.load(
+        path,
+        (gltf) => {
+          this.customModel = gltf.scene;
+
+          // Enable shadows and enhance PBR paint reflectiveness
+          gltf.scene.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              const mesh = child as THREE.Mesh;
+              if (mesh.material) {
+                const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+                mats.forEach((m) => {
+                  if (m.name === 'Paint' && 'roughness' in m) {
+                    (m as THREE.MeshStandardMaterial).roughness = 0.2;
+                    (m as THREE.MeshStandardMaterial).metalness = 0.85;
+                  }
+                });
+              }
+            }
+          });
+
+          // Identify skeletal animation bones for steering, spinning, and active aero
+          const fl = gltf.scene.getObjectByName('Wheel_Front_L_28');
+          const fr = gltf.scene.getObjectByName('Wheel_Front_R_30');
+          const rl = gltf.scene.getObjectByName('Wheel_Rear_L_32');
+          const rr = gltf.scene.getObjectByName('Wheel_Rear_R_34');
+          const sw = gltf.scene.getObjectByName('Animate_SteeringWheel_20');
+          const sp = gltf.scene.getObjectByName('Animate_Spoiler_16');
+
+          if (fl && (fl as THREE.Bone).isBone) this.frontWheelBones.push(fl as THREE.Bone);
+          if (fr && (fr as THREE.Bone).isBone) this.frontWheelBones.push(fr as THREE.Bone);
+          if (rl && (rl as THREE.Bone).isBone) this.rearWheelBones.push(rl as THREE.Bone);
+          if (rr && (rr as THREE.Bone).isBone) this.rearWheelBones.push(rr as THREE.Bone);
+          if (sw && (sw as THREE.Bone).isBone) this.steeringWheelBone = sw as THREE.Bone;
+          if (sp && (sp as THREE.Bone).isBone) this.spoilerBone = sp as THREE.Bone;
+
+          // Hide procedural box car and display the realistic 3D vehicle
+          if (this.proceduralRig) {
+            this.proceduralRig.visible = false;
+          }
+          this.mesh.add(gltf.scene);
+          this.isCustomModelLoaded = true;
+        },
+        undefined,
+        (err) => console.warn(`Failed loading custom vehicle model ${path}:`, err)
+      );
+    });
   }
 
   private buildVehicleMesh(): THREE.Group {
@@ -237,6 +313,33 @@ export class Vehicle implements Damageable {
     this.wheels.forEach((w) => {
       w.rotation.x += wheelRotDelta;
     });
+
+    // Custom 3D Vehicle Skeletal Animation (Wheel steer & spin, Cockpit steering wheel, Active Aero Spoiler)
+    if (this.isCustomModelLoaded) {
+      this.wheelSpinAngle += (this.speed / 0.35) * deltaTime;
+
+      this.frontWheelBones.forEach((b) => {
+        b.rotation.x = this.wheelSpinAngle;
+        b.rotation.y = this.steerAngle;
+      });
+
+      this.rearWheelBones.forEach((b) => {
+        b.rotation.x = this.wheelSpinAngle;
+      });
+
+      if (this.steeringWheelBone) {
+        this.steeringWheelBone.rotation.z = -this.steerAngle * 2.2;
+      }
+
+      if (this.spoilerBone) {
+        const targetSpoiler = Math.abs(this.speed) > 18 ? -0.22 : 0;
+        this.spoilerBone.rotation.x = THREE.MathUtils.lerp(
+          this.spoilerBone.rotation.x,
+          targetSpoiler,
+          5 * deltaTime
+        );
+      }
+    }
 
     // 7. Police Siren Flasher (Alternating Red/Blue)
     if (this.config.hasSiren && this.sirenMesh && this.sirenLight) {

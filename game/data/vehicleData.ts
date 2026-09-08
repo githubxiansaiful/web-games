@@ -12,9 +12,26 @@ export interface VehicleConfig {
   primaryColor: number;
   roofColor?: number;
   hasSiren?: boolean;
+  modelPath?: string;
 }
 
 export const VEHICLE_CONFIGS: Record<string, VehicleConfig> = {
+  lamborghini_fenomeno: {
+    id: 'lamborghini_fenomeno',
+    name: 'Lamborghini Fenomeno 2026',
+    type: 'sports',
+    maxSpeed: 62, // ~223 km/h
+    reverseMaxSpeed: 20,
+    acceleration: 36, // Explosive hypercar acceleration
+    brakeForce: 50, // Carbon ceramic brakes
+    turnSpeed: 3.2,
+    mass: 1420,
+    health: 600,
+    primaryColor: 0xeab308, // Giallo Auge Lamborghini Yellow
+    roofColor: 0x09090b,
+    hasSiren: false,
+    modelPath: '/models/vehicles/lamborghini.glb',
+  },
   gt_coupe: {
     id: 'gt_coupe',
     name: 'Apex GT-99',
