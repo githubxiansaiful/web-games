@@ -19,6 +19,7 @@ import {
   Rocket,
   ArrowUpRight,
   UserCheck,
+  User as UserIcon,
   AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -124,18 +125,31 @@ export const GameWorldHome: React.FC = () => {
         <div className="flex items-center gap-2 sm:gap-3">
           {user ? (
             <div className="flex items-center gap-2">
-              {/* Player Profile Capsule */}
-              <div className="flex items-center gap-2.5 bg-slate-900 border border-slate-700/80 rounded-2xl px-3 py-1.5 text-xs shadow-md">
+              {/* Player Profile Capsule (Links to /profile) */}
+              <Link
+                href="/profile"
+                className="flex items-center gap-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-700/80 hover:border-indigo-500/60 rounded-2xl px-3 py-1.5 text-xs shadow-md transition group cursor-pointer"
+                title="Manage Player Profile & Game Stats"
+              >
                 <UserAvatar avatar={user.avatar} name={user.name} size="sm" />
                 <div className="text-left hidden sm:block">
-                  <div className="font-bold text-white leading-none">{user.name}</div>
+                  <div className="font-bold text-white group-hover:text-indigo-300 transition leading-none">{user.name}</div>
                   <div className="text-[10px] text-amber-400 font-semibold flex items-center gap-1 mt-0.5">
                     <span>★ {user.stats?.runnerStars ?? 0}</span>
                     <span className="text-slate-500">•</span>
                     <span>🪙 {user.stats?.coinsTotal ?? 0}</span>
                   </div>
                 </div>
-              </div>
+              </Link>
+
+              {/* Direct Profile Link Button (Mobile / Desktop) */}
+              <Link
+                href="/profile"
+                className="p-2 bg-slate-900 hover:bg-indigo-950/70 border border-slate-700 hover:border-indigo-500/50 rounded-xl text-slate-400 hover:text-indigo-300 transition cursor-pointer"
+                title="Player Profile & Settings"
+              >
+                <UserIcon className="w-4 h-4" />
+              </Link>
 
               {/* Admin Portal Button (for Admins) */}
               {isAdmin && (
@@ -151,7 +165,7 @@ export const GameWorldHome: React.FC = () => {
               {/* Logout */}
               <button
                 onClick={logout}
-                className="p-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-slate-400 hover:text-white transition cursor-pointer"
+                className="p-2 bg-slate-900 hover:bg-rose-950/60 border border-slate-700 hover:border-rose-700/60 rounded-xl text-slate-400 hover:text-rose-300 transition cursor-pointer"
                 title="Sign Out"
               >
                 <LogOut className="w-4 h-4" />

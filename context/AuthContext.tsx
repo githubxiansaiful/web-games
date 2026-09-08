@@ -36,7 +36,8 @@ interface AuthContextType {
   loginWithGoogle: (googleData: { email: string; name?: string; avatar?: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  updateProfile: (data: { name?: string; avatar?: string; newPassword?: string }) => Promise<{ success: boolean; error?: string }>;
+  updateProfile: (data: { name?: string; avatar?: string; currentPassword?: string; newPassword?: string }) => Promise<{ success: boolean; error?: string }>;
+  deleteAccount: () => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -177,7 +178,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateProfile = async (data: { name?: string; avatar?: string; newPassword?: string }) => {
+  const updateProfile = async (data: { name?: string; avatar?: string; currentPassword?: string; newPassword?: string }) => {
     if (!user) return { success: false, error: 'Not logged in' };
     try {
       const res = await fetch('/api/auth/me', {
@@ -188,6 +189,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const resData = await res.json();
       if (!res.ok) return { success: false, error: resData.error || 'Update failed' };
       setUser(resData.user);
+      if (typeof window !== 'undefined' && resData.user?.name) {
+        localStorage.setItem('runner_player_name', resData.user.name);
+      }
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error' };
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (!user) return { success: false, error: 'Not logged in' };
+    try {
+      const res = await fetch('/api/auth/me', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      });
+      const resData = await res.json();
+      if (!res.ok) return { success: false, error: resData.error || 'Account deletion failed' };
+      setUser(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('xian_active_user_id');
+        localStorage.removeItem('runner_player_name');
+      }
       return { success: true };
     } catch (e: any) {
       return { success: false, error: e?.message || 'Network error' };
@@ -212,6 +237,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         refreshUser: fetchCurrentUser,
         updateProfile,
+        deleteAccount,
       }}
     >
       {children}

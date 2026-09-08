@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db, hashPassword } from '@/lib/db';
+import { db, hashPassword, verifyPassword } from '@/lib/db';
 import { sendAccountDeletedEmail, sendPasswordResetEmail } from '@/lib/email';
 
 export async function GET(req: Request) {
@@ -59,6 +59,11 @@ export async function PUT(req: Request) {
     if (newPassword) {
       if (newPassword.length < 6) {
         return NextResponse.json({ error: 'New password must be at least 6 characters long.' }, { status: 400 });
+      }
+      if (user.passwordHash && currentPassword) {
+        if (!verifyPassword(currentPassword, user.passwordHash)) {
+          return NextResponse.json({ error: 'Current password is incorrect.' }, { status: 400 });
+        }
       }
       updates.passwordHash = hashPassword(newPassword);
 
