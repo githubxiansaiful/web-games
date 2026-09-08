@@ -124,13 +124,7 @@ export class Player implements Damageable {
           });
 
           if (rightHandBone) {
-            const gunGeo = new THREE.BoxGeometry(6, 12, 38);
-            const gunMat = new THREE.MeshStandardMaterial({ color: 0x09090b, metalness: 0.9, roughness: 0.2 });
-            const handGun = new THREE.Mesh(gunGeo, gunMat);
-            handGun.castShadow = true;
-            handGun.position.set(0, -6, 14);
-            handGun.rotation.x = -Math.PI / 2;
-            (rightHandBone as THREE.Bone).add(handGun);
+            this.attachWeaponToHand(rightHandBone, gltfLoader);
           }
 
           // Create AnimationMixer for Maria
@@ -183,13 +177,7 @@ export class Player implements Damageable {
         });
 
         if (rightHandBone) {
-          const gunGeo = new THREE.BoxGeometry(6, 12, 38);
-          const gunMat = new THREE.MeshStandardMaterial({ color: 0x09090b, metalness: 0.9, roughness: 0.2 });
-          const handGun = new THREE.Mesh(gunGeo, gunMat);
-          handGun.castShadow = true;
-          handGun.position.set(0, -6, 14);
-          handGun.rotation.x = -Math.PI / 2;
-          (rightHandBone as THREE.Bone).add(handGun);
+          this.attachWeaponToHand(rightHandBone);
         }
 
         this.mixer = new THREE.AnimationMixer(fbx);
@@ -202,6 +190,53 @@ export class Player implements Damageable {
       undefined,
       (err: any) => console.warn('Failed loading xbot.fbx fallback:', err)
     );
+  }
+
+  private attachWeaponToHand(handBone: THREE.Bone, gltfLoader?: any): void {
+    // 1. Immediate procedural fallback firearm mesh
+    const gunGeo = new THREE.BoxGeometry(6, 12, 38);
+    const gunMat = new THREE.MeshStandardMaterial({ color: 0x09090b, metalness: 0.9, roughness: 0.2 });
+    const handGun = new THREE.Mesh(gunGeo, gunMat);
+    handGun.castShadow = true;
+    handGun.position.set(0, -6, 14);
+    handGun.rotation.x = -Math.PI / 2;
+    handBone.add(handGun);
+
+    // 2. Asynchronously load high-detail 3D tactical PDW gun model
+    const loadGun = (loader: any) => {
+      loader.load(
+        '/models/weapons/gun.glb',
+        (gunGltf: any) => {
+          const realGun = gunGltf.scene;
+          // Scale to fit human hands naturally in centimeter-scaled bone space
+          realGun.scale.setScalar(72);
+          // Position grip inside palm and point barrel forward
+          realGun.position.set(0, -5, 10);
+          realGun.rotation.set(-Math.PI / 2, 0, 0);
+
+          realGun.traverse((child: any) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
+          });
+
+          // Replace placeholder box with detailed 3D weapon
+          handGun.visible = false;
+          handBone.add(realGun);
+        },
+        undefined,
+        (err: any) => console.warn('Failed loading /models/weapons/gun.glb:', err)
+      );
+    };
+
+    if (gltfLoader) {
+      loadGun(gltfLoader);
+    } else if (typeof window !== 'undefined') {
+      import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoader }) => {
+        loadGun(new GLTFLoader());
+      });
+    }
   }
 
   private loadAnimations(loader: any): void {

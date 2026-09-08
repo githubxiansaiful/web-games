@@ -11,6 +11,7 @@ export interface WeaponConfig {
   spread: number;
   color: string;
   icon: string;
+  modelPath?: string;
 }
 
 export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
@@ -30,17 +31,18 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
   },
   smg: {
     id: 'smg',
-    name: 'Neon Vector SMG',
+    name: 'Tactical PDW-9',
     type: 'smg',
-    damage: 18,
-    fireRate: 110,
+    damage: 22,
+    fireRate: 105,
     magazineSize: 32,
-    reloadTime: 1800,
-    range: 90,
+    reloadTime: 1600,
+    range: 110,
     pellets: 1,
-    spread: 0.055,
+    spread: 0.045,
     color: '#a855f7',
     icon: '⚡',
+    modelPath: '/models/weapons/gun.glb',
   },
   shotgun: {
     id: 'shotgun',
