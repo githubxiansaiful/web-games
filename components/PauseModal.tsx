@@ -1,0 +1,89 @@
+'use client';
+
+import React from 'react';
+import { Play, RotateCcw, Layers, HelpCircle, X } from 'lucide-react';
+
+interface PauseModalProps {
+  isOpen: boolean;
+  onResume: () => void;
+  onRestart: () => void;
+  onOpenLevelSelect: () => void;
+}
+
+export const PauseModal: React.FC<PauseModalProps> = ({
+  isOpen,
+  onResume,
+  onRestart,
+  onOpenLevelSelect,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl text-center text-white relative max-h-[92vh] overflow-y-auto">
+        <button
+          onClick={onResume}
+          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <h2 className="text-2xl font-black tracking-tight mb-2">GAME PAUSED</h2>
+        <p className="text-xs text-slate-400 mb-5">Take a breather, hero!</p>
+
+        {/* Action buttons */}
+        <div className="flex flex-col gap-2.5 mb-6">
+          <button
+            onClick={onResume}
+            className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-sm text-white shadow-md flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
+          >
+            <Play className="w-4 h-4 fill-current" />
+            <span>Resume Game (Esc / P)</span>
+          </button>
+
+          <button
+            onClick={onRestart}
+            className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl font-bold text-sm text-slate-200 hover:text-white flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
+          >
+            <RotateCcw className="w-4 h-4 text-amber-400" />
+            <span>Restart Stage (R)</span>
+          </button>
+
+          <button
+            onClick={onOpenLevelSelect}
+            className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl font-bold text-sm text-slate-200 hover:text-white flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
+          >
+            <Layers className="w-4 h-4 text-sky-400" />
+            <span>Select Stage</span>
+          </button>
+        </div>
+
+        {/* Controls Quick Reference */}
+        <div className="bg-slate-800/60 rounded-2xl p-3.5 border border-slate-700/60 text-left">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 mb-2.5">
+            <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Controls Guide</span>
+          </div>
+          <div className="space-y-1.5 text-xs text-slate-300">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-400">Run Left / Right:</span>
+              <span className="font-mono bg-slate-700/70 px-1.5 py-0.5 rounded text-[11px]">A / D or ← / →</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-400">Jump:</span>
+              <span className="font-mono bg-slate-700/70 px-1.5 py-0.5 rounded text-[11px]">W / ↑ or Space</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-400">Double Jump:</span>
+              <span className="font-mono bg-slate-700/70 px-1.5 py-0.5 rounded text-[11px]">Jump again in mid-air</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-400">Quick Respawn:</span>
+              <span className="font-mono bg-slate-700/70 px-1.5 py-0.5 rounded text-[11px]">R</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
