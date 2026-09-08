@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sendWelcomeEmail } from '@/lib/email';
+import { getAuthenticatedAdmin } from '@/lib/adminAuth';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { admin, error, status } = await getAuthenticatedAdmin(req);
+    if (!admin) {
+      return NextResponse.json({ error }, { status: status || 401 });
+    }
+
     const users = await db.getUsers();
     const safeUsers = users.map((u) => ({
       id: u.id,
@@ -24,7 +30,12 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const { name, email, password, role, status } = await req.json();
+    const { admin, error, status } = await getAuthenticatedAdmin(req);
+    if (!admin) {
+      return NextResponse.json({ error }, { status: status || 401 });
+    }
+
+    const { name, email, password, role, status: userStatus } = await req.json();
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: 'Name, email, and password are required.' }, { status: 400 });
@@ -38,8 +49,8 @@ export async function POST(req: Request) {
       avatar: role === 'admin' ? '👑' : '🎮',
     });
 
-    if (status && status !== 'active') {
-      await db.updateUser(newUser.id, { status });
+    if (userStatus && userStatus !== 'active') {
+      await db.updateUser(newUser.id, { status: userStatus });
     }
 
     // Send welcome email via SMTP

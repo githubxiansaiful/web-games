@@ -107,9 +107,19 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'User not found.' }, { status: 404 });
     }
 
-    // Do not allow deleting super admin account
-    if (user.email === 'xiansaiful@gmail.com') {
-      return NextResponse.json({ error: 'Super administrator account cannot be deleted.' }, { status: 403 });
+    // Do not allow deleting super admin or last active admin account
+    const configuredEmail = (process.env.ADMIN_EMAIL || 'xiansaiful@gmail.com').trim().toLowerCase();
+    const isSuper = user.email.toLowerCase() === configuredEmail || user.id === 'usr_admin_xian' || user.id === 'usr_admin_initial';
+    if (isSuper) {
+      return NextResponse.json({ error: 'Security Violation: The primary Super Administrator account cannot be deleted.' }, { status: 403 });
+    }
+
+    if (user.role === 'admin' && user.status === 'active') {
+      const allUsers = await db.getUsers();
+      const remainingActiveAdmins = allUsers.filter(u => u.role === 'admin' && u.status === 'active' && u.id !== user.id);
+      if (remainingActiveAdmins.length === 0) {
+        return NextResponse.json({ error: 'System Lockout Protection: Cannot delete the last remaining active administrator.' }, { status: 400 });
+      }
     }
 
     await db.deleteUser(userId);

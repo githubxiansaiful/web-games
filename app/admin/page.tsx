@@ -194,10 +194,38 @@ export default function AdminPage() {
     }
   };
 
+  // Helper to check if a user is the primary super admin
+  const isTargetSuperAdmin = (u: AuthUser) => {
+    return u.id === 'usr_admin_xian' || u.id === 'usr_admin_initial' || u.email.toLowerCase() === 'xiansaiful@gmail.com';
+  };
+
   // Handle Edit User
   const handleSaveEditUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
+
+    if (editingUser.id === user?.id) {
+      if (editingUser.status !== 'active') {
+        alert('Security Violation: You cannot suspend your own administrator account!');
+        return;
+      }
+      if (editingUser.role !== 'admin') {
+        alert('Security Violation: You cannot demote your own administrator role!');
+        return;
+      }
+    }
+
+    if (isTargetSuperAdmin(editingUser)) {
+      if (editingUser.status !== 'active') {
+        alert('Protected Account: The primary Super Admin account cannot be suspended!');
+        return;
+      }
+      if (editingUser.role !== 'admin') {
+        alert('Protected Account: The primary Super Admin role cannot be revoked!');
+        return;
+      }
+    }
+
     try {
       const res = await fetch(`/api/admin/users/${editingUser.id}`, {
         method: 'PUT',
@@ -208,17 +236,25 @@ export default function AdminPage() {
           status: editingUser.status,
         }),
       });
-      if (res.ok) {
+      const data = await res.json();
+      if (res.ok && data.success) {
         setEditingUser(null);
         fetchAdminData();
+      } else {
+        alert(data.error || 'Failed to update user');
       }
     } catch {
-      // ignore
+      alert('Network error while saving user');
     }
   };
 
   // Handle Reset Password
   const handleResetPassword = async (u: AuthUser) => {
+    if (isTargetSuperAdmin(u) && u.id !== user?.id) {
+      alert('Protected Account: Only the Super Admin themselves can reset their password.');
+      return;
+    }
+
     if (!confirm(`Are you sure you want to reset password for ${u.email}? A temporary password and notification email will be dispatched via Google SMTP.`)) {
       return;
     }
@@ -240,8 +276,12 @@ export default function AdminPage() {
 
   // Handle Delete User
   const handleDeleteUser = async (u: AuthUser) => {
-    if (u.email === 'xiansaiful@gmail.com') {
-      alert('Super admin account cannot be deleted!');
+    if (u.id === user?.id) {
+      alert('Security Violation: You cannot delete your own account from the admin dashboard!');
+      return;
+    }
+    if (isTargetSuperAdmin(u)) {
+      alert('Protected Account: Super admin account cannot be deleted!');
       return;
     }
     if (!confirm(`WARNING: Are you sure you want to permanently delete user ${u.name} (${u.email})? A deletion confirmation email will be sent via SMTP.`)) {
@@ -647,64 +687,83 @@ export default function AdminPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/70">
-                      {filteredUsers.map((u) => (
-                        <tr key={u.id} className="hover:bg-slate-850/50 transition">
-                          <td className="p-3">
-                            <div className="flex items-center gap-2">
-                              <UserAvatar avatar={u.avatar} name={u.name} size="sm" />
-                              <span className="font-bold text-white">{u.name}</span>
-                            </div>
-                          </td>
-                          <td className="p-3 text-slate-300 font-mono text-[11px]">{u.email}</td>
-                          <td className="p-3">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                              u.role === 'admin'
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                            }`}>
-                              {u.role}
-                            </span>
-                          </td>
-                          <td className="p-3">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                              u.status === 'active'
-                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                            }`}>
-                              {u.status}
-                            </span>
-                          </td>
-                          <td className="p-3 text-amber-400 font-bold">★ {u.stats?.runnerStars ?? 0}</td>
-                          <td className="p-3 text-cyan-400 font-mono">{(u.stats?.spaceHighScore ?? 0).toLocaleString()}</td>
-                          <td className="p-3 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                onClick={() => setEditingUser(u)}
-                                className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition cursor-pointer"
-                                title="Edit User"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleResetPassword(u)}
-                                className="p-1.5 bg-slate-800 hover:bg-amber-950 text-slate-300 hover:text-amber-400 rounded-lg transition cursor-pointer"
-                                title="Reset Password & Send Email"
-                              >
-                                <Key className="w-3.5 h-3.5" />
-                              </button>
-                              {u.email !== 'xiansaiful@gmail.com' && (
+                      {filteredUsers.map((u) => {
+                        const isSelf = u.id === user?.id;
+                        const isSuper = isTargetSuperAdmin(u);
+
+                        return (
+                          <tr key={u.id} className="hover:bg-slate-850/50 transition">
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                <UserAvatar avatar={u.avatar} name={u.name} size="sm" />
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-white">{u.name}</span>
+                                  {isSelf && (
+                                    <span className="px-1.5 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 rounded text-[9px] font-black uppercase">
+                                      YOU
+                                    </span>
+                                  )}
+                                  {isSuper && (
+                                    <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded text-[9px] font-black uppercase">
+                                      👑 Super Admin
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-3 text-slate-300 font-mono text-[11px]">{u.email}</td>
+                            <td className="p-3">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                u.role === 'admin'
+                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                  : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                              }`}>
+                                {u.role}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                u.status === 'active'
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                              }`}>
+                                {u.status}
+                              </span>
+                            </td>
+                            <td className="p-3 text-amber-400 font-bold">★ {u.stats?.runnerStars ?? 0}</td>
+                            <td className="p-3 text-cyan-400 font-mono">{(u.stats?.spaceHighScore ?? 0).toLocaleString()}</td>
+                            <td className="p-3 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
                                 <button
-                                  onClick={() => handleDeleteUser(u)}
-                                  className="p-1.5 bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 rounded-lg transition cursor-pointer"
-                                  title="Delete User"
+                                  onClick={() => setEditingUser(u)}
+                                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition cursor-pointer"
+                                  title="Edit User Profile"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <Edit2 className="w-3.5 h-3.5" />
                                 </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                                {(!isSuper || isSelf) && (
+                                  <button
+                                    onClick={() => handleResetPassword(u)}
+                                    className="p-1.5 bg-slate-800 hover:bg-amber-950 text-slate-300 hover:text-amber-400 rounded-lg transition cursor-pointer"
+                                    title="Reset Password & Send Email"
+                                  >
+                                    <Key className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                {!isSelf && !isSuper && (
+                                  <button
+                                    onClick={() => handleDeleteUser(u)}
+                                    className="p-1.5 bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 rounded-lg transition cursor-pointer"
+                                    title="Delete User"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -957,65 +1016,116 @@ export default function AdminPage() {
       )}
 
       {/* Edit User Modal */}
-      {editingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-sm w-full p-6 text-white shadow-2xl">
-            <h3 className="text-lg font-black mb-1">Edit User Profile</h3>
-            <p className="text-xs text-slate-400 mb-4">{editingUser.email}</p>
+      {editingUser && (() => {
+        const isSelfEdit = editingUser.id === user?.id;
+        const isSuperEdit = isTargetSuperAdmin(editingUser);
 
-            <form onSubmit={handleSaveEditUser} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Player Name</label>
-                <input
-                  type="text"
-                  required
-                  value={editingUser.name}
-                  onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
-                />
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-sm w-full p-6 text-white shadow-2xl">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-lg font-black text-white">Edit User Profile</h3>
+                {isSuperEdit && (
+                  <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded text-[10px] font-black uppercase">
+                    👑 Super Admin
+                  </span>
+                )}
+                {isSelfEdit && !isSuperEdit && (
+                  <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 rounded text-[10px] font-black uppercase">
+                    You
+                  </span>
+                )}
               </div>
-              <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Role</label>
-                <select
-                  value={editingUser.role}
-                  onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as any })}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
-                >
-                  <option value="user">User</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Status</label>
-                <select
-                  value={editingUser.status}
-                  onChange={(e) => setEditingUser({ ...editingUser, status: e.target.value as any })}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
-                >
-                  <option value="active">Active</option>
-                  <option value="suspended">Suspended</option>
-                </select>
-              </div>
+              <p className="text-xs text-slate-400 mb-4">{editingUser.email}</p>
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 font-bold rounded-xl text-white cursor-pointer"
-                >
-                  Save Changes
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditingUser(null)}
-                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+              {isSelfEdit && (
+                <div className="mb-3 p-2.5 bg-indigo-950/60 border border-indigo-500/40 rounded-xl text-[11px] text-indigo-200">
+                  🛡️ You are editing your own administrator account. You cannot suspend or demote yourself.
+                </div>
+              )}
+
+              {isSuperEdit && !isSelfEdit && (
+                <div className="mb-3 p-2.5 bg-amber-950/60 border border-amber-500/40 rounded-xl text-[11px] text-amber-200">
+                  👑 Super Admin account privileges and active status are immutable.
+                </div>
+              )}
+
+              <form onSubmit={handleSaveEditUser} className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-slate-300 mb-1 font-semibold">Player Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingUser.name}
+                    onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 mb-1 font-semibold">Role</label>
+                  {isSelfEdit || isSuperEdit ? (
+                    <div>
+                      <input
+                        type="text"
+                        disabled
+                        value="admin (Locked - Cannot Demote)"
+                        className="w-full bg-slate-800/60 border border-slate-700 text-slate-400 rounded-xl px-3 py-2 cursor-not-allowed font-medium"
+                      />
+                    </div>
+                  ) : (
+                    <select
+                      value={editingUser.role}
+                      onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as any })}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    >
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-slate-300 mb-1 font-semibold">Status</label>
+                  {isSelfEdit || isSuperEdit ? (
+                    <div>
+                      <input
+                        type="text"
+                        disabled
+                        value="active (Locked - Cannot Suspend)"
+                        className="w-full bg-slate-800/60 border border-slate-700 text-emerald-400 rounded-xl px-3 py-2 cursor-not-allowed font-medium"
+                      />
+                    </div>
+                  ) : (
+                    <select
+                      value={editingUser.status}
+                      onChange={(e) => setEditingUser({ ...editingUser, status: e.target.value as any })}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    >
+                      <option value="active">Active</option>
+                      <option value="suspended">Suspended</option>
+                    </select>
+                  )}
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 font-bold rounded-xl text-white cursor-pointer"
+                  >
+                    Save Changes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser(null)}
+                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Email Preview Modal */}
       {selectedEmailPreview && (

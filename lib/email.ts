@@ -1,14 +1,14 @@
 import nodemailer, { type Transporter } from 'nodemailer';
 import { db } from './db';
 
-// Gmail SMTP configuration provided by user
+// Gmail SMTP configuration
 const SMTP_CONFIG = {
   host: process.env.SMTP_SERVER || 'smtp.gmail.com',
   port: parseInt(process.env.SMTP_PORT || '465', 10),
   secure: true, // true for 465, false for other ports
   auth: {
     user: process.env.SMTP_USERNAME || 'sharedxian@gmail.com',
-    pass: process.env.SMTP_PASSWORD || 'znip qphc zjmd smgq',
+    pass: process.env.SMTP_PASSWORD || process.env.SMTP_APP_PASSWORD || '',
   },
 };
 

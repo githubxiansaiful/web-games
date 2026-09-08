@@ -34,17 +34,30 @@ import { MultiplayerRaceHUD } from './MultiplayerRaceHUD';
 import { MultiplayerPodiumModal } from './MultiplayerPodiumModal';
 import { multiplayer } from '@/lib/multiplayerClient';
 import { RoomState, RemotePlayerState } from '@/lib/multiplayerTypes';
+import { useAuth } from '@/context/AuthContext';
 
 export const GameCanvas: React.FC = () => {
+  const { user, refreshUser } = useAuth();
+  const userRef = useRef(user);
+  userRef.current = user;
+  const refreshUserRef = useRef(refreshUser);
+  refreshUserRef.current = refreshUser;
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // App / Game Screen Mode: 'home' | 'lobby' | 'game'
   const [appMode, setAppMode] = useState<'home' | 'lobby' | 'game'>('home');
   const [isMultiplayer, setIsMultiplayer] = useState<boolean>(false);
 
-  // Player Profile
-  const [playerName, setPlayerName] = useState<string>('Runner');
+  // Player Profile (sync with logged-in user)
+  const [playerName, setPlayerName] = useState<string>(user?.name || 'Runner');
   const [playerColor, setPlayerColor] = useState<string>('#06b6d4');
+
+  useEffect(() => {
+    if (user?.name) {
+      setPlayerName(user.name);
+    }
+  }, [user?.name]);
 
   // Multiplayer Room State
   const [room, setRoom] = useState<RoomState | null>(null);
@@ -577,6 +590,24 @@ export const GameCanvas: React.FC = () => {
               setMyFinished(true);
               multiplayer.sendFinished(statsRef.current.time, statsRef.current.coins);
 
+              // Persist multiplayer completion & coins to PostgreSQL database
+              const activeUser = userRef.current;
+              fetch('/api/games/stats', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: activeUser?.id,
+                  gameId: 'runner-royale',
+                  stats: activeUser?.id
+                    ? {
+                        coinsTotal: (activeUser.stats?.coinsTotal || 0) + statsRef.current.coins,
+                      }
+                    : undefined,
+                }),
+              })
+                .then(() => refreshUserRef.current?.())
+                .catch(() => {});
+
               setTimeout(() => {
                 setIsPodiumOpen(true);
               }, 800);
@@ -585,7 +616,7 @@ export const GameCanvas: React.FC = () => {
               const currentLevel = levelRef.current;
               const collected = statsRef.current.coins;
               const total = currentLevel.coins.length;
-              const elapsed = statsRef.current.time;
+              const elapsed = parseFloat(statsRef.current.time.toFixed(1));
 
               let stars = 1;
               if (collected >= Math.floor(total * 0.75)) stars = 2;
@@ -593,6 +624,30 @@ export const GameCanvas: React.FC = () => {
 
               setEarnedStars(stars);
               saveProgress(currentLevel.id, stars, elapsed, collected, total);
+
+              // Persist runner stats, stars, best time, and coins to PostgreSQL database
+              const activeUser = userRef.current;
+              const currentStars = activeUser?.stats?.runnerStars || 0;
+              const currentBestTime = activeUser?.stats?.runnerBestTime;
+              const newBestTime = currentBestTime ? Math.min(currentBestTime, elapsed) : elapsed;
+
+              fetch('/api/games/stats', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: activeUser?.id,
+                  gameId: 'runner-royale',
+                  stats: activeUser?.id
+                    ? {
+                        runnerStars: Math.max(currentStars, stars),
+                        runnerBestTime: newBestTime,
+                        coinsTotal: (activeUser.stats?.coinsTotal || 0) + collected,
+                      }
+                    : undefined,
+                }),
+              })
+                .then(() => refreshUserRef.current?.())
+                .catch(() => {});
 
               setTimeout(() => {
                 setIsVictory(true);

@@ -29,12 +29,11 @@ class MultiplayerClient {
       window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1';
 
-    // On localhost, default to local server; on remote (e.g. Vercel), require NEXT_PUBLIC_SOCKET_URL
-    const targetUrl = customSocketUrl || (isLocalhost ? window.location.origin : '');
+    // If NEXT_PUBLIC_SOCKET_URL is set, use it; otherwise connect directly to the current host (works on localhost, VPS, and custom domains)
+    const targetUrl = customSocketUrl || (typeof window !== 'undefined' && window.location.origin ? window.location.origin : '');
 
     if (!targetUrl) {
-      // Running on a serverless host (such as Vercel) without external socket server configured.
-      // Immediately activate local multi-tab fallback mode without polling 404s.
+      // Running in an unsupported environment without URL configured
       this.enableFallbackMode();
       return;
     }
