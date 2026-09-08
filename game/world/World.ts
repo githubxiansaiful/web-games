@@ -42,16 +42,16 @@ export class World {
     this.lakeMesh = this.createInlandLake();
     this.scene.add(this.lakeMesh);
 
-    // 6. SVG Roads & Arched Bridges (anchored to terrain elevation)
+    // 6. SVG Roads & Arched Bridges (anchored to terrain elevation with sidewalks & curbs)
     this.roads = new Roads(this.terrain.getHeightAt);
     this.scene.add(this.roads.group);
 
-    // 7. Buildings across all 20 Districts (anchored to terrain elevation)
-    this.buildings = new Buildings(this.terrain.getHeightAt);
+    // 7. Buildings across all 20 Districts (with road clearance & architecture)
+    this.buildings = new Buildings(this.roads, this.terrain.getHeightAt);
     this.scene.add(this.buildings.group);
 
-    // 8. Props (Trees, Streetlights, Dumpsters, Barriers) anchored to terrain
-    this.props = new Props(this.buildings, this.terrain.getHeightAt);
+    // 8. Props (Trees, Streetlights, Dumpsters, Barriers) strictly off roads
+    this.props = new Props(this.buildings, this.roads, this.terrain.getHeightAt);
     this.scene.add(this.props.group);
   }
 

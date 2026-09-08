@@ -278,6 +278,9 @@ export class Player implements Damageable {
   public enterVehicle(vehicle: Vehicle): void {
     this.currentVehicle = vehicle;
     this.state = 'driving';
+    this.mesh.visible = false;
+    this.position.copy(vehicle.position);
+    this.mesh.position.copy(vehicle.position);
     vehicle.enter(true);
     this.eventBus.emit('PLAYER_ENTERED_VEHICLE', { vehicleId: vehicle.id });
   }
@@ -286,11 +289,12 @@ export class Player implements Damageable {
     if (!this.currentVehicle) return;
     const exitPos = this.currentVehicle.exit();
     this.position.copy(exitPos);
-    this.position.y = 0;
+    this.position.y = this.world.getGroundHeight(exitPos.x, exitPos.z);
     this.velocity.set(0, 0, 0);
     this.currentVehicle = null;
     this.state = 'idle';
     this.mesh.visible = true;
+    this.mesh.position.copy(this.position);
     this.eventBus.emit('PLAYER_EXITED_VEHICLE');
   }
 

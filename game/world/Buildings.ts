@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { ISLAND_DISTRICTS, DistrictInfo } from '../data/islandMapData';
+import { ISLAND_DISTRICTS } from '../data/islandMapData';
+import { Roads } from './Roads';
 
 export interface ObstacleCollider {
   id: string;
@@ -18,33 +19,67 @@ export class Buildings {
   public group: THREE.Group;
   public colliders: ObstacleCollider[] = [];
 
-  constructor(getHeight?: (x: number, z: number) => number) {
+  constructor(roads?: Roads, getHeight?: (x: number, z: number) => number) {
     this.group = new THREE.Group();
     this.group.name = 'IslandBuildings';
-    this.buildDistrictBuildings(getHeight);
+    this.buildDistrictBuildings(roads, getHeight);
   }
 
-  private buildDistrictBuildings(getHeight?: (x: number, z: number) => number): void {
-    const windowTexture = this.generateWindowTexture();
+  private buildDistrictBuildings(roads?: Roads, getHeight?: (x: number, z: number) => number): void {
+    const textures: Record<string, THREE.CanvasTexture> = {
+      skyscraper: this.generateFacadeTexture('skyscraper'),
+      commercial: this.generateFacadeTexture('commercial'),
+      residential: this.generateFacadeTexture('residential'),
+      industrial: this.generateFacadeTexture('industrial'),
+      resort: this.generateFacadeTexture('resort'),
+      airport: this.generateFacadeTexture('industrial'),
+    };
+
+    const rooftopUnitMat = new THREE.MeshStandardMaterial({
+      color: 0x475569,
+      roughness: 0.7,
+      metalness: 0.4,
+    });
+
+    const entranceGlassMat = new THREE.MeshStandardMaterial({
+      color: 0x0284c7,
+      roughness: 0.2,
+      metalness: 0.8,
+      transparent: true,
+      opacity: 0.85,
+    });
+
+    const canopyMat = new THREE.MeshStandardMaterial({
+      color: 0x0f172a,
+      roughness: 0.5,
+      metalness: 0.6,
+    });
+
+    const antennaMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8,
+      metalness: 0.85,
+      roughness: 0.2,
+    });
+
+    const beaconLightMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
 
     for (const district of ISLAND_DISTRICTS) {
       const dGroup = new THREE.Group();
       dGroup.name = `District_${district.id}`;
-      dGroup.position.set(district.worldPos.x, 0, district.worldPos.z);
 
       const count = district.buildingCount;
       const bType = district.buildingType;
+      const facadeTex = textures[bType] || textures.commercial;
 
       for (let i = 0; i < count; i++) {
-        // Arrange buildings neatly in district blocks leaving wide avenue corridors clear
+        // District block distribution
         const row = Math.floor(i / 4);
         const col = i % 4;
-        const ox = (col < 2 ? -34 - (1 - col) * 32 : 34 + (col - 2) * 32);
-        const oz = (row < 2 ? -34 - (1 - row) * 32 : 34 + (row - 2) * 32);
+        let ox = (col < 2 ? -44 - (1 - col) * 36 : 44 + (col - 2) * 36);
+        let oz = (row < 2 ? -44 - (1 - row) * 36 : 44 + (row - 2) * 36);
 
-        const worldX = district.worldPos.x + ox;
-        const worldZ = district.worldPos.z + oz;
-        const baseY = getHeight ? getHeight(worldX, worldZ) : 0;
+        let worldX = district.worldPos.x + ox;
+        let worldZ = district.worldPos.z + oz;
 
         let w = 24;
         let d = 24;
@@ -53,83 +88,190 @@ export class Buildings {
         let neonHex = 0x06b6d4;
 
         if (bType === 'skyscraper') {
-          w = 26 + (i % 3) * 4;
-          d = 26 + ((i + 1) % 3) * 4;
-          h = 45 + (i * 7); // Tall skyscrapers 45m to 90m
-          colorHex = i % 2 === 0 ? 0x0f172a : 0x1e293b;
+          w = 28 + (i % 3) * 6;
+          d = 28 + ((i + 1) % 3) * 6;
+          h = 48 + (i * 7); // 48m to 90m
+          colorHex = i % 2 === 0 ? 0x090d16 : 0x172033;
           neonHex = i % 3 === 0 ? 0x06b6d4 : i % 3 === 1 ? 0x3b82f6 : 0x10b981;
         } else if (bType === 'industrial') {
-          w = 34 + (i % 2) * 6;
-          d = 36 + (i % 3) * 4;
-          h = 16 + (i % 3) * 4; // Wide warehouse sheds
+          w = 36 + (i % 2) * 8;
+          d = 34 + (i % 3) * 6;
+          h = 16 + (i % 3) * 4;
           colorHex = 0x334155;
           neonHex = 0xf59e0b;
         } else if (bType === 'commercial') {
-          w = 26;
-          d = 26;
-          h = 24 + (i % 4) * 6;
-          colorHex = 0x1e1e24;
+          w = 26 + (i % 2) * 4;
+          d = 26 + (i % 3) * 4;
+          h = 26 + (i % 4) * 6;
+          colorHex = 0x181e28;
           neonHex = 0xec4899;
         } else if (bType === 'airport') {
-          w = 42;
-          d = 28;
+          w = 44;
+          d = 30;
           h = 18;
-          colorHex = 0x475569;
+          colorHex = 0x334155;
           neonHex = 0x38bdf8;
         } else if (bType === 'resort') {
-          w = 22;
-          d = 22;
-          h = 18 + (i % 3) * 6;
+          w = 24;
+          d = 24;
+          h = 20 + (i % 3) * 6;
           colorHex = 0x0f172a;
           neonHex = 0x14b8a6;
         } else {
           // Residential
-          w = 20 + (i % 2) * 4;
-          d = 20 + (i % 2) * 4;
-          h = 18 + (i % 3) * 4;
-          colorHex = 0x27272a;
+          w = 22 + (i % 2) * 4;
+          d = 22 + (i % 2) * 4;
+          h = 20 + (i % 3) * 4;
+          colorHex = 0x24272e;
           neonHex = 0x8b5cf6;
         }
 
-        // 1. Building Mesh Body (anchored slightly into ground so no gap on sloped terrain)
-        const foundationSink = 2.0;
+        // --- ROAD CLEARANCE CHECK ---
+        // Ensure no building ever spawns on or overlaps the asphalt or sidewalks!
+        if (roads) {
+          let clearanceOk = false;
+          for (let attempt = 0; attempt < 5; attempt++) {
+            const roadTest = roads.getDistanceToRoad(worldX, worldZ);
+            const requiredClearance = roadTest.halfWidth + Math.max(w, d) * 0.5 + 4.5;
+
+            if (roadTest.distance >= requiredClearance) {
+              clearanceOk = true;
+              break;
+            }
+
+            // Push building outward away from road center
+            const pushDir = new THREE.Vector2(worldX - roadTest.nearestPoint.x, worldZ - roadTest.nearestPoint.z);
+            if (pushDir.lengthSq() < 0.01) {
+              pushDir.set(roadTest.normal.x, roadTest.normal.z);
+            }
+            pushDir.normalize();
+
+            const shift = requiredClearance - roadTest.distance + 4.0;
+            worldX += pushDir.x * shift;
+            worldZ += pushDir.y * shift;
+          }
+
+          if (!clearanceOk) {
+            continue; // Skip building candidate if it cannot clear road or intersections
+          }
+        }
+
+        const baseY = getHeight ? getHeight(worldX, worldZ) : 0;
+        // Skip building if pushed off-island into water
+        if (baseY < 0.2) continue;
+
+        const bGroup = new THREE.Group();
+        bGroup.position.set(worldX, 0, worldZ);
+
+        // 1. Building Main Body (with foundation sink to prevent ground gaps)
+        const foundationSink = 2.5;
         const bodyGeo = new THREE.BoxGeometry(w, h + foundationSink, d);
-        const clonedMat = new THREE.MeshStandardMaterial({
+
+        const bodyMat = new THREE.MeshStandardMaterial({
           color: colorHex,
           roughness: 0.6,
           metalness: 0.35,
-          map: windowTexture,
+          map: facadeTex,
         });
 
-        const bodyMesh = new THREE.Mesh(bodyGeo, clonedMat);
-        bodyMesh.position.set(ox, baseY + (h - foundationSink) / 2 + foundationSink / 2, oz);
+        const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+        bodyMesh.position.y = baseY + (h - foundationSink) / 2 + foundationSink / 2;
         bodyMesh.castShadow = true;
         bodyMesh.receiveShadow = true;
-        dGroup.add(bodyMesh);
+        bGroup.add(bodyMesh);
 
-        // 2. Base Pedestrian Trim
+        // 2. Ground Floor Pedestrian Base & Glass Entrance Lobby
         const baseTrim = new THREE.Mesh(
-          new THREE.BoxGeometry(w + 0.8, 3.5, d + 0.8),
-          new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.8 })
+          new THREE.BoxGeometry(w + 0.8, 4.2, d + 0.8),
+          new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.7, metalness: 0.2 })
         );
-        baseTrim.position.set(ox, baseY + 1.75, oz);
-        dGroup.add(baseTrim);
+        baseTrim.position.y = baseY + 2.1;
+        baseTrim.castShadow = true;
+        bGroup.add(baseTrim);
 
-        // 3. Roof Parapet
-        const roofTrim = new THREE.Mesh(
-          new THREE.BoxGeometry(w + 0.4, 1.2, d + 0.4),
-          new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 })
+        // Front Entrance Double Glass Doors
+        const entranceDoor = new THREE.Mesh(
+          new THREE.BoxGeometry(w * 0.35, 3.2, 0.4),
+          entranceGlassMat
         );
-        roofTrim.position.set(ox, baseY + h + 0.6, oz);
-        dGroup.add(roofTrim);
+        entranceDoor.position.set(0, baseY + 1.6, d / 2 + 0.45);
+        bGroup.add(entranceDoor);
 
-        // 4. Glowing Neon Accent Trim
-        const neonMat = new THREE.MeshBasicMaterial({ color: neonHex });
-        const neonBand = new THREE.Mesh(new THREE.BoxGeometry(w + 0.5, 0.5, d + 0.5), neonMat);
-        neonBand.position.set(ox, baseY + 3.6, oz);
-        dGroup.add(neonBand);
+        // Architectural Entrance Canopy Awning
+        const entranceCanopy = new THREE.Mesh(
+          new THREE.BoxGeometry(w * 0.45, 0.4, 3.2),
+          canopyMat
+        );
+        entranceCanopy.position.set(0, baseY + 3.8, d / 2 + 1.8);
+        entranceCanopy.castShadow = true;
+        bGroup.add(entranceCanopy);
 
-        // 5. Register Physical AABB Collision Box in World Coords
+        // 3. Middle Setback / Architectural Trim Band
+        if (h > 35) {
+          const midTrim = new THREE.Mesh(
+            new THREE.BoxGeometry(w + 0.6, 0.8, d + 0.6),
+            new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 })
+          );
+          midTrim.position.y = baseY + h * 0.55;
+          bGroup.add(midTrim);
+
+          // Glowing architectural neon accent line
+          const neonBand = new THREE.Mesh(
+            new THREE.BoxGeometry(w + 0.7, 0.35, d + 0.7),
+            new THREE.MeshBasicMaterial({ color: neonHex })
+          );
+          neonBand.position.y = baseY + h * 0.55 + 0.55;
+          bGroup.add(neonBand);
+        }
+
+        // 4. Roof Parapet Barrier Wall
+        const parapet = new THREE.Mesh(
+          new THREE.BoxGeometry(w + 0.4, 1.4, d + 0.4),
+          new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 })
+        );
+        parapet.position.y = baseY + h + 0.7;
+        parapet.castShadow = true;
+        bGroup.add(parapet);
+
+        // 5. Rooftop Mechanical Features (HVAC units, elevator shafts, antennas)
+        const elevatorHousing = new THREE.Mesh(
+          new THREE.BoxGeometry(w * 0.35, 3.5, d * 0.35),
+          rooftopUnitMat
+        );
+        elevatorHousing.position.set(-w * 0.15, baseY + h + 1.75, -d * 0.15);
+        elevatorHousing.castShadow = true;
+        bGroup.add(elevatorHousing);
+
+        // HVAC Air Conditioner Chiller Box
+        const acUnit = new THREE.Mesh(
+          new THREE.BoxGeometry(4.2, 2.0, 3.0),
+          rooftopUnitMat
+        );
+        acUnit.position.set(w * 0.2, baseY + h + 1.0, d * 0.15);
+        acUnit.castShadow = true;
+        bGroup.add(acUnit);
+
+        // High-rise antenna spire with blinking red warning beacon
+        if (h >= 50) {
+          const antenna = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.12, 0.35, 14, 8),
+            antennaMat
+          );
+          antenna.position.set(0, baseY + h + 7.0, 0);
+          antenna.castShadow = true;
+          bGroup.add(antenna);
+
+          const beacon = new THREE.Mesh(
+            new THREE.SphereGeometry(0.35, 8, 8),
+            beaconLightMat
+          );
+          beacon.position.set(0, baseY + h + 14.2, 0);
+          bGroup.add(beacon);
+        }
+
+        dGroup.add(bGroup);
+
+        // 6. Solid Physical AABB Collision Box
         const halfW = w / 2;
         const halfD = d / 2;
 
@@ -140,7 +282,7 @@ export class Buildings {
           maxX: worldX + halfW,
           minZ: worldZ - halfD,
           maxZ: worldZ + halfD,
-          height: baseY + h,
+          height: baseY + h + 2.0,
         });
       }
 
@@ -148,37 +290,83 @@ export class Buildings {
     }
   }
 
-  private generateWindowTexture(): THREE.CanvasTexture {
+  /**
+   * Generates high-resolution multi-pane window facade textures
+   * tailored to architectural styles.
+   */
+  private generateFacadeTexture(style: string): THREE.CanvasTexture {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return new THREE.CanvasTexture({} as any);
+    }
+
     const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
+    canvas.width = 512;
+    canvas.height = 512;
     const ctx = canvas.getContext('2d')!;
 
-    // Daytime Concrete facade
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(0, 0, 128, 128);
+    // 1. Wall facade background
+    if (style === 'skyscraper') {
+      ctx.fillStyle = '#0a101d';
+    } else if (style === 'residential') {
+      ctx.fillStyle = '#3a2d24'; // Warm brick tone
+    } else if (style === 'industrial') {
+      ctx.fillStyle = '#334155';
+    } else if (style === 'resort') {
+      ctx.fillStyle = '#f1f5f9';
+    } else {
+      ctx.fillStyle = '#1e293b';
+    }
+    ctx.fillRect(0, 0, 512, 512);
 
-    // Reflective glass grid
-    const cols = 4;
-    const rows = 4;
-    const winW = 18;
-    const winH = 22;
+    // 2. High-resolution window grid
+    const cols = 8;
+    const rows = 8;
+    const cellW = 512 / cols;
+    const cellH = 512 / rows;
+    const winPadX = style === 'skyscraper' ? 6 : 10;
+    const winPadY = 8;
 
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        const isSkyReflect = (r + c) % 2 === 0;
-        ctx.fillStyle = isSkyReflect ? '#38bdf8' : '#0284c7';
-        ctx.fillRect(8 + c * 28, 6 + r * 28, winW, winH);
+        const wx = c * cellW + winPadX;
+        const wy = r * cellH + winPadY;
+        const ww = cellW - winPadX * 2;
+        const wh = cellH - winPadY * 2;
 
-        // White glass reflection sheen
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.fillRect(8 + c * 28, 6 + r * 28, winW, 3);
+        // Window frame border
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(wx - 1, wy - 1, ww + 2, wh + 2);
+
+        // Glass pane color
+        if (style === 'skyscraper') {
+          // Reflective cyan/blue sky with interior variations
+          const isInteriorLit = (r * 3 + c * 7) % 5 === 0;
+          ctx.fillStyle = isInteriorLit ? '#fef08a' : (r + c) % 2 === 0 ? '#38bdf8' : '#0284c7';
+        } else if (style === 'residential') {
+          const isLit = (r * 2 + c * 3) % 4 === 0;
+          ctx.fillStyle = isLit ? '#fde047' : '#1e3a8a';
+        } else if (style === 'resort') {
+          ctx.fillStyle = '#06b6d4';
+        } else {
+          ctx.fillStyle = '#0ea5e9';
+        }
+        ctx.fillRect(wx, wy, ww, wh);
+
+        // Glass reflection diagonal highlight sheen
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.fillRect(wx, wy, ww, 4);
+
+        // Window muntin horizontal divider
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(wx, wy + wh * 0.5, ww, 2);
       }
     }
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(3, 3);
+    texture.needsUpdate = true;
     return texture;
   }
 
@@ -225,7 +413,6 @@ export class Buildings {
         ) {
           collided = true;
 
-          // Calculate penetration depth to all 4 faces
           const toMinX = Math.abs(pos.x - (c.minX - radius));
           const toMaxX = Math.abs(c.maxX + radius - pos.x);
           const toMinZ = Math.abs(pos.z - (c.minZ - radius));

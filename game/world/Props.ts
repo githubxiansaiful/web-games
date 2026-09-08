@@ -1,19 +1,20 @@
 import * as THREE from 'three';
 import { Buildings, ObstacleCollider } from './Buildings';
 import { ISLAND_DISTRICTS } from '../data/islandMapData';
+import { Roads } from './Roads';
 
 export class Props {
   public group: THREE.Group;
   private buildings: Buildings;
 
-  constructor(buildings: Buildings, getHeight?: (x: number, z: number) => number) {
+  constructor(buildings: Buildings, roads?: Roads, getHeight?: (x: number, z: number) => number) {
     this.group = new THREE.Group();
     this.group.name = 'IslandProps';
     this.buildings = buildings;
-    this.buildDistrictProps(getHeight);
+    this.buildDistrictProps(roads, getHeight);
   }
 
-  private buildDistrictProps(getHeight?: (x: number, z: number) => number): void {
+  private buildDistrictProps(roads?: Roads, getHeight?: (x: number, z: number) => number): void {
     const poleGeo = new THREE.CylinderGeometry(0.14, 0.18, 7.5, 8);
     const poleMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
 
@@ -32,24 +33,37 @@ export class Props {
     const barrierGeo = new THREE.BoxGeometry(3.6, 1.0, 0.5);
     const barrierMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.7 });
 
-    // Place trees, streetlights, and barriers in every district along roadsides
     for (const district of ISLAND_DISTRICTS) {
       const cx = district.worldPos.x;
       const cz = district.worldPos.z;
 
-      // 1. Streetlights along district avenues
+      // 1. Streetlights along sidewalks
       const lampOffsets = [
-        { x: -18, z: -18 },
-        { x: 18, z: -18 },
-        { x: -18, z: 18 },
-        { x: 18, z: 18 },
+        { x: -26, z: -26 },
+        { x: 26, z: -26 },
+        { x: -26, z: 26 },
+        { x: 26, z: 26 },
       ];
 
       for (let i = 0; i < lampOffsets.length; i++) {
         const off = lampOffsets[i];
-        const lx = cx + off.x;
-        const lz = cz + off.z;
+        let lx = cx + off.x;
+        let lz = cz + off.z;
+
+        // Streetlight Road Clearance: snap to sidewalk verge (halfWidth + 1.2m)
+        if (roads) {
+          const roadTest = roads.getDistanceToRoad(lx, lz);
+          if (roadTest.distance < roadTest.halfWidth + 3.5) {
+            const pushDir = new THREE.Vector2(lx - roadTest.nearestPoint.x, lz - roadTest.nearestPoint.z);
+            if (pushDir.lengthSq() < 0.01) pushDir.set(roadTest.normal.x, roadTest.normal.z);
+            pushDir.normalize();
+            lx = roadTest.nearestPoint.x + pushDir.x * (roadTest.halfWidth + 1.2);
+            lz = roadTest.nearestPoint.z + pushDir.y * (roadTest.halfWidth + 1.2);
+          }
+        }
+
         const ly = getHeight ? getHeight(lx, lz) : 0;
+        if (ly < 0.2) continue; // Skip if in water
 
         const lightGroup = new THREE.Group();
         lightGroup.position.set(lx, ly, lz);
@@ -74,7 +88,6 @@ export class Props {
 
         this.group.add(lightGroup);
 
-        // Solid physical cylinder obstacle collider
         this.buildings.registerCustomCollider({
           id: `lamp_${district.id}_${i}`,
           type: 'cylinder',
@@ -89,19 +102,37 @@ export class Props {
         });
       }
 
-      // 2. Trees (Park & Sidewalk trees)
+      // 2. Trees (Park and Green Belt trees - STRICTLY OFF ROAD)
       const treeOffsets = [
-        { x: -32, z: 0 },
-        { x: 32, z: 0 },
-        { x: 0, z: -32 },
-        { x: 0, z: 32 },
+        { x: -52, z: 0 },
+        { x: 52, z: 0 },
+        { x: 0, z: -52 },
+        { x: 0, z: 52 },
       ];
 
       for (let i = 0; i < treeOffsets.length; i++) {
         const off = treeOffsets[i];
-        const tx = cx + off.x;
-        const tz = cz + off.z;
+        let tx = cx + off.x;
+        let tz = cz + off.z;
+
+        // Tree Road Clearance: Trees must be at least halfWidth + 5.5m away from road center
+        if (roads) {
+          const roadTest = roads.getDistanceToRoad(tx, tz);
+          const minTreeClearance = roadTest.halfWidth + 5.5;
+
+          if (roadTest.distance < minTreeClearance) {
+            const pushDir = new THREE.Vector2(tx - roadTest.nearestPoint.x, tz - roadTest.nearestPoint.z);
+            if (pushDir.lengthSq() < 0.01) pushDir.set(roadTest.normal.x, roadTest.normal.z);
+            pushDir.normalize();
+
+            // Push outward into park / lawn zone
+            tx = roadTest.nearestPoint.x + pushDir.x * (minTreeClearance + 2.0);
+            tz = roadTest.nearestPoint.z + pushDir.y * (minTreeClearance + 2.0);
+          }
+        }
+
         const ty = getHeight ? getHeight(tx, tz) : 0;
+        if (ty < 0.2) continue; // Skip if in water
 
         const treeGroup = new THREE.Group();
         treeGroup.position.set(tx, ty, tz);
@@ -118,7 +149,6 @@ export class Props {
 
         this.group.add(treeGroup);
 
-        // Solid trunk obstacle collider
         this.buildings.registerCustomCollider({
           id: `tree_${district.id}_${i}`,
           type: 'cylinder',
@@ -133,44 +163,82 @@ export class Props {
         });
       }
 
-      // 3. Dumpsters & Barriers
-      const dx = cx - 22;
-      const dz = cz + 14;
+      // 3. Dumpsters & Barriers (Alley & Sidewalk placement - STRICTLY OFF ROAD)
+      let dx = cx - 38;
+      let dz = cz + 24;
+
+      if (roads) {
+        let dCleared = false;
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const rTest = roads.getDistanceToRoad(dx, dz);
+          if (rTest.distance >= rTest.halfWidth + 3.0) {
+            dCleared = true;
+            break;
+          }
+          const pushDir = new THREE.Vector2(dx - rTest.nearestPoint.x, dz - rTest.nearestPoint.z);
+          if (pushDir.lengthSq() < 0.01) pushDir.set(rTest.normal.x, rTest.normal.z);
+          pushDir.normalize();
+          dx = rTest.nearestPoint.x + pushDir.x * (rTest.halfWidth + 4.5);
+          dz = rTest.nearestPoint.z + pushDir.y * (rTest.halfWidth + 4.5);
+        }
+        if (!dCleared) continue;
+      }
+
       const dy = getHeight ? getHeight(dx, dz) : 0;
+      if (dy >= 0.2) {
+        const dumpster = new THREE.Mesh(dumpsterGeo, dumpsterMat);
+        dumpster.position.set(dx, dy + 0.8, dz);
+        dumpster.castShadow = true;
+        this.group.add(dumpster);
 
-      const dumpster = new THREE.Mesh(dumpsterGeo, dumpsterMat);
-      dumpster.position.set(dx, dy + 0.8, dz);
-      dumpster.castShadow = true;
-      this.group.add(dumpster);
+        this.buildings.registerCustomCollider({
+          id: `dumpster_${district.id}`,
+          type: 'box',
+          minX: dx - 1.3,
+          maxX: dx + 1.3,
+          minZ: dz - 0.9,
+          maxZ: dz + 0.9,
+          height: dy + 2.0,
+        });
+      }
 
-      this.buildings.registerCustomCollider({
-        id: `dumpster_${district.id}`,
-        type: 'box',
-        minX: dx - 1.3,
-        maxX: dx + 1.3,
-        minZ: dz - 0.9,
-        maxZ: dz + 0.9,
-        height: dy + 2.0,
-      });
+      let bx = cx + 38;
+      let bz = cz - 24;
 
-      const bx = cx + 22;
-      const bz = cz - 14;
+      if (roads) {
+        let bCleared = false;
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const rTest = roads.getDistanceToRoad(bx, bz);
+          if (rTest.distance >= rTest.halfWidth + 3.0) {
+            bCleared = true;
+            break;
+          }
+          const pushDir = new THREE.Vector2(bx - rTest.nearestPoint.x, bz - rTest.nearestPoint.z);
+          if (pushDir.lengthSq() < 0.01) pushDir.set(rTest.normal.x, rTest.normal.z);
+          pushDir.normalize();
+          bx = rTest.nearestPoint.x + pushDir.x * (rTest.halfWidth + 4.5);
+          bz = rTest.nearestPoint.z + pushDir.y * (rTest.halfWidth + 4.5);
+        }
+        if (!bCleared) continue;
+      }
+
       const by = getHeight ? getHeight(bx, bz) : 0;
+      if (by >= 0.2) {
+        const barrier = new THREE.Mesh(barrierGeo, barrierMat);
+        barrier.position.set(bx, by + 0.5, bz);
+        barrier.castShadow = true;
+        this.group.add(barrier);
 
-      const barrier = new THREE.Mesh(barrierGeo, barrierMat);
-      barrier.position.set(bx, by + 0.5, bz);
-      barrier.castShadow = true;
-      this.group.add(barrier);
-
-      this.buildings.registerCustomCollider({
-        id: `barrier_${district.id}`,
-        type: 'box',
-        minX: bx - 1.9,
-        maxX: bx + 1.9,
-        minZ: bz - 0.4,
-        maxZ: bz + 0.4,
-        height: by + 1.5,
-      });
+        this.buildings.registerCustomCollider({
+          id: `barrier_${district.id}`,
+          type: 'box',
+          minX: bx - 1.9,
+          maxX: bx + 1.9,
+          minZ: bz - 0.4,
+          maxZ: bz + 0.4,
+          height: by + 1.5,
+        });
+      }
     }
   }
 }

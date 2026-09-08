@@ -18,23 +18,32 @@ export class ThirdPersonCamera {
 
   private world: World;
   private sensitivity: number = 0.0022;
+  private userOrbitTimer: number = 0;
 
   constructor(camera: THREE.PerspectiveCamera, world: World) {
     this.camera = camera;
     this.world = world;
   }
 
-  public setMode(mode: CameraMode): void {
+  public setMode(mode: CameraMode, initialHeading?: number): void {
     this.mode = mode;
+    if (mode === 'vehicle') {
+      if (initialHeading !== undefined) {
+        this.yaw = initialHeading + Math.PI;
+      }
+      this.pitch = 0.22;
+      this.userOrbitTimer = 0;
+    }
   }
 
   public handleMouseMove(deltaX: number, deltaY: number): void {
     this.yaw -= deltaX * this.sensitivity;
     this.pitch -= deltaY * this.sensitivity;
 
-    // Clamp pitch so camera cannot flip upside down
+    // In vehicle mode, flag that player is manually orbiting camera
     if (this.mode === 'vehicle') {
-      this.pitch = Math.max(-0.1, Math.min(0.85, this.pitch));
+      this.userOrbitTimer = 1.2; // 1.2s before auto-re-centering behind vehicle
+      this.pitch = Math.max(0.04, Math.min(0.55, this.pitch));
     } else if (this.mode === 'aim') {
       this.pitch = Math.max(-0.6, Math.min(1.1, this.pitch));
     } else {
@@ -53,7 +62,7 @@ export class ThirdPersonCamera {
     let targetHeight = 1.9;
     let shoulderOffset = 0.45;
     let targetFov = 65;
-    let lerpFactor = 1 - Math.exp(-12 * deltaTime);
+    let lerpFactor = 1 - Math.exp(-14 * deltaTime);
 
     if (this.mode === 'aim') {
       targetDistance = 2.2;
@@ -62,17 +71,39 @@ export class ThirdPersonCamera {
       targetFov = 48;
       lerpFactor = 1 - Math.exp(-22 * deltaTime);
     } else if (this.mode === 'vehicle') {
-      targetDistance = 8.5 + (speed ? Math.min(speed / 6, 4.0) : 0);
-      targetHeight = 3.2;
+      const absSpeed = speed ? Math.abs(speed) : 0;
+      // GTA chase camera distance scales with driving velocity
+      targetDistance = 6.8 + Math.min(absSpeed / 7, 2.5);
+      targetHeight = 2.2 + Math.min(absSpeed / 18, 0.6);
       shoulderOffset = 0.0;
-      targetFov = 68;
-      lerpFactor = 1 - Math.exp(-8 * deltaTime);
+      // Wide FOV sensation at high speed
+      targetFov = 66 + Math.min(absSpeed / 3.2, 11);
+      lerpFactor = 1 - Math.exp(-10 * deltaTime);
 
-      // In vehicle mode, gently bias yaw towards vehicle facing when moving fast
-      if (facingAngle !== undefined && speed && Math.abs(speed) > 5) {
-        const diff = facingAngle - this.yaw;
+      // Decrement manual orbit timer
+      if (this.userOrbitTimer > 0) {
+        this.userOrbitTimer -= deltaTime;
+      }
+
+      // Auto-center camera behind the vehicle (GTA 5 style)
+      if (facingAngle !== undefined) {
+        const targetYaw = facingAngle + Math.PI;
+        const diff = targetYaw - this.yaw;
         const normalizedDiff = Math.atan2(Math.sin(diff), Math.cos(diff));
-        this.yaw += normalizedDiff * (deltaTime * 1.8);
+
+        // When user is not manually rotating or when moving at speed, swing behind car
+        const autoCenterStrength = this.userOrbitTimer > 0
+          ? (absSpeed > 6 ? 2.0 : 0.0)
+          : (absSpeed > 1 ? 4.5 : 2.2);
+
+        if (autoCenterStrength > 0) {
+          this.yaw += normalizedDiff * Math.min(1, autoCenterStrength * deltaTime);
+        }
+
+        // Return pitch smoothly to standard driving vantage (0.22 rad)
+        if (this.userOrbitTimer <= 0) {
+          this.pitch = THREE.MathUtils.lerp(this.pitch, 0.22, 3.5 * deltaTime);
+        }
       }
     }
 
@@ -82,9 +113,20 @@ export class ThirdPersonCamera {
       this.camera.updateProjectionMatrix();
     }
 
-    // 2. Compute LookAt Target point (player head / vehicle center)
+    // 2. Compute LookAt Target point (player head / vehicle forward lookahead)
     const lookAtOrigin = followPosition.clone();
-    lookAtOrigin.y += this.mode === 'vehicle' ? 1.4 : targetHeight * 0.9;
+    if (this.mode === 'vehicle') {
+      lookAtOrigin.y += 1.2;
+      // Look slightly forward ahead over the hood of the vehicle (GTA style)
+      if (facingAngle !== undefined) {
+        const fwdX = Math.sin(facingAngle) * 2.8;
+        const fwdZ = Math.cos(facingAngle) * 2.8;
+        lookAtOrigin.x += fwdX;
+        lookAtOrigin.z += fwdZ;
+      }
+    } else {
+      lookAtOrigin.y += targetHeight * 0.9;
+    }
 
     // 3. Compute Ideal Camera Position in spherical coordinates around target
     const cosPitch = Math.cos(this.pitch);

@@ -61,7 +61,7 @@ export class PlayerController {
 
       if (this.input.isInteractingF()) {
         this.player.enterVehicle(nearestVehicle);
-        this.camera.setMode('vehicle');
+        this.camera.setMode('vehicle', nearestVehicle.heading);
         this.eventBus.emit('INTERACTION_PROMPT', { visible: false });
         return;
       }
@@ -179,8 +179,10 @@ export class PlayerController {
 
     vehicle.update(deltaTime, throttle, steer, handbrake);
 
-    // Sync player position to car position
+    // Sync player position to car position and keep mesh invisible
     this.player.position.copy(vehicle.position);
+    this.player.mesh.position.copy(vehicle.position);
+    this.player.mesh.visible = false;
     this.player.emitStats();
   }
 }

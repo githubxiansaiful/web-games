@@ -1,9 +1,25 @@
 import * as THREE from 'three';
 import { getIslandRoadNetwork, svgToWorld, RoadSegment } from '../data/islandMapData';
 
+export interface RoadRibbon {
+  worldPoints: THREE.Vector3[];
+  halfW: number;
+  isBridge: boolean;
+}
+
+export interface RoadDistanceResult {
+  distance: number;
+  halfWidth: number;
+  isBridge: boolean;
+  nearestPoint: THREE.Vector3;
+  tangent: THREE.Vector3;
+  normal: THREE.Vector3;
+}
+
 export class Roads {
   public group: THREE.Group;
   public roadSegments: RoadSegment[];
+  public roadRibbons: RoadRibbon[] = [];
   private bridgeSegments: Array<{ worldPoints: THREE.Vector3[]; halfW: number }> = [];
 
   constructor(getHeight?: (x: number, z: number) => number) {
@@ -15,13 +31,25 @@ export class Roads {
 
   private buildIslandRoads(getHeight?: (x: number, z: number) => number): void {
     const asphaltMaterial = new THREE.MeshStandardMaterial({
-      color: 0x181e29,
-      roughness: 0.8,
-      metalness: 0.15,
+      color: 0x181e28,
+      roughness: 0.82,
+      metalness: 0.12,
     });
 
     const yellowLineMaterial = new THREE.MeshBasicMaterial({
       color: 0xfacc15,
+    });
+
+    const curbMaterial = new THREE.MeshStandardMaterial({
+      color: 0x64748b,
+      roughness: 0.75,
+      metalness: 0.2,
+    });
+
+    const sidewalkMaterial = new THREE.MeshStandardMaterial({
+      color: 0x475569,
+      roughness: 0.88,
+      metalness: 0.05,
     });
 
     const bridgePierMaterial = new THREE.MeshStandardMaterial({
@@ -34,11 +62,6 @@ export class Roads {
       color: 0x94a3b8,
       metalness: 0.8,
       roughness: 0.3,
-    });
-
-    const sidewalkMaterial = new THREE.MeshStandardMaterial({
-      color: 0x475569,
-      roughness: 0.9,
     });
 
     for (const segment of this.roadSegments) {
@@ -63,19 +86,15 @@ export class Roads {
 
       if (worldPoints.length < 2) continue;
 
+      const halfW = segment.width / 2;
+      this.roadRibbons.push({ worldPoints, halfW, isBridge: segment.isBridge });
+
       if (segment.isBridge) {
-        this.bridgeSegments.push({ worldPoints, halfW: segment.width / 2 });
+        this.bridgeSegments.push({ worldPoints, halfW });
       }
 
-      // 1. Build Smooth Continuous Road Ribbon
-      const halfW = segment.width / 2;
-      const positions: number[] = [];
-      const normals: number[] = [];
-      const uvs: number[] = [];
-      const indices: number[] = [];
-
-      let totalDist = 0;
-
+      // Pre-calculate per-point tangents and perpendicular normals on XZ plane
+      const perps: THREE.Vector3[] = [];
       for (let i = 0; i < worldPoints.length; i++) {
         const curr = worldPoints[i];
         let tangent = new THREE.Vector3();
@@ -88,8 +107,20 @@ export class Roads {
           tangent.subVectors(worldPoints[i + 1], worldPoints[i - 1]).normalize();
         }
 
-        // Perpendicular normal on XZ plane
-        const perp = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+        perps.push(new THREE.Vector3(-tangent.z, 0, tangent.x).normalize());
+      }
+
+      // 1. Build Smooth Continuous Road Asphalt Ribbon
+      const positions: number[] = [];
+      const normals: number[] = [];
+      const uvs: number[] = [];
+      const indices: number[] = [];
+
+      let totalDist = 0;
+
+      for (let i = 0; i < worldPoints.length; i++) {
+        const curr = worldPoints[i];
+        const perp = perps[i];
 
         const left = curr.clone().addScaledVector(perp, -halfW);
         const right = curr.clone().addScaledVector(perp, halfW);
@@ -121,7 +152,59 @@ export class Roads {
       roadMesh.receiveShadow = true;
       this.group.add(roadMesh);
 
-      // 2. Yellow Dashed Centerlines
+      // 2. Build Realistic Concrete Curbs & Sidewalks (for land roads)
+      if (!segment.isBridge) {
+        const sidewalkW = 2.8;
+        const curbW = 0.35;
+        const curbLift = 0.12;
+
+        // Both sides: -1 (left), +1 (right)
+        for (const side of [-1, 1]) {
+          const swPositions: number[] = [];
+          const swNormals: number[] = [];
+          const swUvs: number[] = [];
+          const swIndices: number[] = [];
+
+          for (let i = 0; i < worldPoints.length; i++) {
+            const curr = worldPoints[i];
+            const perp = perps[i];
+
+            // Inner edge of sidewalk (curb edge adjacent to asphalt)
+            const innerOff = side * halfW;
+            const outerOff = side * (halfW + curbW + sidewalkW);
+
+            const innerPt = curr.clone().addScaledVector(perp, innerOff);
+            innerPt.y += curbLift;
+
+            const outerPt = curr.clone().addScaledVector(perp, outerOff);
+            outerPt.y += curbLift;
+
+            swPositions.push(innerPt.x, innerPt.y, innerPt.z);
+            swPositions.push(outerPt.x, outerPt.y, outerPt.z);
+
+            swNormals.push(0, 1, 0, 0, 1, 0);
+            swUvs.push(0, totalDist * 0.2, 1, totalDist * 0.2);
+
+            if (i < worldPoints.length - 1) {
+              const base = i * 2;
+              swIndices.push(base, base + 1, base + 2);
+              swIndices.push(base + 1, base + 3, base + 2);
+            }
+          }
+
+          const swGeo = new THREE.BufferGeometry();
+          swGeo.setAttribute('position', new THREE.Float32BufferAttribute(swPositions, 3));
+          swGeo.setAttribute('normal', new THREE.Float32BufferAttribute(swNormals, 3));
+          swGeo.setAttribute('uv', new THREE.Float32BufferAttribute(swUvs, 2));
+          swGeo.setIndex(swIndices);
+
+          const swMesh = new THREE.Mesh(swGeo, sidewalkMaterial);
+          swMesh.receiveShadow = true;
+          this.group.add(swMesh);
+        }
+      }
+
+      // 3. Yellow Dashed Centerlines
       for (let i = 0; i < worldPoints.length - 1; i += 2) {
         const p1 = worldPoints[i];
         const p2 = worldPoints[Math.min(i + 1, worldPoints.length - 1)];
@@ -138,7 +221,7 @@ export class Roads {
         this.group.add(dashMesh);
       }
 
-      // 3. Bridge Pillars and Guardrails if bridge
+      // 4. Bridge Pillars and Guardrails if bridge
       if (segment.isBridge) {
         for (let i = 1; i < worldPoints.length - 1; i += 3) {
           const p = worldPoints[i];
@@ -157,13 +240,7 @@ export class Roads {
           const railPositions: number[] = [];
           for (let i = 0; i < worldPoints.length; i++) {
             const curr = worldPoints[i];
-            let tangent = new THREE.Vector3();
-            if (i < worldPoints.length - 1) {
-              tangent.subVectors(worldPoints[i + 1], curr).normalize();
-            } else {
-              tangent.subVectors(curr, worldPoints[i - 1]).normalize();
-            }
-            const perp = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+            const perp = perps[i];
             const railPos = curr.clone().addScaledVector(perp, side * (halfW + 0.3));
             railPositions.push(railPos.x, railPos.y + 0.6, railPos.z);
           }
@@ -184,6 +261,59 @@ export class Roads {
         }
       }
     }
+  }
+
+  /**
+   * Fast 2D query returning distance from (x, z) to nearest road centerline,
+   * road width, nearest point on road, and outward normal vector.
+   */
+  public getDistanceToRoad(x: number, z: number): RoadDistanceResult {
+    let minDistance = 999999;
+    let minHalfWidth = 8;
+    let isBridge = false;
+    let nearestPoint = new THREE.Vector3();
+    let bestTangent = new THREE.Vector3(1, 0, 0);
+    let bestNormal = new THREE.Vector3(0, 0, 1);
+
+    for (const ribbon of this.roadRibbons) {
+      const pts = ribbon.worldPoints;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p1 = pts[i];
+        const p2 = pts[i + 1];
+        const dx = p2.x - p1.x;
+        const dz = p2.z - p1.z;
+        const lenSq = dx * dx + dz * dz;
+        if (lenSq < 0.001) continue;
+
+        const t = Math.max(0, Math.min(1, ((x - p1.x) * dx + (z - p1.z) * dz) / lenSq));
+        const projX = p1.x + t * dx;
+        const projY = p1.y + t * (p2.y - p1.y);
+        const projZ = p1.z + t * dz;
+
+        const distSq = (x - projX) * (x - projX) + (z - projZ) * (z - projZ);
+        const dist = Math.sqrt(distSq);
+
+        if (dist < minDistance) {
+          minDistance = dist;
+          minHalfWidth = ribbon.halfW;
+          isBridge = ribbon.isBridge;
+          nearestPoint.set(projX, projY, projZ);
+
+          const len = Math.sqrt(lenSq);
+          bestTangent.set(dx / len, (p2.y - p1.y) / len, dz / len);
+          bestNormal.set(-bestTangent.z, 0, bestTangent.x);
+        }
+      }
+    }
+
+    return {
+      distance: minDistance,
+      halfWidth: minHalfWidth,
+      isBridge,
+      nearestPoint,
+      tangent: bestTangent,
+      normal: bestNormal,
+    };
   }
 
   public getBridgeElevation(x: number, z: number): number {
