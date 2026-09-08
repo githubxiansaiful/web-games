@@ -253,9 +253,23 @@ export class Player implements Damageable {
           loader.load(
             '/models/character/idle.fbx',
             (idleFbx: any) => {
-              if (idleFbx.animations.length > 0 && this.mixer) {
-                const idleClip = idleFbx.animations[0];
+              // Mixamo downloads with skin often have dummy Take 001 at index 0 and real animation at index 1
+              const idleClip = idleFbx.animations.find((a: THREE.AnimationClip) => a.tracks.length > 0) || idleFbx.animations[0];
+              if (idleClip && idleClip.tracks.length > 0 && this.mixer) {
                 idleClip.name = 'idle';
+
+                // Retarget Hips.position to character bind hip height (105.25cm)
+                const hipPosTrack = idleClip.tracks.find((t: THREE.KeyframeTrack) => t.name.includes('Hips.position'));
+                if (hipPosTrack && hipPosTrack.values) {
+                  const firstY = hipPosTrack.values[1];
+                  const bindY = 105.25;
+                  for (let i = 0; i < hipPosTrack.values.length; i += 3) {
+                    const deltaY = (hipPosTrack.values[i + 1] - firstY) * (bindY / (firstY || 1));
+                    hipPosTrack.values[i] = 0;
+                    hipPosTrack.values[i + 1] = bindY + deltaY;
+                    hipPosTrack.values[i + 2] = 1.765;
+                  }
+                }
 
                 // Stop previous fallback idle
                 if (this.idleAction) {
