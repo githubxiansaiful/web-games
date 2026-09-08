@@ -117,7 +117,6 @@ export class Roads {
       roadGeo.setIndex(indices);
 
       const roadMesh = new THREE.Mesh(roadGeo, asphaltMaterial);
-      roadMesh.receiveShadow = true;
       this.group.add(roadMesh);
 
       // 2. Yellow Dashed Centerlines
@@ -146,7 +145,6 @@ export class Roads {
             const pierGeo = new THREE.BoxGeometry(2.4, p.y + 2, 2.4);
             const pier = new THREE.Mesh(pierGeo, bridgePierMaterial);
             pier.position.set(p.x, (p.y - 2) / 2, p.z);
-            pier.castShadow = true;
             this.group.add(pier);
           }
         }
@@ -177,7 +175,6 @@ export class Roads {
             );
             const railGeo = new THREE.TubeGeometry(railCurve, 32, 0.25, 6, false);
             const railMesh = new THREE.Mesh(railGeo, guardrailMaterial);
-            railMesh.castShadow = true;
             this.group.add(railMesh);
           }
         }

@@ -62,19 +62,10 @@ export class World {
     hemiLight.position.set(0, 100, 0);
     this.scene.add(hemiLight);
 
-    // Bright Golden Sun Directional Light
-    const sunLight = new THREE.DirectionalLight(0xfffaed, 2.3);
+    // Bright Golden Sun Directional Light (Clean daytime illumination without shadows)
+    const sunLight = new THREE.DirectionalLight(0xfffaed, 2.1);
     sunLight.position.set(120, 200, 90);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
-    sunLight.shadow.camera.near = 10;
-    sunLight.shadow.camera.far = 600;
-    sunLight.shadow.camera.left = -350;
-    sunLight.shadow.camera.right = 350;
-    sunLight.shadow.camera.top = 350;
-    sunLight.shadow.camera.bottom = -350;
-    sunLight.shadow.bias = -0.0003;
+    sunLight.castShadow = false;
     this.scene.add(sunLight);
   }
 
@@ -103,7 +94,6 @@ export class World {
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = 0;
-    ground.receiveShadow = true;
     ground.name = 'MainlandGround';
     return ground;
   }

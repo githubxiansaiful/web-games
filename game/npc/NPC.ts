@@ -94,13 +94,11 @@ export class NPC implements Damageable {
     // Torso
     const torso = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.7, 0.35), shirtMat);
     torso.position.y = 1.25;
-    torso.castShadow = true;
     root.add(torso);
 
     // Head
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.38, 0.36), skinMat);
     head.position.y = 1.76;
-    head.castShadow = true;
     root.add(head);
 
     // Left Leg

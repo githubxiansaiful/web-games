@@ -90,7 +90,6 @@ export class Player implements Damageable {
     const torsoGeo = new THREE.BoxGeometry(0.68, 0.75, 0.38);
     const torso = new THREE.Mesh(torsoGeo, jacketMat);
     torso.position.y = 1.25;
-    torso.castShadow = true;
     root.add(torso);
 
     // Neon jacket stripe
@@ -103,7 +102,6 @@ export class Player implements Damageable {
     const headGeo = new THREE.BoxGeometry(0.38, 0.42, 0.38);
     const head = new THREE.Mesh(headGeo, skinMat);
     head.position.y = 1.8;
-    head.castShadow = true;
     root.add(head);
 
     // Cyber Visor / Glasses
@@ -118,12 +116,10 @@ export class Player implements Damageable {
     const legGeo = new THREE.BoxGeometry(0.24, 0.76, 0.26);
     const legLeftMesh = new THREE.Mesh(legGeo, pantsMat);
     legLeftMesh.position.y = -0.38;
-    legLeftMesh.castShadow = true;
     leftLeg.add(legLeftMesh);
 
     const shoeLeft = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.16, 0.35), shoeMat);
     shoeLeft.position.set(0, -0.76, 0.05);
-    shoeLeft.castShadow = true;
     leftLeg.add(shoeLeft);
     root.add(leftLeg);
 
@@ -132,12 +128,10 @@ export class Player implements Damageable {
     rightLeg.position.set(0.2, 0.88, 0);
     const legRightMesh = new THREE.Mesh(legGeo, pantsMat);
     legRightMesh.position.y = -0.38;
-    legRightMesh.castShadow = true;
     rightLeg.add(legRightMesh);
 
     const shoeRight = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.16, 0.35), shoeMat);
     shoeRight.position.set(0, -0.76, 0.05);
-    shoeRight.castShadow = true;
     rightLeg.add(shoeRight);
     root.add(rightLeg);
 
@@ -147,7 +141,6 @@ export class Player implements Damageable {
     const armGeo = new THREE.BoxGeometry(0.2, 0.65, 0.2);
     const armLeftMesh = new THREE.Mesh(armGeo, jacketMat);
     armLeftMesh.position.y = -0.32;
-    armLeftMesh.castShadow = true;
     leftArm.add(armLeftMesh);
     root.add(leftArm);
 
@@ -156,7 +149,6 @@ export class Player implements Damageable {
     rightArm.position.set(0.46, 1.5, 0);
     const armRightMesh = new THREE.Mesh(armGeo, jacketMat);
     armRightMesh.position.y = -0.32;
-    armRightMesh.castShadow = true;
     rightArm.add(armRightMesh);
 
     // Equipped Weapon Mesh

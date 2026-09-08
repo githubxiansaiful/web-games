@@ -98,8 +98,6 @@ export class Buildings {
 
         const bodyMesh = new THREE.Mesh(bodyGeo, clonedMat);
         bodyMesh.position.set(ox, h / 2, oz);
-        bodyMesh.castShadow = true;
-        bodyMesh.receiveShadow = true;
         dGroup.add(bodyMesh);
 
         // 2. Base Pedestrian Trim
@@ -108,7 +106,6 @@ export class Buildings {
           new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.8 })
         );
         baseTrim.position.set(ox, 1.75, oz);
-        baseTrim.receiveShadow = true;
         dGroup.add(baseTrim);
 
         // 3. Roof Parapet

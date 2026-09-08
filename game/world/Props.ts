@@ -55,7 +55,6 @@ export class Props {
 
         const pole = new THREE.Mesh(poleGeo, poleMat);
         pole.position.y = 3.75;
-        pole.castShadow = true;
         lightGroup.add(pole);
 
         const arm = new THREE.Mesh(lampArmGeo, poleMat);
@@ -106,12 +105,10 @@ export class Props {
 
         const trunk = new THREE.Mesh(trunkGeo, trunkMat);
         trunk.position.y = 2.1;
-        trunk.castShadow = true;
         treeGroup.add(trunk);
 
         const leaves = new THREE.Mesh(foliageGeo, foliageMat);
         leaves.position.y = 5.2;
-        leaves.castShadow = true;
         treeGroup.add(leaves);
 
         this.group.add(treeGroup);
@@ -136,7 +133,6 @@ export class Props {
       const dx = cx - 22;
       const dz = cz + 14;
       dumpster.position.set(dx, 0.8, dz);
-      dumpster.castShadow = true;
       this.group.add(dumpster);
 
       this.buildings.registerCustomCollider({
@@ -153,7 +149,6 @@ export class Props {
       const bx = cx + 22;
       const bz = cz - 14;
       barrier.position.set(bx, 0.5, bz);
-      barrier.castShadow = true;
       this.group.add(barrier);
 
       this.buildings.registerCustomCollider({
