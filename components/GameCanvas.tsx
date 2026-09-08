@@ -118,10 +118,14 @@ export const GameCanvas: React.FC = () => {
       // ignore
     }
 
-    // Detect touch capability
+    // Detect touch capability & screen size
     if (typeof window !== 'undefined') {
-      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth < 1024;
-      setShowTouchControls(hasTouch);
+      const checkTouch = () => {
+        const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth < 1024;
+        setShowTouchControls(hasTouch);
+      };
+      checkTouch();
+      window.addEventListener('resize', checkTouch);
 
       const unlockAudio = () => {
         sounds.playJump();
@@ -130,6 +134,10 @@ export const GameCanvas: React.FC = () => {
       };
       window.addEventListener('touchstart', unlockAudio, { once: true });
       window.addEventListener('click', unlockAudio, { once: true });
+
+      return () => {
+        window.removeEventListener('resize', checkTouch);
+      };
     }
   }, []);
 
@@ -757,6 +765,7 @@ export const GameCanvas: React.FC = () => {
           setIsPaused(false);
           setIsLevelSelectOpen(true);
         }}
+        onGoHome={handleLeaveRoom}
       />
 
       {/* Solo Stage Victory Modal */}

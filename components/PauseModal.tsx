@@ -1,13 +1,14 @@
 'use client';
 
 import React from 'react';
-import { Play, RotateCcw, Layers, HelpCircle, X } from 'lucide-react';
+import { Play, RotateCcw, Layers, HelpCircle, X, Home } from 'lucide-react';
 
 interface PauseModalProps {
   isOpen: boolean;
   onResume: () => void;
   onRestart: () => void;
   onOpenLevelSelect: () => void;
+  onGoHome?: () => void;
 }
 
 export const PauseModal: React.FC<PauseModalProps> = ({
@@ -15,6 +16,7 @@ export const PauseModal: React.FC<PauseModalProps> = ({
   onResume,
   onRestart,
   onOpenLevelSelect,
+  onGoHome,
 }) => {
   if (!isOpen) return null;
 
@@ -38,7 +40,7 @@ export const PauseModal: React.FC<PauseModalProps> = ({
             className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-sm text-white shadow-md flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
           >
             <Play className="w-4 h-4 fill-current" />
-            <span>Resume Game (Esc / P)</span>
+            <span>Resume Game<span className="hidden sm:inline"> (Esc / P)</span></span>
           </button>
 
           <button
@@ -46,7 +48,7 @@ export const PauseModal: React.FC<PauseModalProps> = ({
             className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl font-bold text-sm text-slate-200 hover:text-white flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
           >
             <RotateCcw className="w-4 h-4 text-amber-400" />
-            <span>Restart Stage (R)</span>
+            <span>Restart Stage<span className="hidden sm:inline"> (R)</span></span>
           </button>
 
           <button
@@ -56,6 +58,19 @@ export const PauseModal: React.FC<PauseModalProps> = ({
             <Layers className="w-4 h-4 text-sky-400" />
             <span>Select Stage</span>
           </button>
+
+          {onGoHome && (
+            <button
+              onClick={() => {
+                onResume();
+                onGoHome();
+              }}
+              className="w-full py-2.5 px-4 bg-slate-800 hover:bg-rose-950/40 border border-slate-700 hover:border-rose-700/50 rounded-xl font-bold text-sm text-slate-300 hover:text-rose-300 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
+            >
+              <Home className="w-4 h-4 text-rose-400" />
+              <span>Main Menu</span>
+            </button>
+          )}
         </div>
 
         {/* Controls Quick Reference */}
@@ -64,7 +79,37 @@ export const PauseModal: React.FC<PauseModalProps> = ({
             <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
             <span>Controls Guide</span>
           </div>
-          <div className="space-y-1.5 text-xs text-slate-300">
+
+          {/* Mobile Touch Controls Guide */}
+          <div className="space-y-1.5 text-xs text-slate-300 sm:hidden">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-400">Run:</span>
+              <span className="font-semibold bg-slate-700/70 px-2 py-0.5 rounded text-[11px] text-slate-200">
+                Left / Right Arrows
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-400">Jump:</span>
+              <span className="font-semibold bg-indigo-900/80 text-indigo-200 px-2 py-0.5 rounded text-[11px]">
+                Big JUMP Button
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-400">Double Jump:</span>
+              <span className="font-semibold bg-slate-700/70 px-2 py-0.5 rounded text-[11px] text-slate-200">
+                Tap Jump Twice
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-400">Checkpoint Respawn:</span>
+              <span className="font-semibold bg-amber-950/60 text-amber-300 px-2 py-0.5 rounded text-[11px]">
+                Quick Reset Button
+              </span>
+            </div>
+          </div>
+
+          {/* Desktop Keyboard Controls Guide */}
+          <div className="hidden sm:block space-y-1.5 text-xs text-slate-300">
             <div className="flex justify-between items-center">
               <span className="text-slate-400">Run Left / Right:</span>
               <span className="font-mono bg-slate-700/70 px-1.5 py-0.5 rounded text-[11px]">A / D or ← / →</span>

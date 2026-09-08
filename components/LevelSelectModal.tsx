@@ -152,7 +152,10 @@ export const LevelSelectModal: React.FC<LevelSelectModalProps> = ({
 
         {/* Modal Footer Tips */}
         <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-700/50 text-center text-xs text-slate-400 flex flex-wrap justify-center gap-4">
-          <span>💡 Press <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-slate-200 font-mono">W / Space</kbd> twice to Double Jump</span>
+          <span>
+            💡 <span className="hidden sm:inline">Press <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-slate-200 font-mono">W / Space</kbd> twice</span>
+            <span className="inline sm:hidden">Tap Jump twice in mid-air</span> to Double Jump
+          </span>
           <span>💡 Stand on Moving Platforms to cross spike chasms safely</span>
         </div>
       </div>

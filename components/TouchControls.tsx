@@ -123,9 +123,9 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
   }, [onDirectionPress, onJumpPress]);
 
   return (
-    <div className="absolute inset-x-0 bottom-0 pointer-events-none z-30 select-none pb-5 px-4 sm:px-8 safe-bottom safe-left safe-right flex justify-between items-end">
+    <div className="absolute inset-x-0 bottom-0 pointer-events-none z-30 select-none pb-4 sm:pb-6 px-3 sm:px-8 safe-bottom safe-left safe-right flex justify-between items-end touch-none">
       {/* Left side: D-PAD Controls */}
-      <div className="flex items-center gap-3 pointer-events-auto">
+      <div className="flex items-center gap-2.5 sm:gap-3 pointer-events-auto">
         {/* Left Arrow Button */}
         <button
           onTouchStart={handleLeftTouchStart}
@@ -145,14 +145,14 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
               onDirectionPress('left', false);
             }
           }}
-          className={`w-16 h-16 sm:w-18 sm:h-18 rounded-2xl backdrop-blur-lg border-2 flex items-center justify-center transition-all active:scale-95 shadow-xl ${
+          className={`w-15 h-15 sm:w-18 sm:h-18 rounded-2xl backdrop-blur-md border flex items-center justify-center transition-all active:scale-95 shadow-lg select-none touch-none ${
             leftActive
-              ? 'bg-indigo-600/90 border-indigo-400 text-white shadow-indigo-500/40 scale-95'
-              : 'bg-slate-900/75 border-slate-700/80 text-slate-200'
+              ? 'bg-indigo-600/90 border-indigo-300 text-white shadow-indigo-500/40 scale-95'
+              : 'bg-slate-950/35 hover:bg-slate-900/50 border-white/20 text-white/80'
           }`}
           aria-label="Run Left"
         >
-          <ArrowLeft className="w-8 h-8" />
+          <ArrowLeft className="w-7 h-7 sm:w-8 sm:h-8" />
         </button>
 
         {/* Right Arrow Button */}
@@ -174,19 +174,19 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
               onDirectionPress('right', false);
             }
           }}
-          className={`w-16 h-16 sm:w-18 sm:h-18 rounded-2xl backdrop-blur-lg border-2 flex items-center justify-center transition-all active:scale-95 shadow-xl ${
+          className={`w-15 h-15 sm:w-18 sm:h-18 rounded-2xl backdrop-blur-md border flex items-center justify-center transition-all active:scale-95 shadow-lg select-none touch-none ${
             rightActive
-              ? 'bg-indigo-600/90 border-indigo-400 text-white shadow-indigo-500/40 scale-95'
-              : 'bg-slate-900/75 border-slate-700/80 text-slate-200'
+              ? 'bg-indigo-600/90 border-indigo-300 text-white shadow-indigo-500/40 scale-95'
+              : 'bg-slate-950/35 hover:bg-slate-900/50 border-white/20 text-white/80'
           }`}
           aria-label="Run Right"
         >
-          <ArrowRight className="w-8 h-8" />
+          <ArrowRight className="w-7 h-7 sm:w-8 sm:h-8" />
         </button>
       </div>
 
       {/* Right side: Action Buttons (Quick Respawn + Big Jump) */}
-      <div className="flex items-center gap-3 pointer-events-auto">
+      <div className="flex items-center gap-2.5 sm:gap-3 pointer-events-auto">
         {/* Quick Respawn Mini Button */}
         {onQuickRespawn && (
           <button
@@ -199,11 +199,11 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
               triggerHaptic(20);
               onQuickRespawn();
             }}
-            className="w-11 h-11 rounded-xl bg-slate-900/70 hover:bg-slate-800 backdrop-blur-md border border-slate-700/80 text-amber-300 flex items-center justify-center shadow-lg active:scale-90 transition-transform mb-2"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-950/35 hover:bg-slate-900/50 backdrop-blur-md border border-white/20 text-amber-300/85 flex items-center justify-center shadow-md active:scale-90 transition-transform mb-1.5 touch-none select-none"
             title="Quick Respawn at Checkpoint"
             aria-label="Respawn at checkpoint"
           >
-            <RotateCcw className="w-5 h-5" />
+            <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         )}
 
@@ -226,15 +226,15 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
               onJumpPress(false);
             }
           }}
-          className={`w-20 h-20 sm:w-22 sm:h-22 rounded-3xl backdrop-blur-xl border-2 flex flex-col items-center justify-center transition-all active:scale-95 shadow-2xl ${
+          className={`w-18 h-18 sm:w-22 sm:h-22 rounded-3xl backdrop-blur-md border flex flex-col items-center justify-center transition-all active:scale-95 shadow-xl select-none touch-none ${
             jumpActive
-              ? 'bg-indigo-500 border-indigo-300 text-white shadow-indigo-500/50 scale-95 ring-4 ring-indigo-400/40'
-              : 'bg-indigo-600/85 border-indigo-400/80 text-white shadow-indigo-600/40'
+              ? 'bg-indigo-600/90 border-indigo-300 text-white shadow-indigo-500/50 scale-95 ring-4 ring-indigo-400/40'
+              : 'bg-indigo-600/45 border-indigo-400/60 text-white/90 shadow-indigo-950/30'
           }`}
           aria-label="Jump / Double Jump"
         >
-          <ArrowUp className="w-8 h-8 sm:w-9 sm:h-9" />
-          <span className="text-[10px] sm:text-xs font-black tracking-widest uppercase mt-0.5">
+          <ArrowUp className="w-7 h-7 sm:w-9 sm:h-9" />
+          <span className="text-[9px] sm:text-xs font-black tracking-widest uppercase mt-0.5">
             JUMP
           </span>
         </button>

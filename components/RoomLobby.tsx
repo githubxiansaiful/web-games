@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { RoomState, RoomPlayer } from '@/lib/multiplayerTypes';
 import { LEVELS } from '@/lib/levels';
+import { multiplayer } from '@/lib/multiplayerClient';
 import {
   Users,
   Copy,
@@ -68,10 +69,20 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
               <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">
                 Multiplayer Lobby
               </span>
-              <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full font-bold border border-emerald-500/30 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Live Room
-              </span>
+              {multiplayer.isFallback() ? (
+                <span
+                  className="bg-amber-500/20 text-amber-300 text-[10px] px-2 py-0.5 rounded-full font-bold border border-amber-500/30 flex items-center gap-1"
+                  title="Running in local tab sync. Connect NEXT_PUBLIC_SOCKET_URL for internet multiplayer."
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  Local Tab Sync
+                </span>
+              ) : (
+                <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full font-bold border border-emerald-500/30 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Online Live
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-3 mt-1">
               <h2 className="text-2xl sm:text-3xl font-black tracking-tight font-mono text-white">

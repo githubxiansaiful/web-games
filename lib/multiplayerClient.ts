@@ -23,14 +23,29 @@ class MultiplayerClient {
     if (typeof window === 'undefined') return;
     if (this.socket) return;
 
+    // Detect external dedicated socket server URL if configured
+    const customSocketUrl = process.env.NEXT_PUBLIC_SOCKET_URL?.trim();
+    const isLocalhost =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+
+    // On localhost, default to local server; on remote (e.g. Vercel), require NEXT_PUBLIC_SOCKET_URL
+    const targetUrl = customSocketUrl || (isLocalhost ? window.location.origin : '');
+
+    if (!targetUrl) {
+      // Running on a serverless host (such as Vercel) without external socket server configured.
+      // Immediately activate local multi-tab fallback mode without polling 404s.
+      this.enableFallbackMode();
+      return;
+    }
+
     try {
-      const socketUrl = window.location.origin;
-      this.socket = io(socketUrl, {
+      this.socket = io(targetUrl, {
         reconnection: true,
-        reconnectionAttempts: 10,
+        reconnectionAttempts: 5,
         reconnectionDelay: 1000,
         transports: ['websocket', 'polling'],
-        timeout: 3000,
+        timeout: 4000,
       });
 
       this.socket.on('connect', () => {
@@ -81,6 +96,10 @@ class MultiplayerClient {
     } catch {
       this.enableFallbackMode();
     }
+  }
+
+  public isFallback(): boolean {
+    return this.isFallbackMode;
   }
 
   public async waitForConnection(timeoutMs: number = 2000): Promise<boolean> {

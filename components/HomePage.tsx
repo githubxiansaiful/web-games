@@ -429,10 +429,11 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
 
         {/* Footer Quick Instructions */}
-        <div className="mt-8 pt-4 border-t border-slate-800 text-center text-xs text-slate-500 flex flex-wrap justify-center gap-6">
-          <span>🎮 Arrow Keys or WASD to run & jump</span>
+        <div className="mt-8 pt-4 border-t border-slate-800 text-center text-xs text-slate-500 flex flex-wrap justify-center gap-4 sm:gap-6">
+          <span className="hidden md:inline">🎮 Arrow Keys or WASD to run & jump</span>
+          <span className="inline md:hidden">📱 Touch on-screen controls to run & jump</span>
           <span>✨ Double tap jump in air for double jump</span>
-          <span>⚡ Stand on moving platforms to ferry across hazards</span>
+          <span>⚡ Stand on moving platforms to cross hazards</span>
         </div>
       </main>
     </div>

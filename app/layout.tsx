@@ -13,12 +13,45 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Platformer Run - 2D Multiplayer Platformer Game",
-  description: "Real-time multiplayer 2D platformer with room creation, double-jump, moving platforms, coins, hazards, and goal flag.",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+  ),
+  title: "Runner Royale - 2D Multiplayer Platformer",
+  description:
+    "Real-time multiplayer 2D platformer with room creation, double-jump, moving platforms, coins, hazards, and goal flag.",
+  applicationName: "Runner Royale",
+  keywords: [
+    "platformer",
+    "multiplayer",
+    "game",
+    "html5 game",
+    "runner",
+    "speedrun",
+    "2d game",
+    "nextjs",
+  ],
+  authors: [{ name: "Platformer Run Team" }],
+  creator: "Platformer Run",
+  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Platformer Run",
+    title: "Runner Royale",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    title: "Runner Royale - 2D Multiplayer Platformer",
+    description:
+      "Real-time multiplayer 2D platformer with room creation, double-jump, moving platforms, coins, hazards, and race standings.",
+    siteName: "Runner Royale",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Runner Royale - 2D Multiplayer Platformer",
+    description:
+      "Real-time multiplayer 2D platformer with room creation, double-jump, moving platforms, coins, and race standings.",
   },
 };
 
