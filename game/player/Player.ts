@@ -193,26 +193,17 @@ export class Player implements Damageable {
   }
 
   private attachWeaponToHand(handBone: THREE.Bone, gltfLoader?: any): void {
-    // 1. Immediate procedural fallback firearm mesh
-    const gunGeo = new THREE.BoxGeometry(6, 12, 38);
-    const gunMat = new THREE.MeshStandardMaterial({ color: 0x09090b, metalness: 0.9, roughness: 0.2 });
-    const handGun = new THREE.Mesh(gunGeo, gunMat);
-    handGun.castShadow = true;
-    handGun.position.set(0, -6, 14);
-    handGun.rotation.x = -Math.PI / 2;
-    handBone.add(handGun);
-
-    // 2. Asynchronously load high-detail 3D tactical PDW gun model
+    // Asynchronously load high-detail 3D tactical PDW gun model directly
     const loadGun = (loader: any) => {
       loader.load(
         '/models/weapons/gun.glb',
         (gunGltf: any) => {
           const realGun = gunGltf.scene;
           // Scale to fit human hands naturally in centimeter-scaled bone space
-          realGun.scale.setScalar(72);
-          // Position grip inside palm and point barrel forward
-          realGun.position.set(0, -5, 10);
-          realGun.rotation.set(-Math.PI / 2, 0, 0);
+          realGun.scale.setScalar(80);
+          // Position grip inside palm and point barrel forward along sightline
+          realGun.position.set(0, 4, 0);
+          realGun.rotation.set(0, Math.PI / 2, 0);
 
           realGun.traverse((child: any) => {
             if (child.isMesh) {
@@ -221,8 +212,6 @@ export class Player implements Damageable {
             }
           });
 
-          // Replace placeholder box with detailed 3D weapon
-          handGun.visible = false;
           handBone.add(realGun);
         },
         undefined,
