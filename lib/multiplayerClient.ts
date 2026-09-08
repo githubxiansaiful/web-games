@@ -7,13 +7,16 @@ class MultiplayerClient {
   private socket: Socket | null = null;
   private channel: BroadcastChannel | null = null;
   private listeners: Map<string, Set<EventCallback>> = new Map();
-  public myPlayerId: string = 'local_' + Math.random().toString(36).substring(2, 9);
+  public myPlayerId: string = 'runner_' + Math.random().toString(36).substring(2, 9);
   public currentRoom: RoomState | null = null;
   public isConnected: boolean = false;
   private isFallbackMode: boolean = false;
 
   constructor() {
-    // Lazy initialized when joining or creating room
+    if (typeof window !== 'undefined') {
+      // Eagerly connect socket on client load
+      setTimeout(() => this.init(), 100);
+    }
   }
 
   public init() {
@@ -21,14 +24,13 @@ class MultiplayerClient {
     if (this.socket) return;
 
     try {
-      // Connect to same origin
       const socketUrl = window.location.origin;
       this.socket = io(socketUrl, {
         reconnection: true,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: 10,
         reconnectionDelay: 1000,
         transports: ['websocket', 'polling'],
-        timeout: 4000,
+        timeout: 3000,
       });
 
       this.socket.on('connect', () => {
@@ -41,7 +43,6 @@ class MultiplayerClient {
       });
 
       this.socket.on('connect_error', () => {
-        // Fallback to BroadcastChannel for local/multi-tab play if socket server not running
         this.enableFallbackMode();
       });
 
@@ -51,6 +52,9 @@ class MultiplayerClient {
       });
 
       this.socket.on('game_starting', (data: { stageId: number; players: RoomPlayer[] }) => {
+        if (this.currentRoom) {
+          this.currentRoom.status = 'in_game';
+        }
         this.emitLocal('game_starting', data);
       });
 
@@ -79,18 +83,39 @@ class MultiplayerClient {
     }
   }
 
+  public async waitForConnection(timeoutMs: number = 2000): Promise<boolean> {
+    this.init();
+    if (this.socket?.connected) return true;
+    if (!this.socket) return false;
+
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        resolve(this.socket?.connected ?? false);
+      }, timeoutMs);
+
+      this.socket?.once('connect', () => {
+        clearTimeout(timer);
+        resolve(true);
+      });
+
+      this.socket?.once('connect_error', () => {
+        clearTimeout(timer);
+        resolve(false);
+      });
+    });
+  }
+
   private enableFallbackMode() {
     if (this.isFallbackMode) return;
     this.isFallbackMode = true;
     this.isConnected = true;
 
-    // Use BroadcastChannel for multi-tab fallback
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       if (!this.channel) {
         this.channel = new BroadcastChannel('runner_royale_local_bus');
         this.channel.onmessage = (event) => {
           const { type, data, senderId } = event.data;
-          if (senderId === this.myPlayerId) return; // skip own
+          if (senderId === this.myPlayerId) return;
 
           if (type === 'room_action') {
             this.handleFallbackRoomAction(data);
@@ -102,6 +127,24 @@ class MultiplayerClient {
             this.emitLocal('remote_player_finished', data);
           }
         };
+
+        // Listen for storage events across tabs as secondary sync
+        window.addEventListener('storage', (e) => {
+          if (e.key?.startsWith('runner_active_room_') && e.newValue) {
+            try {
+              const updated = JSON.parse(e.newValue);
+              if (this.currentRoom && updated.code === this.currentRoom.code) {
+                this.currentRoom = updated;
+                this.emitLocal('room_updated', updated);
+                if (updated.status === 'in_game') {
+                  this.emitLocal('game_starting', { stageId: updated.stageId, players: updated.players });
+                }
+              }
+            } catch {
+              // ignore
+            }
+          }
+        });
       }
     }
   }
@@ -111,6 +154,9 @@ class MultiplayerClient {
       this.currentRoom = data.room;
       this.emitLocal('room_updated', data.room);
     } else if (data.action === 'game_starting') {
+      if (this.currentRoom) {
+        this.currentRoom.status = 'in_game';
+      }
       this.emitLocal('game_starting', data.payload);
     } else if (data.action === 'returned_to_lobby') {
       this.currentRoom = data.room;
@@ -118,16 +164,16 @@ class MultiplayerClient {
     }
   }
 
-  public createRoom(
+  public async createRoom(
     code: string,
     player: { name: string; color: string },
     stageId: number = 1
   ): Promise<{ success: boolean; room?: RoomState; message?: string }> {
-    this.init();
+    const isSocketConnected = await this.waitForConnection();
 
-    return new Promise((resolve) => {
-      if (this.socket && this.socket.connected) {
-        this.socket.emit(
+    if (isSocketConnected && this.socket) {
+      return new Promise((resolve) => {
+        this.socket!.emit(
           'create_room',
           { code, player, stageId },
           (res: { success: boolean; room?: RoomState; player?: RoomPlayer; message?: string }) => {
@@ -138,40 +184,47 @@ class MultiplayerClient {
             resolve(res);
           }
         );
-      } else {
-        // Fallback local room creation
-        this.enableFallbackMode();
-        const fallbackRoom: RoomState = {
-          code: String(code || Math.floor(100000 + Math.random() * 900000)),
-          hostId: this.myPlayerId,
-          stageId,
-          status: 'lobby',
-          players: [
-            {
-              id: this.myPlayerId,
-              name: player.name || 'Host',
-              color: player.color || '#06b6d4',
-              isHost: true,
-              isReady: true,
-            },
-          ],
-        };
-        this.currentRoom = fallbackRoom;
-        this.emitFallbackAction('room_updated', { room: fallbackRoom });
-        resolve({ success: true, room: fallbackRoom });
-      }
-    });
+      });
+    }
+
+    // Fallback mode with LocalStorage + BroadcastChannel
+    this.enableFallbackMode();
+    const roomCode = String(code || Math.floor(100000 + Math.random() * 900000));
+    const fallbackRoom: RoomState = {
+      code: roomCode,
+      hostId: this.myPlayerId,
+      stageId,
+      status: 'lobby',
+      players: [
+        {
+          id: this.myPlayerId,
+          name: player.name || 'Host',
+          color: player.color || '#06b6d4',
+          isHost: true,
+          isReady: true,
+        },
+      ],
+    };
+
+    this.currentRoom = fallbackRoom;
+    try {
+      localStorage.setItem('runner_active_room_' + roomCode, JSON.stringify(fallbackRoom));
+    } catch {
+      // ignore
+    }
+    this.emitFallbackAction('room_updated', { room: fallbackRoom });
+    return { success: true, room: fallbackRoom };
   }
 
-  public joinRoom(
+  public async joinRoom(
     code: string,
     player: { name: string; color: string }
   ): Promise<{ success: boolean; room?: RoomState; message?: string }> {
-    this.init();
+    const isSocketConnected = await this.waitForConnection();
 
-    return new Promise((resolve) => {
-      if (this.socket && this.socket.connected) {
-        this.socket.emit(
+    if (isSocketConnected && this.socket) {
+      return new Promise((resolve) => {
+        this.socket!.emit(
           'join_room',
           { code, player },
           (res: { success: boolean; room?: RoomState; player?: RoomPlayer; message?: string }) => {
@@ -182,36 +235,51 @@ class MultiplayerClient {
             resolve(res);
           }
         );
-      } else {
-        // Fallback mode join attempt
-        this.enableFallbackMode();
-        // If room exists in fallback broadcast
-        const fallbackRoom = this.currentRoom || {
-          code,
-          hostId: 'host_fallback',
-          stageId: 1,
-          status: 'lobby' as const,
-          players: [],
-        };
+      });
+    }
 
-        const newPlayer: RoomPlayer = {
-          id: this.myPlayerId,
-          name: player.name || 'Runner',
-          color: player.color || '#ec4899',
-          isHost: fallbackRoom.players.length === 0,
-          isReady: false,
-        };
+    // Fallback mode with LocalStorage lookup
+    this.enableFallbackMode();
+    const roomCode = String(code).trim();
+    let existingRoom: RoomState | null = null;
 
-        const updatedRoom = {
-          ...fallbackRoom,
-          players: [...fallbackRoom.players.filter((p) => p.id !== this.myPlayerId), newPlayer],
-        };
+    try {
+      const saved = localStorage.getItem('runner_active_room_' + roomCode);
+      if (saved) existingRoom = JSON.parse(saved);
+    } catch {
+      // ignore
+    }
 
-        this.currentRoom = updatedRoom;
-        this.emitFallbackAction('room_updated', { room: updatedRoom });
-        resolve({ success: true, room: updatedRoom });
-      }
-    });
+    if (!existingRoom && this.currentRoom?.code === roomCode) {
+      existingRoom = this.currentRoom;
+    }
+
+    if (!existingRoom) {
+      return { success: false, message: 'Room not found! Check the room code or start socket server.' };
+    }
+
+    const newPlayer: RoomPlayer = {
+      id: this.myPlayerId,
+      name: player.name || 'Runner',
+      color: player.color || '#ec4899',
+      isHost: false,
+      isReady: false,
+    };
+
+    const updatedRoom: RoomState = {
+      ...existingRoom,
+      players: [...existingRoom.players.filter((p) => p.id !== this.myPlayerId), newPlayer],
+    };
+
+    this.currentRoom = updatedRoom;
+    try {
+      localStorage.setItem('runner_active_room_' + roomCode, JSON.stringify(updatedRoom));
+    } catch {
+      // ignore
+    }
+
+    this.emitFallbackAction('room_updated', { room: updatedRoom });
+    return { success: true, room: updatedRoom };
   }
 
   public toggleReady(isReady: boolean) {
@@ -221,6 +289,11 @@ class MultiplayerClient {
       const p = this.currentRoom.players.find((pl) => pl.id === this.myPlayerId);
       if (p) {
         p.isReady = isReady;
+        try {
+          localStorage.setItem('runner_active_room_' + this.currentRoom.code, JSON.stringify(this.currentRoom));
+        } catch {
+          // ignore
+        }
         this.emitFallbackAction('room_updated', { room: this.currentRoom });
         this.emitLocal('room_updated', this.currentRoom);
       }
@@ -232,6 +305,11 @@ class MultiplayerClient {
       this.socket.emit('change_stage', { stageId });
     } else if (this.currentRoom) {
       this.currentRoom.stageId = stageId;
+      try {
+        localStorage.setItem('runner_active_room_' + this.currentRoom.code, JSON.stringify(this.currentRoom));
+      } catch {
+        // ignore
+      }
       this.emitFallbackAction('room_updated', { room: this.currentRoom });
       this.emitLocal('room_updated', this.currentRoom);
     }
@@ -246,6 +324,11 @@ class MultiplayerClient {
         stageId: this.currentRoom.stageId,
         players: this.currentRoom.players,
       };
+      try {
+        localStorage.setItem('runner_active_room_' + this.currentRoom.code, JSON.stringify(this.currentRoom));
+      } catch {
+        // ignore
+      }
       this.emitFallbackAction('game_starting', { payload });
       this.emitLocal('game_starting', payload);
     }
@@ -296,6 +379,11 @@ class MultiplayerClient {
     } else if (this.currentRoom) {
       this.currentRoom.status = 'lobby';
       if (stageId) this.currentRoom.stageId = stageId;
+      try {
+        localStorage.setItem('runner_active_room_' + this.currentRoom.code, JSON.stringify(this.currentRoom));
+      } catch {
+        // ignore
+      }
       this.emitFallbackAction('returned_to_lobby', { room: this.currentRoom });
       this.emitLocal('returned_to_lobby', this.currentRoom);
     }

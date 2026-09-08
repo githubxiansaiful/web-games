@@ -229,10 +229,18 @@ export const GameCanvas: React.FC = () => {
       if (updatedRoom.stageId) {
         setCurrentLevelId(updatedRoom.stageId);
       }
+
+      // FAIL-SAFE: If room status becomes in_game, all players enter game mode immediately
+      if (updatedRoom.status === 'in_game') {
+        loadLevel(updatedRoom.stageId || 1);
+        setAppMode('game');
+        setIsMultiplayer(true);
+        setIsPodiumOpen(false);
+      }
     });
 
     const unsubGameStarting = multiplayer.on('game_starting', (data: { stageId: number }) => {
-      loadLevel(data.stageId);
+      loadLevel(data.stageId || 1);
       setAppMode('game');
       setIsMultiplayer(true);
       setIsPodiumOpen(false);

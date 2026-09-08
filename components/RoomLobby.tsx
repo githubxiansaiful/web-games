@@ -49,6 +49,13 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
   const selectedLevel = LEVELS.find((l) => l.id === room.stageId) || LEVELS[0];
   const allReady = room.players.every((p) => p.isHost || p.isReady);
 
+  // Auto-launch if room status becomes in_game
+  React.useEffect(() => {
+    if (room.status === 'in_game') {
+      onStartGame();
+    }
+  }, [room.status, onStartGame]);
+
   const LOBBY_EMOTES = ['👋', '🔥', '🚀', '👑', '⚡', '🎉', '💀'];
 
   return (

@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Platformer Run - 2D Platformer Game",
-  description: "Mobile-friendly 2D platformer with double-jump, moving platforms, coins, hazards, checkpoints, and goal flag.",
+  title: "Platformer Run - 2D Multiplayer Platformer Game",
+  description: "Real-time multiplayer 2D platformer with room creation, double-jump, moving platforms, coins, hazards, and goal flag.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -39,9 +39,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased overflow-hidden`}
     >
-      <body className="h-full w-full bg-slate-950 text-slate-100 overflow-hidden select-none">
+      <body
+        suppressHydrationWarning
+        className="h-full w-full bg-slate-950 text-slate-100 overflow-hidden select-none"
+      >
         {children}
       </body>
     </html>

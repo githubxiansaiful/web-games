@@ -154,10 +154,20 @@ app.prepare().then(() => {
     socket.on('start_game', () => {
       if (!currentRoomCode) return;
       const room = rooms.get(currentRoomCode);
-      if (!room || room.hostId !== socket.id) return;
+      if (!room) return;
 
+      const p = room.players.get(socket.id);
+      const isHost = p?.isHost || room.hostId === socket.id;
+      if (!isHost) {
+        console.warn(`[Socket] start_game ignored: ${socket.id} is not host of room ${currentRoomCode}`);
+        return;
+      }
+
+      console.log(`[Socket] Starting game in room ${currentRoomCode} with ${room.players.size} runners!`);
       room.status = 'in_game';
       room.finishCounter = 0;
+
+      // Broadcast game_starting and room_updated to ALL players in the room
       io.to(currentRoomCode).emit('game_starting', {
         stageId: room.stageId,
         players: Array.from(room.players.values()),
