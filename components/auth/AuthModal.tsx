@@ -63,11 +63,18 @@ export const AuthModal: React.FC = () => {
   };
 
   const handleGoogleSignIn = () => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim();
     if (clientId) {
-      const redirectUri = `${window.location.origin}/api/auth/callback/google`;
+      let redirectUri = `${window.location.origin}/api/auth/callback/google`;
+      // Google OAuth strictly forbids 0.0.0.0; normalize to localhost
+      if (window.location.hostname === '0.0.0.0' || window.location.hostname === '127.0.0.1') {
+        const port = window.location.port ? `:${window.location.port}` : '';
+        redirectUri = `http://localhost${port}/api/auth/callback/google`;
+      }
+
+      const state = encodeURIComponent(JSON.stringify({ redirectUri, from: window.location.origin }));
       const scope = 'openid email profile';
-      const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&prompt=select_account`;
+      const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${state}&prompt=select_account`;
       window.location.href = url;
       return;
     }

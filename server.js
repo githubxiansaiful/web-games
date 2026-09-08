@@ -253,7 +253,8 @@ app.prepare().then(() => {
   });
 
   httpServer.listen(port, () => {
-    console.log(`> Ready on http://${hostname}:${port}`);
+    console.log(`> Xian's Game World ready on http://localhost:${port}`);
+    console.log(`> Network access: http://${hostname}:${port}`);
     console.log(`> Multiplayer Socket.io server running`);
   });
 });

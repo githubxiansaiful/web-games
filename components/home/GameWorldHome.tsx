@@ -19,6 +19,7 @@ import {
   Rocket,
   ArrowUpRight,
   UserCheck,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { GameCanvas } from '@/components/GameCanvas';
@@ -31,8 +32,27 @@ export const GameWorldHome: React.FC = () => {
   // Active game view: null (showcase home), 'runner' (Game 1), 'space' (Game 2)
   const [activeGame, setActiveGame] = useState<'runner' | 'space' | null>(null);
   const [leaderboard, setLeaderboard] = useState<{ topSpace: any[]; topRunner: any[] }>({ topSpace: [], topRunner: [] });
+  const [authBannerError, setAuthBannerError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // 1. Auto-normalize from 0.0.0.0 to localhost for seamless OAuth compatibility
+      if (window.location.hostname === '0.0.0.0') {
+        const port = window.location.port ? `:${window.location.port}` : '';
+        window.location.replace(`http://localhost${port}${window.location.pathname}${window.location.search}`);
+        return;
+      }
+
+      // 2. Check for OAuth callback errors in URL
+      const params = new URLSearchParams(window.location.search);
+      const authErr = params.get('auth_error');
+      if (authErr) {
+        setAuthBannerError(authErr);
+        // Clear param from address bar without reloading
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+
     fetch('/api/games/leaderboard')
       .then((res) => res.json())
       .then((data) => {
@@ -155,6 +175,31 @@ export const GameWorldHome: React.FC = () => {
           )}
         </div>
       </header>
+
+      {/* Auth Error Notification Banner (if any) */}
+      {authBannerError && (
+        <div className="max-w-4xl mx-auto px-4 mt-6">
+          <div className="p-4 rounded-2xl bg-rose-950/80 border border-rose-500/60 text-rose-200 flex items-center justify-between gap-4 shadow-xl backdrop-blur-md animate-in fade-in">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+              <div>
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider">Google Sign-In Alert</h4>
+                <p className="text-xs text-rose-200/90 mt-0.5">
+                  {authBannerError.includes('0.0.0.0') || authBannerError === 'token_failed' || authBannerError.includes('invalid_request')
+                    ? 'Google OAuth security policy does not allow 0.0.0.0. Please access the game via http://localhost:3000.'
+                    : `Authentication notice: ${authBannerError}`}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setAuthBannerError(null)}
+              className="px-3 py-1 bg-rose-900/80 hover:bg-rose-800 text-rose-200 text-xs font-semibold rounded-lg transition cursor-pointer shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 2. HERO SECTION */}
       <section className="relative px-4 sm:px-8 py-12 sm:py-16 text-center max-w-5xl mx-auto flex flex-col items-center">
