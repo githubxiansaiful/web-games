@@ -238,12 +238,22 @@ export class Vehicle implements Damageable {
   public update(deltaTime: number, throttle: number = 0, steer: number = 0, handbrake: boolean = false): void {
     if (this.isDead) return;
 
-    // 1. Steering with speed-dependent sensitivity
-    const targetSteerAngle = steer * 0.55;
-    const steerLerp = 1 - Math.exp(-12 * deltaTime);
+    // 1. Progressive Keyboard Steering with Speed-Dependent Lock & Stability
+    const absSpeed = Math.abs(this.speed);
+    // Smooth turn-in rate (7.0) and fast re-centering (12.0) for natural feel on A/D keys
+    const steerResponseSpeed = Math.abs(steer) > 0.01 ? 7.0 : 12.0;
+    const steerLerp = 1 - Math.exp(-steerResponseSpeed * deltaTime);
+
+    // Speed-dependent max lock:
+    // Full steering lock (~24 deg) at parking/city speeds for sharp intersections.
+    // Clamped down smoothly to ~8 deg at high speeds so tapping A/D doesn't snap out of control!
+    const speedRatio = Math.min(absSpeed / 30, 1.0);
+    const maxLock = handbrake ? 0.46 : (0.42 - speedRatio * 0.28); // 0.42 -> 0.14 rad
+
+    const targetSteerAngle = steer * maxLock;
     this.steerAngle = THREE.MathUtils.lerp(this.steerAngle, targetSteerAngle, steerLerp);
 
-    // Update front wheel visual turning
+    // Update front wheel visual turning (fallback procedural mesh)
     this.frontWheelAnchors.forEach((a) => {
       a.rotation.y = this.steerAngle;
     });
@@ -276,10 +286,13 @@ export class Vehicle implements Damageable {
       }
     }
 
-    // 3. Heading rotation from front wheel steering
-    if (Math.abs(this.speed) > 0.1) {
-      const turnFactor = this.speed > 0 ? 1 : -1;
-      const turnRate = (this.steerAngle * this.config.turnSpeed * (Math.abs(this.speed) / 12)) * turnFactor;
+    // 3. Heading rotation from front wheel steering (controlled understeer curve + handbrake drift)
+    if (absSpeed > 0.1) {
+      const turnFactor = this.speed >= 0 ? 1 : -1;
+      // Realistic tire grip curve: nimble in streets, stable on straights without violent twitching
+      const speedFactor = Math.min(absSpeed / 7, 1.0) / (1.0 + absSpeed * 0.032);
+      const driftMultiplier = handbrake ? 2.2 : 1.0;
+      const turnRate = this.steerAngle * this.config.turnSpeed * speedFactor * turnFactor * driftMultiplier;
       this.heading += turnRate * deltaTime;
     }
 

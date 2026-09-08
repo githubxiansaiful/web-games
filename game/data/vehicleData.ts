@@ -20,11 +20,11 @@ export const VEHICLE_CONFIGS: Record<string, VehicleConfig> = {
     id: 'lamborghini_fenomeno',
     name: 'Lamborghini Fenomeno 2026',
     type: 'sports',
-    maxSpeed: 62, // ~223 km/h
-    reverseMaxSpeed: 20,
-    acceleration: 36, // Explosive hypercar acceleration
-    brakeForce: 50, // Carbon ceramic brakes
-    turnSpeed: 3.2,
+    maxSpeed: 46, // ~165 km/h (fast & exciting, yet controllable on city streets)
+    reverseMaxSpeed: 14,
+    acceleration: 22, // Progressive, punchy V12 launch
+    brakeForce: 45, // Carbon ceramic brakes
+    turnSpeed: 1.8, // Smooth, realistic turning rate
     mass: 1420,
     health: 600,
     primaryColor: 0xeab308, // Giallo Auge Lamborghini Yellow
@@ -36,11 +36,11 @@ export const VEHICLE_CONFIGS: Record<string, VehicleConfig> = {
     id: 'gt_coupe',
     name: 'Apex GT-99',
     type: 'sports',
-    maxSpeed: 42, // ~150 km/h
-    reverseMaxSpeed: 14,
-    acceleration: 24,
-    brakeForce: 38,
-    turnSpeed: 2.5,
+    maxSpeed: 36, // ~130 km/h
+    reverseMaxSpeed: 12,
+    acceleration: 16,
+    brakeForce: 35,
+    turnSpeed: 1.6,
     mass: 1350,
     health: 400,
     primaryColor: 0x06b6d4, // Neon cyan
@@ -51,11 +51,11 @@ export const VEHICLE_CONFIGS: Record<string, VehicleConfig> = {
     id: 'police_cruiser',
     name: 'Metro Interceptor',
     type: 'police',
-    maxSpeed: 45, // ~162 km/h
-    reverseMaxSpeed: 16,
-    acceleration: 26,
-    brakeForce: 42,
-    turnSpeed: 2.6,
+    maxSpeed: 38, // ~137 km/h
+    reverseMaxSpeed: 14,
+    acceleration: 18,
+    brakeForce: 38,
+    turnSpeed: 1.5,
     mass: 1800,
     health: 600,
     primaryColor: 0x0f172a, // Black & white
@@ -66,11 +66,11 @@ export const VEHICLE_CONFIGS: Record<string, VehicleConfig> = {
     id: 'taxi_sedan',
     name: 'City Crown Cab',
     type: 'taxi',
-    maxSpeed: 32,
+    maxSpeed: 28, // ~100 km/h
     reverseMaxSpeed: 10,
-    acceleration: 16,
-    brakeForce: 30,
-    turnSpeed: 2.1,
+    acceleration: 13,
+    brakeForce: 28,
+    turnSpeed: 1.35,
     mass: 1550,
     health: 350,
     primaryColor: 0xeab308, // Classic Yellow Cab
