@@ -8,6 +8,8 @@ export interface UserStats {
   runnerBestTime?: number;
   spaceGames: number;
   spaceHighScore: number;
+  villageGames?: number;
+  villageBounty?: number;
   coinsTotal: number;
 }
 

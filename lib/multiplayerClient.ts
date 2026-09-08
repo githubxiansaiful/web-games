@@ -92,6 +92,17 @@ class MultiplayerClient {
         this.currentRoom = room;
         this.emitLocal('returned_to_lobby', room);
       });
+
+      // Village real-time sync listeners
+      this.socket.on('remote_village_player_sync', (data: any) => {
+        this.emitLocal('remote_village_player_sync', data);
+      });
+      this.socket.on('remote_village_shoot_sync', (data: any) => {
+        this.emitLocal('remote_village_shoot_sync', data);
+      });
+      this.socket.on('remote_village_action_sync', (data: any) => {
+        this.emitLocal('remote_village_action_sync', data);
+      });
     } catch {
       this.enableFallbackMode();
     }
@@ -185,7 +196,8 @@ class MultiplayerClient {
   public async createRoom(
     code: string,
     player: { name: string; color: string },
-    stageId: number = 1
+    stageId: number = 1,
+    gameType: 'runner' | 'village' = 'runner'
   ): Promise<{ success: boolean; room?: RoomState; message?: string }> {
     const isSocketConnected = await this.waitForConnection();
 
@@ -193,7 +205,7 @@ class MultiplayerClient {
       return new Promise((resolve) => {
         this.socket!.emit(
           'create_room',
-          { code, player, stageId },
+          { code, player, stageId, gameType },
           (res: { success: boolean; room?: RoomState; player?: RoomPlayer; message?: string }) => {
             if (res.success && res.room) {
               this.currentRoom = res.room;
@@ -210,6 +222,7 @@ class MultiplayerClient {
     const roomCode = String(code || Math.floor(100000 + Math.random() * 900000));
     const fallbackRoom: RoomState = {
       code: roomCode,
+      gameType,
       hostId: this.myPlayerId,
       stageId,
       status: 'lobby',
@@ -217,7 +230,7 @@ class MultiplayerClient {
         {
           id: this.myPlayerId,
           name: player.name || 'Host',
-          color: player.color || '#06b6d4',
+          color: player.color || (gameType === 'village' ? '#22c55e' : '#06b6d4'),
           isHost: true,
           isReady: true,
         },
@@ -395,6 +408,42 @@ class MultiplayerClient {
     }
   }
 
+  public emitVillagePlayerSync(data: any) {
+    if (this.socket && this.socket.connected) {
+      this.socket.emit('village_player_sync', data);
+    } else if (this.channel) {
+      this.channel.postMessage({
+        type: 'village_player_sync',
+        senderId: this.myPlayerId,
+        data: { id: this.myPlayerId, ...data },
+      });
+    }
+  }
+
+  public emitVillageShootSync(data: any) {
+    if (this.socket && this.socket.connected) {
+      this.socket.emit('village_shoot_sync', data);
+    } else if (this.channel) {
+      this.channel.postMessage({
+        type: 'village_shoot_sync',
+        senderId: this.myPlayerId,
+        data: { shooterId: this.myPlayerId, ...data },
+      });
+    }
+  }
+
+  public emitVillageActionSync(data: any) {
+    if (this.socket && this.socket.connected) {
+      this.socket.emit('village_action_sync', data);
+    } else if (this.channel) {
+      this.channel.postMessage({
+        type: 'village_action_sync',
+        senderId: this.myPlayerId,
+        data: { senderId: this.myPlayerId, ...data },
+      });
+    }
+  }
+
   public returnToLobby(stageId?: number) {
     if (this.socket && this.socket.connected) {
       this.socket.emit('return_to_lobby', { stageId });
@@ -445,3 +494,4 @@ class MultiplayerClient {
 }
 
 export const multiplayer = new MultiplayerClient();
+export const multiplayerClient = multiplayer;

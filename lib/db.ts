@@ -9,6 +9,8 @@ export interface UserStats {
   runnerBestTime?: number;
   spaceGames: number;
   spaceHighScore: number;
+  villageGames?: number;
+  villageBounty?: number;
   coinsTotal: number;
 }
 
@@ -95,6 +97,20 @@ const DEFAULT_GAMES: GameInfo[] = [
     multiplayer: false,
     icon: '🚀',
   },
+  {
+    id: 'village-outlaws',
+    title: 'Village Outlaws 2D',
+    tagline: 'Open-World Rural Gangs, Police Chases & Co-Op Riding',
+    description: 'Explore a sprawling 4 km² rural village open world. Ride bicycles, high-speed motorcycles, and village buses. Raid bandit outposts, evade 4-star police chases with sirens & roadblocks, and team up with a friend in 2-player realtime co-op!',
+    genre: '2D Open World / Action Driving',
+    tags: ['OPEN WORLD', 'CO-OP MULTIPLAYER', 'POLICE CHASE', 'VEHICLES', 'GUNS & ACTION'],
+    badge: 'HOT',
+    rating: 5.0,
+    playCount: 680,
+    isActive: true,
+    multiplayer: true,
+    icon: '🏍️',
+  },
 ];
 
 function getInitialAdminUsers(): User[] {
@@ -150,6 +166,8 @@ function mapUserRow(row: any): User {
       runnerBestTime: row.runner_best_time != null ? Number(row.runner_best_time) : undefined,
       spaceGames: Number(row.space_games || 0),
       spaceHighScore: Number(row.space_high_score || 0),
+      villageGames: Number(row.village_games || 0),
+      villageBounty: Number(row.village_bounty || 0),
       coinsTotal: Number(row.coins_total || 0),
     },
   };
@@ -283,7 +301,21 @@ class DatabaseService {
             CREATE INDEX IF NOT EXISTS idx_users_email ON users(LOWER(email));
             CREATE INDEX IF NOT EXISTS idx_email_logs_sent_at ON email_logs(sent_at DESC);
             CREATE INDEX IF NOT EXISTS idx_games_play_count ON games(play_count DESC);
+
+            -- Auto-migration for new game columns
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS village_games INTEGER DEFAULT 0;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS village_bounty INTEGER DEFAULT 0;
           `);
+
+          // Seed default games if missing
+          for (const g of DEFAULT_GAMES) {
+            await client.query(
+              `INSERT INTO games (id, title, tagline, description, genre, tags, badge, rating, play_count, is_active, multiplayer, icon)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+               ON CONFLICT (id) DO NOTHING`,
+              [g.id, g.title, g.tagline, g.description, g.genre, g.tags, g.badge, g.rating, g.playCount, g.isActive, g.multiplayer, g.icon]
+            );
+          }
 
           // 2. Check if users table is empty
           const usersCountRes = await client.query('SELECT COUNT(*) as count FROM users');
@@ -593,6 +625,14 @@ class DatabaseService {
         setClauses.push(`space_high_score = $${idx++}`);
         values.push(updates.stats.spaceHighScore);
       }
+      if (updates.stats.villageGames !== undefined) {
+        setClauses.push(`village_games = $${idx++}`);
+        values.push(updates.stats.villageGames);
+      }
+      if (updates.stats.villageBounty !== undefined) {
+        setClauses.push(`village_bounty = $${idx++}`);
+        values.push(updates.stats.villageBounty);
+      }
       if (updates.stats.coinsTotal !== undefined) {
         setClauses.push(`coins_total = $${idx++}`);
         values.push(updates.stats.coinsTotal);
@@ -621,7 +661,7 @@ class DatabaseService {
     return (res.rowCount ?? 0) > 0;
   }
 
-  async updateStats(userId: string, game: 'runner' | 'space', statsUpdate: Partial<UserStats>): Promise<void> {
+  async updateStats(userId: string, game: 'runner' | 'space' | 'village', statsUpdate: Partial<UserStats>): Promise<void> {
     await this.ensureInitialized();
     const user = await this.getUserById(userId);
     if (!user) return;
@@ -631,6 +671,7 @@ class DatabaseService {
       ...statsUpdate,
       runnerGames: user.stats.runnerGames + (game === 'runner' ? 1 : 0),
       spaceGames: user.stats.spaceGames + (game === 'space' ? 1 : 0),
+      villageGames: (user.stats.villageGames || 0) + (game === 'village' ? 1 : 0),
     };
 
     await this.updateUser(userId, { stats: newStats });

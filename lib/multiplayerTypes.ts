@@ -28,6 +28,7 @@ export type RoomPlayer = {
 
 export type RoomState = {
   code: string;
+  gameType?: 'runner' | 'village';
   hostId: string;
   stageId: number;
   status: 'lobby' | 'countdown' | 'in_game' | 'finished';

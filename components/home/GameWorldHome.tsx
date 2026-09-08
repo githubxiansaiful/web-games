@@ -22,14 +22,20 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { GameCanvas } from '@/components/GameCanvas';
 import { SpaceGameCanvas } from '@/components/space-game/SpaceGameCanvas';
+import { VillageGameCanvas } from '@/components/village-game/VillageGameCanvas';
+import { VillageMultiplayerLobby } from '@/components/village-game/VillageMultiplayerLobby';
+import { RoomState } from '@/lib/multiplayerTypes';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 
 export const GameWorldHome: React.FC = () => {
   const { user, isLoading, isAdmin, openAuthModal } = useAuth();
 
-  // Active game view: null (home), 'runner' (Game 1), 'space' (Game 2)
-  const [activeGame, setActiveGame] = useState<'runner' | 'space' | null>(null);
+  // Active game view: null (home), 'runner' (Game 1), 'space' (Game 2), 'village' (Game 3)
+  const [activeGame, setActiveGame] = useState<'runner' | 'space' | 'village' | null>(null);
+  const [showVillageLobby, setShowVillageLobby] = useState(false);
+  const [villageMode, setVillageMode] = useState<'solo' | 'multiplayer'>('solo');
+  const [villageRoom, setVillageRoom] = useState<RoomState | null>(null);
   const [leaderboard, setLeaderboard] = useState<{ topSpace: any[]; topRunner: any[] }>({
     topSpace: [],
     topRunner: [],
@@ -59,9 +65,13 @@ export const GameWorldHome: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  const handlePlayGame = (gameKey: 'runner' | 'space') => {
+  const handlePlayGame = (gameKey: 'runner' | 'space' | 'village') => {
     if (!user) {
       openAuthModal('login');
+      return;
+    }
+    if (gameKey === 'village') {
+      setShowVillageLobby(true);
       return;
     }
     setActiveGame(gameKey);
@@ -99,6 +109,22 @@ export const GameWorldHome: React.FC = () => {
     return (
       <div className="fixed inset-0 z-50 w-full h-full bg-slate-950 overflow-hidden touch-none">
         <SpaceGameCanvas onGoHome={() => setActiveGame(null)} />
+      </div>
+    );
+  }
+
+  // If Game 3 (Village Outlaws 2D) is running
+  if (activeGame === 'village') {
+    return (
+      <div className="fixed inset-0 z-50 w-full h-full bg-black overflow-hidden touch-none">
+        <VillageGameCanvas
+          mode={villageMode}
+          room={villageRoom}
+          onGoHome={() => {
+            setActiveGame(null);
+            setVillageRoom(null);
+          }}
+        />
       </div>
     );
   }
@@ -163,7 +189,7 @@ export const GameWorldHome: React.FC = () => {
         <div className="flex items-center justify-between px-1">
           <h2 className="text-xs font-black tracking-widest text-slate-400 uppercase">CHOOSE GAME</h2>
           <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-            2 TITLES READY
+            3 TITLES READY
           </span>
         </div>
 
@@ -324,6 +350,104 @@ export const GameWorldHome: React.FC = () => {
         </div>
 
         {/* ============================================================ */}
+        {/* GAME CARD 3: VILLAGE OUTLAWS 2D (OPEN WORLD ACTION DRIVING)  */}
+        {/* ============================================================ */}
+        <div className="group relative rounded-3xl bg-slate-900/90 border border-slate-800/90 hover:border-emerald-500/60 overflow-hidden shadow-2xl transition-all duration-200">
+          {/* Visual Poster Banner */}
+          <div className="h-44 sm:h-52 w-full relative overflow-hidden bg-gradient-to-br from-emerald-950 via-slate-900 to-amber-950 flex flex-col justify-end p-4 sm:p-5">
+            {/* Ambient Rural Glow */}
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,#059669_0%,transparent_60%)] opacity-30" />
+            <div className="absolute -top-16 -right-16 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-slate-900 via-slate-900/80 to-transparent" />
+
+            {/* Poster Badges */}
+            <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between z-10">
+              <span className="px-2.5 py-1 rounded-full bg-emerald-600/90 text-white font-black text-[10px] tracking-wider uppercase shadow-md flex items-center gap-1.5">
+                <Users className="w-3 h-3" />
+                <span>2P CO-OP & SOLO</span>
+              </span>
+              <span className="px-2.5 py-1 rounded-full bg-slate-950/80 border border-slate-700/80 text-emerald-400 font-black text-[10px] tracking-wider uppercase">
+                2.6 KM² MAP
+              </span>
+            </div>
+
+            {/* Poster Center Graphic Art */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center opacity-85 group-hover:scale-105 transition-transform duration-300">
+              <div className="w-20 h-20 rounded-2xl bg-emerald-500/10 border border-emerald-400/30 flex items-center justify-center shadow-inner text-4xl">
+                🏍️
+              </div>
+            </div>
+
+            {/* Game Title & Tags on Poster */}
+            <div className="relative z-10 space-y-1">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none">
+                  Village Outlaws 2D
+                </h3>
+                <span className="px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-[10px] tracking-wide">
+                  NEW
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-emerald-300">
+                <span>Cycles, Bikes & Buses</span>
+                <span className="text-slate-600">•</span>
+                <span>Drive-By Gunplay</span>
+                <span className="text-slate-600">•</span>
+                <span>4-Star Police Pursuits</span>
+                <span className="text-slate-600">•</span>
+                <span>Radar Mini-Map</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card Body & Actions */}
+          <div className="p-4 sm:p-5 space-y-3 bg-slate-900/95">
+            {/* User Stats Snapshot if logged in */}
+            {user && (
+              <div className="flex items-center justify-between text-xs bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-800">
+                <span className="text-slate-400 font-medium">Your Village Career:</span>
+                <div className="flex items-center gap-3 font-bold">
+                  <span className="text-amber-400 flex items-center gap-1">
+                    <Coins className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{user.stats?.coinsTotal ?? 0} Coins</span>
+                  </span>
+                  <span className="text-cyan-400">
+                    Bounty: ${user.stats?.villageBounty ?? 0}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Tap To Play Actions */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <button
+                onClick={() => {
+                  if (!user) {
+                    openAuthModal('login');
+                    return;
+                  }
+                  setVillageMode('solo');
+                  setVillageRoom(null);
+                  setActiveGame('village');
+                }}
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-600/30 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Play className="w-4 h-4 fill-white" />
+                <span>PLAY SOLO (FREE ROAM)</span>
+              </button>
+
+              <button
+                onClick={() => handlePlayGame('village')}
+                className="w-full py-3.5 px-4 bg-slate-800 hover:bg-slate-750 border border-slate-700/80 text-emerald-300 hover:text-white font-bold text-sm rounded-2xl transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Users className="w-4 h-4" />
+                <span>2-PLAYER CO-OP</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ============================================================ */}
         {/* 3. ARCADE HIGH SCORE MACHINE (COMMUNITY LEADERBOARD)         */}
         {/* ============================================================ */}
         <div className="rounded-3xl bg-slate-900/80 border border-slate-800 p-4 sm:p-5 space-y-3.5">
@@ -433,6 +557,19 @@ export const GameWorldHome: React.FC = () => {
 
       {/* Auth Modal */}
       <AuthModal />
+
+      {/* Village Outlaws Multiplayer Lobby */}
+      {showVillageLobby && (
+        <VillageMultiplayerLobby
+          onStartGame={(mode, room) => {
+            setVillageMode(mode);
+            setVillageRoom(room || null);
+            setShowVillageLobby(false);
+            setActiveGame('village');
+          }}
+          onClose={() => setShowVillageLobby(false)}
+        />
+      )}
     </div>
   );
 };
