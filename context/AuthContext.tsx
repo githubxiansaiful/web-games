@@ -48,6 +48,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authModalView, setAuthModalView] = useState<'login' | 'register' | 'forgot'>('login');
 
+  // Instant hydration from local storage on client mount: eliminates FOUC (flash of unauthenticated content)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('xian_cached_user');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.id) {
+            setUser(parsed);
+            setIsLoading(false);
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, []);
+
   const fetchCurrentUser = useCallback(async () => {
     try {
       const savedUserId = typeof window !== 'undefined' ? localStorage.getItem('xian_active_user_id') : null;
@@ -58,10 +76,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(data.user);
           if (typeof window !== 'undefined') {
             localStorage.setItem('xian_active_user_id', data.user.id);
+            localStorage.setItem('xian_cached_user', JSON.stringify(data.user));
             localStorage.setItem('runner_player_name', data.user.name);
           }
         } else {
           setUser(null);
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('xian_active_user_id');
+            localStorage.removeItem('xian_cached_user');
+          }
+        }
+      } else if (res.status === 401 || res.status === 403) {
+        setUser(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('xian_active_user_id');
+          localStorage.removeItem('xian_cached_user');
         }
       }
     } catch (e) {
@@ -106,6 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(data.user);
       if (typeof window !== 'undefined') {
         localStorage.setItem('xian_active_user_id', data.user.id);
+        localStorage.setItem('xian_cached_user', JSON.stringify(data.user));
         localStorage.setItem('runner_player_name', data.user.name);
       }
       setIsAuthModalOpen(false);
@@ -129,6 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(data.user);
       if (typeof window !== 'undefined') {
         localStorage.setItem('xian_active_user_id', data.user.id);
+        localStorage.setItem('xian_cached_user', JSON.stringify(data.user));
         localStorage.setItem('runner_player_name', data.user.name);
       }
       setIsAuthModalOpen(false);
@@ -156,6 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(data.user);
       if (typeof window !== 'undefined') {
         localStorage.setItem('xian_active_user_id', data.user.id);
+        localStorage.setItem('xian_cached_user', JSON.stringify(data.user));
         localStorage.setItem('runner_player_name', data.user.name);
       }
       setIsAuthModalOpen(false);
@@ -174,6 +206,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       if (typeof window !== 'undefined') {
         localStorage.removeItem('xian_active_user_id');
+        localStorage.removeItem('xian_cached_user');
       }
     }
   };
@@ -189,8 +222,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const resData = await res.json();
       if (!res.ok) return { success: false, error: resData.error || 'Update failed' };
       setUser(resData.user);
-      if (typeof window !== 'undefined' && resData.user?.name) {
-        localStorage.setItem('runner_player_name', resData.user.name);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('xian_cached_user', JSON.stringify(resData.user));
+        if (resData.user?.name) {
+          localStorage.setItem('runner_player_name', resData.user.name);
+        }
       }
       return { success: true };
     } catch (e: any) {
@@ -211,6 +247,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       if (typeof window !== 'undefined') {
         localStorage.removeItem('xian_active_user_id');
+        localStorage.removeItem('xian_cached_user');
         localStorage.removeItem('runner_player_name');
       }
       return { success: true };

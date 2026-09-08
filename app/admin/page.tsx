@@ -53,7 +53,7 @@ interface SystemStats {
 }
 
 export default function AdminPage() {
-  const { user, isAdmin, login, logout, openAuthModal } = useAuth();
+  const { user, isLoading: isAuthLoading, isAdmin, login, logout, openAuthModal } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'emails' | 'games' | 'settings'>('dashboard');
   const [stats, setStats] = useState<SystemStats | null>(null);
@@ -265,6 +265,15 @@ export default function AdminPage() {
   // ----------------------------------------------------
   // Unauthorized Screen for Non-Admin Users
   // ----------------------------------------------------
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-white">
+        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
+        <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Verifying Admin Session...</span>
+      </div>
+    );
+  }
+
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-white">

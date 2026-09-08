@@ -29,7 +29,7 @@ import { AuthModal } from '@/components/auth/AuthModal';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 
 export const GameWorldHome: React.FC = () => {
-  const { user, isAdmin, logout, openAuthModal } = useAuth();
+  const { user, isLoading, isAdmin, logout, openAuthModal } = useAuth();
 
   // Active game view: null (showcase home), 'runner' (Game 1), 'space' (Game 2)
   const [activeGame, setActiveGame] = useState<'runner' | 'space' | null>(null);
@@ -123,7 +123,11 @@ export const GameWorldHome: React.FC = () => {
 
         {/* Right Nav Auth & Admin Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {user ? (
+          {isLoading ? (
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-28 bg-slate-900/80 border border-slate-800 rounded-2xl animate-pulse" />
+            </div>
+          ) : user ? (
             <div className="flex items-center gap-2">
               {/* Player Profile Capsule (Links to /profile) */}
               <Link
