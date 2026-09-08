@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/context/AuthContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,41 +18,41 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
   ),
-  title: "Runner Royale - 2D Multiplayer Platformer",
+  title: "Xian's Game World - Cyber Arcade & Multiplayer Platform",
   description:
-    "Real-time multiplayer 2D platformer with room creation, double-jump, moving platforms, coins, hazards, and goal flag.",
-  applicationName: "Runner Royale",
+    "Play epic web games on Xian's Game World: Cyber Runner Royale multiplayer platformer and Neon Space Survivor arcade shooter. Real-time multiplayer rooms, solo speedruns, and live leaderboards.",
+  applicationName: "Xian's Game World",
   keywords: [
-    "platformer",
+    "xian games",
+    "web games",
     "multiplayer",
-    "game",
-    "html5 game",
-    "runner",
-    "speedrun",
-    "2d game",
+    "arcade",
+    "runner royale",
+    "space survivor",
+    "html5 games",
     "nextjs",
   ],
-  authors: [{ name: "Platformer Run Team" }],
-  creator: "Platformer Run",
+  authors: [{ name: "Saiful Xian" }],
+  creator: "Saiful Xian",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Runner Royale",
+    title: "Xian's Games",
   },
   openGraph: {
     type: "website",
     locale: "en_US",
-    title: "Runner Royale - 2D Multiplayer Platformer",
+    title: "Xian's Game World - Cyber Arcade & Multiplayer",
     description:
-      "Real-time multiplayer 2D platformer with room creation, double-jump, moving platforms, coins, hazards, and race standings.",
-    siteName: "Runner Royale",
+      "Play epic web games on Xian's Game World: Cyber Runner Royale multiplayer platformer and Neon Space Survivor arcade shooter.",
+    siteName: "Xian's Game World",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Runner Royale - 2D Multiplayer Platformer",
+    title: "Xian's Game World - Cyber Arcade & Multiplayer",
     description:
-      "Real-time multiplayer 2D platformer with room creation, double-jump, moving platforms, coins, and race standings.",
+      "Play epic web games on Xian's Game World: Cyber Runner Royale multiplayer platformer and Neon Space Survivor arcade shooter.",
   },
 };
 
@@ -73,13 +74,15 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased overflow-hidden`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body
         suppressHydrationWarning
-        className="h-full w-full bg-slate-950 text-slate-100 overflow-hidden select-none"
+        className="min-h-full w-full bg-slate-950 text-slate-100 select-none overflow-x-hidden"
       >
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

@@ -1,0 +1,85 @@
+{
+  "users": [
+    {
+      "id": "usr_admin_xian",
+      "name": "Xian Saiful",
+      "email": "xiansaiful@gmail.com",
+      "passwordHash": "a9e83c1530b6cbf4a173c360a660f93918b73e94d168529383ca0e998f7b59eb7d57ca85bda6c3927397329419441fe691d670d2add8fd0c4c17f4760681c9d7",
+      "role": "admin",
+      "status": "active",
+      "avatar": "👑",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "lastLoginAt": "2026-09-08T20:07:52.946Z",
+      "stats": {
+        "runnerGames": 42,
+        "runnerStars": 9,
+        "runnerBestTime": 28.4,
+        "spaceGames": 35,
+        "spaceHighScore": 24850,
+        "coinsTotal": 280
+      }
+    },
+    {
+      "id": "usr_player_demo",
+      "name": "Retro Gamer",
+      "email": "player@xianworld.com",
+      "passwordHash": "77b5c837fa74adac4ad29e1543f3a9556d6cc212648b56a599fba42cdc49d932ffe7016b8eb41273f9842e5a1056481b14b5d5885851a59348379366d69d882f",
+      "role": "user",
+      "status": "active",
+      "avatar": "🎮",
+      "createdAt": "2026-02-15T12:00:00.000Z",
+      "lastLoginAt": "2026-09-08T20:07:52.947Z",
+      "stats": {
+        "runnerGames": 18,
+        "runnerStars": 6,
+        "runnerBestTime": 36.2,
+        "spaceGames": 22,
+        "spaceHighScore": 15400,
+        "coinsTotal": 145
+      }
+    }
+  ],
+  "emailLogs": [],
+  "games": [
+    {
+      "id": "runner-royale",
+      "title": "Cyber Runner Royale",
+      "tagline": "High-Speed Parkour & Multiplayer Racing",
+      "description": "Sprint, jump, dash, and double-jump across 3 neon cyberpunk stages. Speedrun solo with star goals, or challenge friends in live 4-player multiplayer rooms with real-time race sync!",
+      "genre": "2D Platformer / Speedrun",
+      "tags": [
+        "MULTIPLAYER",
+        "SOLO RACING",
+        "PARKOUR",
+        "RETRO NEON",
+        "LEADERBOARDS"
+      ],
+      "badge": "POPULAR",
+      "rating": 4.9,
+      "playCount": 1420,
+      "isActive": true,
+      "multiplayer": true,
+      "icon": "🏃‍♂️"
+    },
+    {
+      "id": "space-survivor",
+      "title": "Neon Space Survivor",
+      "tagline": "Retro Arcade Space Shooter & Boss Battles",
+      "description": "Pilot your neon starfighter against unrelenting swarms of alien drones, cruiser bombers, asteroid storms, and colossal mothership bosses. Collect weapon upgrades, trigger smart bombs, and survive endless waves!",
+      "genre": "Arcade Space Shooter",
+      "tags": [
+        "ACTION ARCADE",
+        "SURVIVAL",
+        "BOSS FIGHTS",
+        "LASER POWERUPS",
+        "HIGH SCORES"
+      ],
+      "badge": "NEW",
+      "rating": 4.8,
+      "playCount": 980,
+      "isActive": true,
+      "multiplayer": false,
+      "icon": "🚀"
+    }
+  ]
+}

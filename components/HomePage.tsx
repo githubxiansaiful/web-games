@@ -345,7 +345,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <LogIn className="w-4 h-4 text-cyan-400" />
-                    <h3 className="font-bold text-base text-white">Join Friend's Room</h3>
+                    <h3 className="font-bold text-base text-white">Join Friend&apos;s Room</h3>
                   </div>
                   <p className="text-xs text-slate-400 mb-5">
                     Enter the 6-digit room code shared by your friend (e.g. <span className="font-mono text-cyan-300 font-bold">123456</span>) to join their lobby.
