@@ -35,7 +35,21 @@ export const GameWorldHome: React.FC = () => {
   const { user, isLoading, isAdmin, openAuthModal } = useAuth();
 
   // Active game view: null (home), 'runner' (Game 1), 'space' (Game 2), 'apex' (Game 3)
-  const [activeGame, setActiveGame] = useState<'runner' | 'space' | 'apex' | null>(null);
+  // Preserves active game state on browser refresh via URL parameter & localStorage
+  const [activeGame, setActiveGame] = useState<'runner' | 'space' | 'apex' | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const gameParam = params.get('game');
+      if (gameParam === 'runner' || gameParam === 'space' || gameParam === 'apex') {
+        return gameParam;
+      }
+      const saved = localStorage.getItem('xian_active_game');
+      if (saved === 'runner' || saved === 'space' || saved === 'apex') {
+        return saved;
+      }
+    }
+    return null;
+  });
   const [showMapPreview, setShowMapPreview] = useState(false);
   const [previewDistrictId, setPreviewDistrictId] = useState<string | null>(null);
   const [leaderboard, setLeaderboard] = useState<{ topSpace: any[]; topRunner: any[] }>({
@@ -67,6 +81,24 @@ export const GameWorldHome: React.FC = () => {
       .catch(() => {});
   }, []);
 
+  // Listen for browser Back / Forward navigation
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const gameParam = params.get('game');
+      if (gameParam === 'runner' || gameParam === 'space' || gameParam === 'apex') {
+        setActiveGame(gameParam);
+      } else {
+        setActiveGame(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const handlePlayGame = (gameKey: 'runner' | 'space' | 'apex') => {
     if (!user) {
       openAuthModal('login');
@@ -75,13 +107,27 @@ export const GameWorldHome: React.FC = () => {
     setActiveGame(gameKey);
   };
 
-  // Lock body scrolling when a game canvas is active, restore for home page
+  // Sync URL query param, localStorage, and body classes when activeGame changes
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const url = new URL(window.location.href);
     if (activeGame) {
+      localStorage.setItem('xian_active_game', activeGame);
+      if (url.searchParams.get('game') !== activeGame) {
+        url.searchParams.set('game', activeGame);
+        window.history.replaceState({}, '', url.toString());
+      }
       document.body.classList.add('game-active');
     } else {
+      localStorage.removeItem('xian_active_game');
+      if (url.searchParams.has('game')) {
+        url.searchParams.delete('game');
+        window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+      }
       document.body.classList.remove('game-active');
     }
+
     return () => {
       document.body.classList.remove('game-active');
     };
