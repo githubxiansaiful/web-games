@@ -64,14 +64,15 @@ export class GameEngine {
     });
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.shadowMap.enabled = false;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
 
     // 3. Scene & Camera
     this.scene = new THREE.Scene();
     const aspect = container.clientWidth / container.clientHeight;
-    this.camera = new THREE.PerspectiveCamera(65, aspect, 0.2, 500);
+    this.camera = new THREE.PerspectiveCamera(65, aspect, 0.2, 1200);
 
     // 4. World Environment
     this.world = new World(this.scene);
@@ -217,6 +218,9 @@ export class GameEngine {
     // 4. Update Player & Controller
     const livingTargets = this.npcManager.getLivingTargets();
     this.playerController.update(dt, livingTargets);
+
+    // 4b. Update World Environment & Dynamic Terrain Chunks
+    this.world.update(dt, this.player.position);
 
     // 5. Update Vehicles
     this.vehicleManager.update(dt);

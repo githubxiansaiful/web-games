@@ -2,100 +2,106 @@ import * as THREE from 'three';
 import { Roads } from './Roads';
 import { Buildings } from './Buildings';
 import { Props } from './Props';
+import { Terrain } from './Terrain';
 import { svgToWorld } from '../data/islandMapData';
 
 export class World {
   public scene: THREE.Scene;
+  public terrain: Terrain;
   public roads: Roads;
   public buildings: Buildings;
   public props: Props;
-  public groundMesh: THREE.Mesh;
   public oceanMesh: THREE.Mesh;
   public lakeMesh: THREE.Mesh;
+  public sunLight!: THREE.DirectionalLight;
   public bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
-    this.bounds = { minX: -650, maxX: 650, minZ: -500, maxZ: 500 };
+    // Generous open world perimeter allowing exploration of all districts, mountains, and beaches
+    this.bounds = { minX: -2000, maxX: 2000, minZ: -2000, maxZ: 2000 };
 
-    // 1. Atmosphere and Fog (Clear Daytime Sky)
-    const skyColor = new THREE.Color(0x60a5fa); // Bright Clear Sky Blue
-    const horizonColor = new THREE.Color(0xbae6fd); // Soft Horizon Blue
+    // 1. Atmospheric Fog & Sky Horizon
+    const skyColor = new THREE.Color(0x60a5fa);    // Bright Clear Sky Blue
+    const horizonColor = new THREE.Color(0xcce2f8); // Soft Atmospheric Horizon
     this.scene.background = skyColor;
-    this.scene.fog = new THREE.FogExp2(0xbae6fd, 0.0018);
+    this.scene.fog = new THREE.FogExp2(0xcce2f8, 0.0012);
 
-    // 2. Daytime Sunlight & Atmospheric Lighting
+    // 2. Daytime Sunlight & PBR Atmospheric Lighting
     this.setupLighting();
 
-    // 3. Ocean Water Plane
+    // 3. Ocean Water Plane (Covering vast territory)
     this.oceanMesh = this.createOcean();
     this.scene.add(this.oceanMesh);
 
-    // 4. Mainland Island Terrain
-    this.groundMesh = this.createMainlandTerrain();
-    this.scene.add(this.groundMesh);
+    // 4. Procedural 3D Terrain System (Multi-surface: Grass, Dirt, Rock, Sand)
+    this.terrain = new Terrain();
+    this.scene.add(this.terrain.group);
 
     // 5. Inland Lake (Lakeview)
     this.lakeMesh = this.createInlandLake();
     this.scene.add(this.lakeMesh);
 
-    // 6. SVG Roads & Arched Bridges
-    this.roads = new Roads();
+    // 6. SVG Roads & Arched Bridges (anchored to terrain elevation)
+    this.roads = new Roads(this.terrain.getHeightAt);
     this.scene.add(this.roads.group);
 
-    // 7. Buildings across all 20 Districts
-    this.buildings = new Buildings();
+    // 7. Buildings across all 20 Districts (anchored to terrain elevation)
+    this.buildings = new Buildings(this.terrain.getHeightAt);
     this.scene.add(this.buildings.group);
 
-    // 8. Props (Trees, Streetlights, Dumpsters, Barriers) with solid colliders
-    this.props = new Props(this.buildings);
+    // 8. Props (Trees, Streetlights, Dumpsters, Barriers) anchored to terrain
+    this.props = new Props(this.buildings, this.terrain.getHeightAt);
     this.scene.add(this.props.group);
   }
 
   private setupLighting(): void {
     // Soft natural daylight ambient fill
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.15);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.95);
     this.scene.add(ambientLight);
 
     // Sky and ground color bounce
-    const hemiLight = new THREE.HemisphereLight(0x7dd3fc, 0x94a3b8, 1.2);
-    hemiLight.position.set(0, 100, 0);
+    const hemiLight = new THREE.HemisphereLight(0x7dd3fc, 0x94a3b8, 1.0);
+    hemiLight.position.set(0, 150, 0);
     this.scene.add(hemiLight);
 
-    // Bright Golden Sun Directional Light (Clean daytime illumination without shadows)
-    const sunLight = new THREE.DirectionalLight(0xfffaed, 2.1);
-    sunLight.position.set(120, 200, 90);
-    sunLight.castShadow = false;
-    this.scene.add(sunLight);
+    // Golden Sun Directional Light with Soft Shadows
+    this.sunLight = new THREE.DirectionalLight(0xfff8ea, 2.0);
+    this.sunLight.position.set(120, 220, 90);
+    this.sunLight.castShadow = true;
+
+    // Crisp high-resolution shadow map
+    this.sunLight.shadow.mapSize.width = 2048;
+    this.sunLight.shadow.mapSize.height = 2048;
+    this.sunLight.shadow.camera.near = 10;
+    this.sunLight.shadow.camera.far = 650;
+
+    // Shadow frustum covering 400m active player radius
+    const d = 200;
+    this.sunLight.shadow.camera.left = -d;
+    this.sunLight.shadow.camera.right = d;
+    this.sunLight.shadow.camera.top = d;
+    this.sunLight.shadow.camera.bottom = -d;
+    this.sunLight.shadow.bias = -0.0004;
+    this.sunLight.shadow.normalBias = 0.03;
+
+    this.scene.add(this.sunLight);
+    this.scene.add(this.sunLight.target);
   }
 
   private createOcean(): THREE.Mesh {
-    const oceanGeo = new THREE.PlaneGeometry(2400, 2000, 16, 16);
+    const oceanGeo = new THREE.PlaneGeometry(8000, 8000, 16, 16);
     const oceanMat = new THREE.MeshStandardMaterial({
-      color: 0x0c344e, // Deep coastal turquoise/navy ocean
-      roughness: 0.15,
-      metalness: 0.8,
+      color: 0x0c3852, // Coastal navy turquoise ocean
+      roughness: 0.12,
+      metalness: 0.75,
     });
     const ocean = new THREE.Mesh(oceanGeo, oceanMat);
     ocean.rotation.x = -Math.PI / 2;
-    ocean.position.y = -0.6; // Slightly below ground level
+    ocean.position.y = -0.2; // Ocean water level
+    ocean.receiveShadow = true;
     ocean.name = 'Ocean';
     return ocean;
-  }
-
-  private createMainlandTerrain(): THREE.Mesh {
-    // Island terrain plane covering entire SVG territory
-    const groundGeo = new THREE.PlaneGeometry(1300, 950, 32, 32);
-    const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x5e8248, // Lush green landscape matching map landGrad
-      roughness: 0.9,
-      metalness: 0.05,
-    });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = 0;
-    ground.name = 'MainlandGround';
-    return ground;
   }
 
   private createInlandLake(): THREE.Mesh {
@@ -103,13 +109,14 @@ export class World {
     const lakePos = svgToWorld(535, 325);
     const lakeGeo = new THREE.CircleGeometry(65, 32);
     const lakeMat = new THREE.MeshStandardMaterial({
-      color: 0x1c4f66,
-      roughness: 0.2,
-      metalness: 0.7,
+      color: 0x1a4a5e,
+      roughness: 0.15,
+      metalness: 0.65,
     });
     const lake = new THREE.Mesh(lakeGeo, lakeMat);
     lake.rotation.x = -Math.PI / 2;
-    lake.position.set(lakePos.x, 0.01, lakePos.z);
+    lake.position.set(lakePos.x, 0.02, lakePos.z);
+    lake.receiveShadow = true;
     lake.name = 'LakeviewLake';
     return lake;
   }
@@ -119,7 +126,7 @@ export class World {
     if (bridgeElev > 0.05) {
       return bridgeElev;
     }
-    return 0; // Base terrain elevation
+    return this.terrain.getHeightAt(x, z);
   }
 
   public resolveCollision(
@@ -129,7 +136,7 @@ export class World {
     let collided = false;
     const normal = new THREE.Vector3();
 
-    // 1. Check island perimeter bounds
+    // 1. Check world perimeter bounds
     if (pos.x < this.bounds.minX + radius) {
       pos.x = this.bounds.minX + radius;
       normal.x = 1;
@@ -199,5 +206,18 @@ export class World {
     };
   }
 
-  public update(_deltaTime: number): void {}
+  /**
+   * Per-frame update for dynamic terrain chunk streaming and player-focused shadow frustum.
+   */
+  public update(_deltaTime: number, playerPos?: THREE.Vector3): void {
+    if (!playerPos) return;
+
+    // 1. Update procedural terrain chunk streaming and LOD around player
+    this.terrain.update(playerPos);
+
+    // 2. Center directional sun shadow frustum on player position
+    this.sunLight.position.set(playerPos.x + 120, playerPos.y + 220, playerPos.z + 90);
+    this.sunLight.target.position.copy(playerPos);
+    this.sunLight.target.updateMatrixWorld();
+  }
 }

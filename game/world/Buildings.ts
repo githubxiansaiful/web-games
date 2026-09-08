@@ -18,13 +18,13 @@ export class Buildings {
   public group: THREE.Group;
   public colliders: ObstacleCollider[] = [];
 
-  constructor() {
+  constructor(getHeight?: (x: number, z: number) => number) {
     this.group = new THREE.Group();
     this.group.name = 'IslandBuildings';
-    this.buildDistrictBuildings();
+    this.buildDistrictBuildings(getHeight);
   }
 
-  private buildDistrictBuildings(): void {
+  private buildDistrictBuildings(getHeight?: (x: number, z: number) => number): void {
     const windowTexture = this.generateWindowTexture();
 
     for (const district of ISLAND_DISTRICTS) {
@@ -41,6 +41,10 @@ export class Buildings {
         const col = i % 4;
         const ox = (col < 2 ? -34 - (1 - col) * 32 : 34 + (col - 2) * 32);
         const oz = (row < 2 ? -34 - (1 - row) * 32 : 34 + (row - 2) * 32);
+
+        const worldX = district.worldPos.x + ox;
+        const worldZ = district.worldPos.z + oz;
+        const baseY = getHeight ? getHeight(worldX, worldZ) : 0;
 
         let w = 24;
         let d = 24;
@@ -87,8 +91,9 @@ export class Buildings {
           neonHex = 0x8b5cf6;
         }
 
-        // 1. Building Mesh Body
-        const bodyGeo = new THREE.BoxGeometry(w, h, d);
+        // 1. Building Mesh Body (anchored slightly into ground so no gap on sloped terrain)
+        const foundationSink = 2.0;
+        const bodyGeo = new THREE.BoxGeometry(w, h + foundationSink, d);
         const clonedMat = new THREE.MeshStandardMaterial({
           color: colorHex,
           roughness: 0.6,
@@ -97,7 +102,9 @@ export class Buildings {
         });
 
         const bodyMesh = new THREE.Mesh(bodyGeo, clonedMat);
-        bodyMesh.position.set(ox, h / 2, oz);
+        bodyMesh.position.set(ox, baseY + (h - foundationSink) / 2 + foundationSink / 2, oz);
+        bodyMesh.castShadow = true;
+        bodyMesh.receiveShadow = true;
         dGroup.add(bodyMesh);
 
         // 2. Base Pedestrian Trim
@@ -105,7 +112,7 @@ export class Buildings {
           new THREE.BoxGeometry(w + 0.8, 3.5, d + 0.8),
           new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.8 })
         );
-        baseTrim.position.set(ox, 1.75, oz);
+        baseTrim.position.set(ox, baseY + 1.75, oz);
         dGroup.add(baseTrim);
 
         // 3. Roof Parapet
@@ -113,18 +120,16 @@ export class Buildings {
           new THREE.BoxGeometry(w + 0.4, 1.2, d + 0.4),
           new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 })
         );
-        roofTrim.position.set(ox, h + 0.6, oz);
+        roofTrim.position.set(ox, baseY + h + 0.6, oz);
         dGroup.add(roofTrim);
 
         // 4. Glowing Neon Accent Trim
         const neonMat = new THREE.MeshBasicMaterial({ color: neonHex });
         const neonBand = new THREE.Mesh(new THREE.BoxGeometry(w + 0.5, 0.5, d + 0.5), neonMat);
-        neonBand.position.set(ox, 3.6, oz);
+        neonBand.position.set(ox, baseY + 3.6, oz);
         dGroup.add(neonBand);
 
         // 5. Register Physical AABB Collision Box in World Coords
-        const worldX = district.worldPos.x + ox;
-        const worldZ = district.worldPos.z + oz;
         const halfW = w / 2;
         const halfD = d / 2;
 
@@ -135,7 +140,7 @@ export class Buildings {
           maxX: worldX + halfW,
           minZ: worldZ - halfD,
           maxZ: worldZ + halfD,
-          height: h,
+          height: baseY + h,
         });
       }
 

@@ -59,6 +59,7 @@ export class Vehicle implements Damageable {
     });
     const chassis = new THREE.Mesh(chassisGeo, chassisMat);
     chassis.position.y = 0.55;
+    chassis.castShadow = true;
     root.add(chassis);
 
     // 2. Cabin / Greenhouse
@@ -70,6 +71,7 @@ export class Vehicle implements Damageable {
     });
     const cabin = new THREE.Mesh(cabinGeo, cabinMat);
     cabin.position.set(0, 1.15, -0.2);
+    cabin.castShadow = true;
     root.add(cabin);
 
     // Windshield & Windows
@@ -138,6 +140,7 @@ export class Vehicle implements Damageable {
 
     wheelPositions.forEach((wp) => {
       const wheelMesh = new THREE.Mesh(wheelGeo, wheelMat);
+      wheelMesh.castShadow = true;
 
       if (wp.isFront) {
         const anchor = new THREE.Group();

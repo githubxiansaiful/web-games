@@ -118,9 +118,10 @@ export class ThirdPersonCamera {
       idealCamPos = lookAtOrigin.clone().add(rayDir.multiplyScalar(safeDist));
     }
 
-    // Prevent camera dipping below ground
-    if (idealCamPos.y < 0.4) {
-      idealCamPos.y = 0.4;
+    // Prevent camera dipping below ground or mountain terrain
+    const groundUnderCam = this.world.getGroundHeight(idealCamPos.x, idealCamPos.z);
+    if (idealCamPos.y < groundUnderCam + 0.6) {
+      idealCamPos.y = groundUnderCam + 0.6;
     }
 
     // 5. Apply smooth damping

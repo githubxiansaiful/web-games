@@ -6,14 +6,14 @@ export class Props {
   public group: THREE.Group;
   private buildings: Buildings;
 
-  constructor(buildings: Buildings) {
+  constructor(buildings: Buildings, getHeight?: (x: number, z: number) => number) {
     this.group = new THREE.Group();
     this.group.name = 'IslandProps';
     this.buildings = buildings;
-    this.buildDistrictProps();
+    this.buildDistrictProps(getHeight);
   }
 
-  private buildDistrictProps(): void {
+  private buildDistrictProps(getHeight?: (x: number, z: number) => number): void {
     const poleGeo = new THREE.CylinderGeometry(0.14, 0.18, 7.5, 8);
     const poleMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
 
@@ -49,12 +49,14 @@ export class Props {
         const off = lampOffsets[i];
         const lx = cx + off.x;
         const lz = cz + off.z;
+        const ly = getHeight ? getHeight(lx, lz) : 0;
 
         const lightGroup = new THREE.Group();
-        lightGroup.position.set(lx, 0, lz);
+        lightGroup.position.set(lx, ly, lz);
 
         const pole = new THREE.Mesh(poleGeo, poleMat);
         pole.position.y = 3.75;
+        pole.castShadow = true;
         lightGroup.add(pole);
 
         const arm = new THREE.Mesh(lampArmGeo, poleMat);
@@ -72,7 +74,7 @@ export class Props {
 
         this.group.add(lightGroup);
 
-        // Solid physical cylinder obstacle collider (cannot walk or drive through pole)
+        // Solid physical cylinder obstacle collider
         this.buildings.registerCustomCollider({
           id: `lamp_${district.id}_${i}`,
           type: 'cylinder',
@@ -83,7 +85,7 @@ export class Props {
           maxX: lx + 0.45,
           minZ: lz - 0.45,
           maxZ: lz + 0.45,
-          height: 8.0,
+          height: ly + 8.0,
         });
       }
 
@@ -99,21 +101,24 @@ export class Props {
         const off = treeOffsets[i];
         const tx = cx + off.x;
         const tz = cz + off.z;
+        const ty = getHeight ? getHeight(tx, tz) : 0;
 
         const treeGroup = new THREE.Group();
-        treeGroup.position.set(tx, 0, tz);
+        treeGroup.position.set(tx, ty, tz);
 
         const trunk = new THREE.Mesh(trunkGeo, trunkMat);
         trunk.position.y = 2.1;
+        trunk.castShadow = true;
         treeGroup.add(trunk);
 
         const leaves = new THREE.Mesh(foliageGeo, foliageMat);
         leaves.position.y = 5.2;
+        leaves.castShadow = true;
         treeGroup.add(leaves);
 
         this.group.add(treeGroup);
 
-        // Solid trunk obstacle collider (character CANNOT go over or through tree trunk!)
+        // Solid trunk obstacle collider
         this.buildings.registerCustomCollider({
           id: `tree_${district.id}_${i}`,
           type: 'cylinder',
@@ -124,15 +129,18 @@ export class Props {
           maxX: tx + 0.75,
           minZ: tz - 0.75,
           maxZ: tz + 0.75,
-          height: 9.0,
+          height: ty + 9.0,
         });
       }
 
       // 3. Dumpsters & Barriers
-      const dumpster = new THREE.Mesh(dumpsterGeo, dumpsterMat);
       const dx = cx - 22;
       const dz = cz + 14;
-      dumpster.position.set(dx, 0.8, dz);
+      const dy = getHeight ? getHeight(dx, dz) : 0;
+
+      const dumpster = new THREE.Mesh(dumpsterGeo, dumpsterMat);
+      dumpster.position.set(dx, dy + 0.8, dz);
+      dumpster.castShadow = true;
       this.group.add(dumpster);
 
       this.buildings.registerCustomCollider({
@@ -142,13 +150,16 @@ export class Props {
         maxX: dx + 1.3,
         minZ: dz - 0.9,
         maxZ: dz + 0.9,
-        height: 2.0,
+        height: dy + 2.0,
       });
 
-      const barrier = new THREE.Mesh(barrierGeo, barrierMat);
       const bx = cx + 22;
       const bz = cz - 14;
-      barrier.position.set(bx, 0.5, bz);
+      const by = getHeight ? getHeight(bx, bz) : 0;
+
+      const barrier = new THREE.Mesh(barrierGeo, barrierMat);
+      barrier.position.set(bx, by + 0.5, bz);
+      barrier.castShadow = true;
       this.group.add(barrier);
 
       this.buildings.registerCustomCollider({
@@ -158,7 +169,7 @@ export class Props {
         maxX: bx + 1.9,
         minZ: bz - 0.4,
         maxZ: bz + 0.4,
-        height: 1.5,
+        height: by + 1.5,
       });
     }
   }

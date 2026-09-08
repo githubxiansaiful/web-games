@@ -41,8 +41,9 @@ export class Player implements Damageable {
   private eventBus: EventBus;
 
   constructor(initialPosition: THREE.Vector3, world: World) {
-    this.position.copy(initialPosition);
     this.world = world;
+    this.position.copy(initialPosition);
+    this.position.y = Math.max(initialPosition.y, this.world.getGroundHeight(this.position.x, this.position.z));
     this.soundManager = SoundManager.getInstance();
     this.eventBus = EventBus.getInstance();
 
@@ -90,6 +91,7 @@ export class Player implements Damageable {
     const torsoGeo = new THREE.BoxGeometry(0.68, 0.75, 0.38);
     const torso = new THREE.Mesh(torsoGeo, jacketMat);
     torso.position.y = 1.25;
+    torso.castShadow = true;
     root.add(torso);
 
     // Neon jacket stripe
@@ -102,6 +104,7 @@ export class Player implements Damageable {
     const headGeo = new THREE.BoxGeometry(0.38, 0.42, 0.38);
     const head = new THREE.Mesh(headGeo, skinMat);
     head.position.y = 1.8;
+    head.castShadow = true;
     root.add(head);
 
     // Cyber Visor / Glasses
@@ -116,10 +119,12 @@ export class Player implements Damageable {
     const legGeo = new THREE.BoxGeometry(0.24, 0.76, 0.26);
     const legLeftMesh = new THREE.Mesh(legGeo, pantsMat);
     legLeftMesh.position.y = -0.38;
+    legLeftMesh.castShadow = true;
     leftLeg.add(legLeftMesh);
 
     const shoeLeft = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.16, 0.35), shoeMat);
     shoeLeft.position.set(0, -0.76, 0.05);
+    shoeLeft.castShadow = true;
     leftLeg.add(shoeLeft);
     root.add(leftLeg);
 
@@ -128,10 +133,12 @@ export class Player implements Damageable {
     rightLeg.position.set(0.2, 0.88, 0);
     const legRightMesh = new THREE.Mesh(legGeo, pantsMat);
     legRightMesh.position.y = -0.38;
+    legRightMesh.castShadow = true;
     rightLeg.add(legRightMesh);
 
     const shoeRight = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.16, 0.35), shoeMat);
     shoeRight.position.set(0, -0.76, 0.05);
+    shoeRight.castShadow = true;
     rightLeg.add(shoeRight);
     root.add(rightLeg);
 
@@ -141,6 +148,7 @@ export class Player implements Damageable {
     const armGeo = new THREE.BoxGeometry(0.2, 0.65, 0.2);
     const armLeftMesh = new THREE.Mesh(armGeo, jacketMat);
     armLeftMesh.position.y = -0.32;
+    armLeftMesh.castShadow = true;
     leftArm.add(armLeftMesh);
     root.add(leftArm);
 
@@ -149,12 +157,14 @@ export class Player implements Damageable {
     rightArm.position.set(0.46, 1.5, 0);
     const armRightMesh = new THREE.Mesh(armGeo, jacketMat);
     armRightMesh.position.y = -0.32;
+    armRightMesh.castShadow = true;
     rightArm.add(armRightMesh);
 
     // Equipped Weapon Mesh
     const gunGeo = new THREE.BoxGeometry(0.12, 0.22, 0.45);
     const gun = new THREE.Mesh(gunGeo, gunMat);
     gun.position.set(0, -0.65, 0.22);
+    gun.castShadow = true;
     rightArm.add(gun);
 
     root.add(rightArm);
@@ -310,7 +320,7 @@ export class Player implements Damageable {
       this.state = 'dead';
       // Fall down on defeat
       this.mesh.rotation.z = Math.PI / 2;
-      this.mesh.position.y = 0.2;
+      this.mesh.position.y = this.world.getGroundHeight(this.position.x, this.position.z) + 0.2;
       this.eventBus.emit('PLAYER_DIED');
     }
 
@@ -323,6 +333,7 @@ export class Player implements Damageable {
     this.armor = 100;
     this.state = 'idle';
     this.position.copy(spawnPosition);
+    this.position.y = Math.max(spawnPosition.y, this.world.getGroundHeight(this.position.x, this.position.z));
     this.velocity.set(0, 0, 0);
     this.mesh.rotation.set(0, 0, 0);
     this.mesh.visible = true;

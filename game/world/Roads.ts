@@ -6,14 +6,14 @@ export class Roads {
   public roadSegments: RoadSegment[];
   private bridgeSegments: Array<{ worldPoints: THREE.Vector3[]; halfW: number }> = [];
 
-  constructor() {
+  constructor(getHeight?: (x: number, z: number) => number) {
     this.group = new THREE.Group();
     this.group.name = 'IslandRoads';
     this.roadSegments = getIslandRoadNetwork();
-    this.buildIslandRoads();
+    this.buildIslandRoads(getHeight);
   }
 
-  private buildIslandRoads(): void {
+  private buildIslandRoads(getHeight?: (x: number, z: number) => number): void {
     const asphaltMaterial = new THREE.MeshStandardMaterial({
       color: 0x181e29,
       roughness: 0.8,
@@ -48,13 +48,14 @@ export class Roads {
       for (let i = 0; i < count; i++) {
         const pt = segment.points[i];
         const w = svgToWorld(pt.x, pt.y);
+        const groundY = getHeight ? getHeight(w.x, w.z) : 0;
 
-        // Bridge elevation curve: rises up in the middle of water
-        let elevation = 0.04;
+        let elevation = groundY + 0.08;
         if (segment.isBridge) {
           const t = i / (count - 1);
-          // Arch elevation profile (up to 7.5m in center)
-          elevation = Math.sin(t * Math.PI) * 7.5 + 0.1;
+          // Arch elevation profile (up to 8m in center, anchored to coastal ground)
+          const archH = Math.sin(t * Math.PI) * 8.0;
+          elevation = Math.max(groundY + 0.1, archH + 0.3);
         }
 
         worldPoints.push(new THREE.Vector3(w.x, elevation, w.z));
@@ -117,6 +118,7 @@ export class Roads {
       roadGeo.setIndex(indices);
 
       const roadMesh = new THREE.Mesh(roadGeo, asphaltMaterial);
+      roadMesh.receiveShadow = true;
       this.group.add(roadMesh);
 
       // 2. Yellow Dashed Centerlines
@@ -145,6 +147,7 @@ export class Roads {
             const pierGeo = new THREE.BoxGeometry(2.4, p.y + 2, 2.4);
             const pier = new THREE.Mesh(pierGeo, bridgePierMaterial);
             pier.position.set(p.x, (p.y - 2) / 2, p.z);
+            pier.castShadow = true;
             this.group.add(pier);
           }
         }
@@ -175,6 +178,7 @@ export class Roads {
             );
             const railGeo = new THREE.TubeGeometry(railCurve, 32, 0.25, 6, false);
             const railMesh = new THREE.Mesh(railGeo, guardrailMaterial);
+            railMesh.castShadow = true;
             this.group.add(railMesh);
           }
         }
