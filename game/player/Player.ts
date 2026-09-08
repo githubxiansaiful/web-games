@@ -26,15 +26,22 @@ export class Player implements Damageable {
 
   public currentVehicle: Vehicle | null = null;
 
-  // Procedural Limb Animation Anchors
-  private torsoMesh: THREE.Mesh;
-  private headMesh: THREE.Mesh;
-  private leftLeg: THREE.Group;
-  private rightLeg: THREE.Group;
-  private leftArm: THREE.Group;
-  private rightArm: THREE.Group;
-  private gunMesh: THREE.Mesh;
+  // Procedural Limb Animation Anchors (Fallback)
+  private placeholderRig!: THREE.Group;
+  private torsoMesh!: THREE.Mesh;
+  private headMesh!: THREE.Mesh;
+  private leftLeg!: THREE.Group;
+  private rightLeg!: THREE.Group;
+  private leftArm!: THREE.Group;
+  private rightArm!: THREE.Group;
+  private gunMesh!: THREE.Mesh;
   private animTimer: number = 0;
+
+  // Real Mixamo FBX Model & Animation Rig
+  public fbxModel: THREE.Group | null = null;
+  private mixer: THREE.AnimationMixer | null = null;
+  private walkAction: THREE.AnimationAction | null = null;
+  public isFbxLoaded: boolean = false;
 
   private world: World;
   private soundManager: SoundManager;
@@ -47,9 +54,12 @@ export class Player implements Damageable {
     this.soundManager = SoundManager.getInstance();
     this.eventBus = EventBus.getInstance();
 
-    // 1. Build Character Rig
+    this.mesh = new THREE.Group();
+    this.mesh.name = 'PlayerCharacter';
+
+    // 1. Build Fallback Character Rig (active until FBX model finishes loading)
     const rig = this.buildCharacterRig();
-    this.mesh = rig.root;
+    this.placeholderRig = rig.root;
     this.torsoMesh = rig.torso;
     this.headMesh = rig.head;
     this.leftLeg = rig.leftLeg;
@@ -57,8 +67,109 @@ export class Player implements Damageable {
     this.leftArm = rig.leftArm;
     this.rightArm = rig.rightArm;
     this.gunMesh = rig.gun;
+    this.mesh.add(this.placeholderRig);
 
     this.mesh.position.copy(this.position);
+
+    // 2. Asynchronously Load Real Mixamo Character Model & Walking Animation
+    this.loadMixamoModel();
+  }
+
+  private loadMixamoModel(): void {
+    if (typeof window === 'undefined') return;
+
+    import('three/examples/jsm/loaders/FBXLoader.js').then(({ FBXLoader }) => {
+      const loader = new FBXLoader();
+
+      loader.load(
+        '/models/character/xbot.fbx',
+        (fbx) => {
+          this.fbxModel = fbx;
+          // Scale from centimeters to meters (180.9cm -> ~1.82m)
+          fbx.scale.setScalar(0.0102);
+
+          // Mixamo FBX models face -Z by default; rotate 180 degrees to face +Z
+          fbx.rotation.y = Math.PI;
+
+          // Enable soft shadows on all character meshes
+          fbx.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              const mesh = child as THREE.SkinnedMesh;
+              if (mesh.material) {
+                const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+                mats.forEach((m) => {
+                  (m as THREE.MeshStandardMaterial).roughness = 0.65;
+                  (m as THREE.MeshStandardMaterial).metalness = 0.25;
+                });
+              }
+            }
+          });
+
+          // Attach firearm weapon directly to the right hand bone
+          let rightHandBone: THREE.Bone | null = null;
+          fbx.traverse((child) => {
+            if (child.name === 'mixamorigRightHand' && (child as THREE.Bone).isBone) {
+              rightHandBone = child as THREE.Bone;
+            }
+          });
+
+          if (rightHandBone) {
+            const gunGeo = new THREE.BoxGeometry(6, 12, 38);
+            const gunMat = new THREE.MeshStandardMaterial({ color: 0x09090b, metalness: 0.9, roughness: 0.2 });
+            const handGun = new THREE.Mesh(gunGeo, gunMat);
+            handGun.castShadow = true;
+            handGun.position.set(0, -6, 14);
+            handGun.rotation.x = -Math.PI / 2;
+            (rightHandBone as THREE.Bone).add(handGun);
+          }
+
+          // Create AnimationMixer for the character skeleton
+          this.mixer = new THREE.AnimationMixer(fbx);
+
+          // Hide placeholder block model and display the realistic Mixamo character
+          this.placeholderRig.visible = false;
+          this.mesh.add(fbx);
+          this.isFbxLoaded = true;
+
+          // Load Walking animation
+          loader.load(
+            '/models/character/walking.fbx',
+            (animFbx) => {
+              if (animFbx.animations.length > 0 && this.mixer) {
+                const walkClip = animFbx.animations[0];
+                walkClip.name = 'walk';
+
+                // In-Place Root Motion Filtering:
+                // Mixamo walking animations by default translate the Hips bone forward along Z.
+                // Lock X and Z on the Hips position track so character walks in-place
+                // while maintaining natural pelvic bobbing (Y) and full leg/arm stride!
+                const hipPosTrack = walkClip.tracks.find((t) => t.name.includes('Hips.position'));
+                if (hipPosTrack && hipPosTrack.values) {
+                  const firstX = hipPosTrack.values[0];
+                  const firstZ = hipPosTrack.values[2];
+                  for (let i = 0; i < hipPosTrack.values.length; i += 3) {
+                    hipPosTrack.values[i] = firstX;
+                    hipPosTrack.values[i + 2] = firstZ;
+                  }
+                }
+
+                this.walkAction = this.mixer.clipAction(walkClip);
+                this.walkAction.setLoop(THREE.LoopRepeat, Infinity);
+                this.walkAction.clampWhenFinished = false;
+                this.walkAction.play();
+                this.walkAction.setEffectiveWeight(0);
+              }
+            },
+            undefined,
+            (err) => console.warn('Failed loading walking.fbx:', err)
+          );
+        },
+        undefined,
+        (err) => console.warn('Failed loading xbot.fbx:', err)
+      );
+    });
   }
 
   private buildCharacterRig(): {
@@ -224,8 +335,27 @@ export class Player implements Damageable {
     this.mesh.position.copy(this.position);
     this.mesh.rotation.y = this.facingAngle;
 
-    // 6. Procedural Limb Animation
-    this.animateLimbs(deltaTime);
+    // 6. Character Animations (Mixamo FBX Skinned Mesh or Procedural Fallback)
+    const horizontalSpeed = Math.sqrt(
+      this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z
+    );
+
+    if (this.isFbxLoaded && this.mixer) {
+      this.mixer.update(deltaTime);
+
+      if (this.walkAction) {
+        if (this.isGrounded && horizontalSpeed > 0.3) {
+          const curWeight = this.walkAction.getEffectiveWeight();
+          this.walkAction.setEffectiveWeight(THREE.MathUtils.lerp(curWeight, 1.0, 12 * deltaTime));
+          this.walkAction.timeScale = horizontalSpeed > 6.0 ? 1.6 : 1.1;
+        } else {
+          const curWeight = this.walkAction.getEffectiveWeight();
+          this.walkAction.setEffectiveWeight(THREE.MathUtils.lerp(curWeight, 0.0, 10 * deltaTime));
+        }
+      }
+    } else {
+      this.animateLimbs(deltaTime);
+    }
   }
 
   private animateLimbs(deltaTime: number): void {
