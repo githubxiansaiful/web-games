@@ -63,18 +63,17 @@ app.prepare().then(() => {
     let currentRoomCode = null;
 
     // 1. Create Room
-    socket.on('create_room', ({ code, player, stageId, gameType }, callback) => {
+    socket.on('create_room', ({ code, player, stageId }, callback) => {
       const roomCode = String(code || Math.floor(100000 + Math.random() * 900000));
-      const room = getOrCreateRoom(roomCode, gameType || 'runner');
+      const room = getOrCreateRoom(roomCode, 'runner');
 
       currentRoomCode = roomCode;
       socket.join(roomCode);
 
-      const defaultPrefix = gameType === 'village' ? 'Outlaw ' : 'Runner ';
       const playerData = {
         id: socket.id,
-        name: player.name || defaultPrefix + socket.id.slice(0, 4),
-        color: player.color || (gameType === 'village' ? '#22c55e' : '#06b6d4'),
+        name: player.name || 'Runner ' + socket.id.slice(0, 4),
+        color: player.color || '#06b6d4',
         isHost: true,
         isReady: true,
       };
@@ -104,9 +103,8 @@ app.prepare().then(() => {
         return;
       }
 
-      const maxLimit = room.gameType === 'village' ? 2 : 8;
-      if (room.players.size >= maxLimit) {
-        if (callback) callback({ success: false, message: `Room is full (maximum ${maxLimit} players for this game).` });
+      if (room.players.size >= 8) {
+        if (callback) callback({ success: false, message: 'Room is full (maximum 8 players).' });
         return;
       }
 
@@ -195,31 +193,6 @@ app.prepare().then(() => {
       io.to(currentRoomCode).emit('remote_player_emote', {
         id: socket.id,
         emoji,
-      });
-    });
-
-    // 7b. Village Real-Time Synchronizations (2-Player Co-Op)
-    socket.on('village_player_sync', (data) => {
-      if (!currentRoomCode) return;
-      socket.to(currentRoomCode).emit('remote_village_player_sync', {
-        id: socket.id,
-        ...data,
-      });
-    });
-
-    socket.on('village_shoot_sync', (data) => {
-      if (!currentRoomCode) return;
-      socket.to(currentRoomCode).emit('remote_village_shoot_sync', {
-        shooterId: socket.id,
-        ...data,
-      });
-    });
-
-    socket.on('village_action_sync', (data) => {
-      if (!currentRoomCode) return;
-      socket.to(currentRoomCode).emit('remote_village_action_sync', {
-        senderId: socket.id,
-        ...data,
       });
     });
 

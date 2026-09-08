@@ -19,8 +19,7 @@ export async function POST(req: Request) {
     }
 
     if (userId && stats) {
-      const gameKey =
-        gameId === 'space-survivor' ? 'space' : gameId === 'village-outlaws' ? 'village' : 'runner';
+      const gameKey = gameId === 'space-survivor' ? 'space' : 'runner';
       await db.updateStats(userId, gameKey, stats);
     }
 
