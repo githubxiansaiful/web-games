@@ -67,10 +67,22 @@ export const GameWorldHome: React.FC = () => {
     setActiveGame(gameKey);
   };
 
+  // Lock body scrolling when a game canvas is active, restore for home page
+  useEffect(() => {
+    if (activeGame) {
+      document.body.classList.add('game-active');
+    } else {
+      document.body.classList.remove('game-active');
+    }
+    return () => {
+      document.body.classList.remove('game-active');
+    };
+  }, [activeGame]);
+
   // If Game 1 (Runner Royale) is running
   if (activeGame === 'runner') {
     return (
-      <div className="relative w-full h-screen bg-slate-950 overflow-hidden">
+      <div className="fixed inset-0 z-50 w-full h-full bg-slate-950 overflow-hidden touch-none">
         <GameCanvas />
         <button
           onClick={() => setActiveGame(null)}
@@ -85,14 +97,14 @@ export const GameWorldHome: React.FC = () => {
   // If Game 2 (Space Survivor) is running
   if (activeGame === 'space') {
     return (
-      <div className="relative w-full h-screen bg-slate-950 overflow-hidden">
+      <div className="fixed inset-0 z-50 w-full h-full bg-slate-950 overflow-hidden touch-none">
         <SpaceGameCanvas onGoHome={() => setActiveGame(null)} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#060913] text-slate-100 flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen w-full bg-[#060913] text-slate-100 flex flex-col antialiased selection:bg-indigo-500 selection:text-white pb-16">
       {/* 1. FLOATING MINIMAL TOP BAR (NO BULKY NAVBAR) */}
       <div className="w-full max-w-2xl mx-auto px-4 pt-4 pb-2 flex items-center justify-between">
         {/* Brand Mark */}
