@@ -14,6 +14,7 @@ import {
   Maximize,
   Minimize,
   Gamepad2,
+  Home,
 } from 'lucide-react';
 
 interface HUDProps {
@@ -25,11 +26,14 @@ interface HUDProps {
   isMuted: boolean;
   activeCheckpoint: string | null;
   showTouchControls: boolean;
+  isMultiplayer?: boolean;
+  roomCode?: string;
   onToggleMute: () => void;
   onRestart: () => void;
   onPause: () => void;
   onOpenLevelSelect: () => void;
   onToggleTouchControls: () => void;
+  onGoHome?: () => void;
 }
 
 export const HUD: React.FC<HUDProps> = ({
@@ -41,11 +45,14 @@ export const HUD: React.FC<HUDProps> = ({
   isMuted,
   activeCheckpoint,
   showTouchControls,
+  isMultiplayer,
+  roomCode,
   onToggleMute,
   onRestart,
   onPause,
   onOpenLevelSelect,
   onToggleTouchControls,
+  onGoHome,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -79,17 +86,36 @@ export const HUD: React.FC<HUDProps> = ({
 
   return (
     <div className="absolute top-0 left-0 right-0 p-2 sm:p-4 safe-top safe-left safe-right flex flex-wrap items-center justify-between pointer-events-none z-20 gap-1.5 sm:gap-2">
-      {/* Left side: Stage Info & Checkpoint */}
+      {/* Left side: Stage Info, Checkpoint & Home */}
       <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto">
-        <div className="bg-slate-900/85 backdrop-blur-md border border-slate-700/60 rounded-xl px-2.5 sm:px-3 py-1.5 shadow-lg flex items-center gap-2 text-white">
+        {onGoHome && (
           <button
-            onClick={onOpenLevelSelect}
-            className="flex items-center gap-1 px-2 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-semibold tracking-wide transition active:scale-95 cursor-pointer"
-            title="Choose Stage"
+            onClick={onGoHome}
+            className="p-2 bg-slate-900/85 hover:bg-slate-800 backdrop-blur-md border border-slate-700/60 rounded-xl text-slate-200 hover:text-white transition active:scale-95 shadow-md cursor-pointer"
+            title="Main Menu"
           >
-            <Layers className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Stages</span>
+            <Home className="w-4 h-4" />
           </button>
+        )}
+
+        {roomCode && (
+          <div className="bg-indigo-950/85 backdrop-blur-md border border-indigo-500/60 rounded-xl px-2.5 py-1.5 text-indigo-300 font-mono text-xs font-bold shadow-md flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>#{roomCode}</span>
+          </div>
+        )}
+
+        <div className="bg-slate-900/85 backdrop-blur-md border border-slate-700/60 rounded-xl px-2.5 sm:px-3 py-1.5 shadow-lg flex items-center gap-2 text-white">
+          {!isMultiplayer && (
+            <button
+              onClick={onOpenLevelSelect}
+              className="flex items-center gap-1 px-2 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-semibold tracking-wide transition active:scale-95 cursor-pointer"
+              title="Choose Stage"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Stages</span>
+            </button>
+          )}
           <span className="font-bold text-xs sm:text-sm tracking-wide text-slate-100 max-w-[110px] xs:max-w-[150px] sm:max-w-none truncate">
             {levelName}
           </span>

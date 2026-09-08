@@ -71,7 +71,13 @@ export class GameRenderer {
     player: PlayerState,
     level: LevelData,
     particles: Particle[],
-    floatingTexts: FloatingText[]
+    floatingTexts: FloatingText[],
+    localPlayerColor: string = '#06b6d4',
+    localPlayerName: string = 'You',
+    localPlayerId: string = 'local',
+    remotePlayers?: Map<string, any>,
+    leaderId?: string | null,
+    localEmote?: { emoji: string; timer: number } | null
   ) {
     ctx.clearRect(0, 0, width, height);
 
@@ -132,9 +138,56 @@ export class GameRenderer {
     // Particles
     this.drawParticles(ctx, particles);
 
-    // Player
+    // Remote Players (Multiplayer)
+    if (remotePlayers) {
+      for (const [id, rp] of remotePlayers.entries()) {
+        if (!rp.isDead) {
+          const isLeader = leaderId === id;
+          this.drawPlayerVisual(
+            ctx,
+            rp.x,
+            rp.y,
+            rp.facing,
+            rp.squashX || 1,
+            rp.squashY || 1,
+            rp.width || 28,
+            rp.height || 38,
+            rp.vx,
+            rp.grounded,
+            rp.canDoubleJump ?? false,
+            rp.color || '#ec4899',
+            rp.name || 'Rival',
+            isLeader,
+            rp.currentEmote?.emoji,
+            0,
+            rp.trail || []
+          );
+        }
+      }
+    }
+
+    // Local Player
     if (!player.isDead) {
-      this.drawPlayer(ctx, player);
+      const isLeader = leaderId === 'local' || leaderId === localPlayerId;
+      this.drawPlayerVisual(
+        ctx,
+        player.x,
+        player.y,
+        player.facing,
+        player.squashX,
+        player.squashY,
+        player.width,
+        player.height,
+        player.vx,
+        player.grounded,
+        player.canDoubleJump,
+        localPlayerColor,
+        localPlayerName,
+        isLeader,
+        localEmote?.emoji,
+        player.invulnerableTimer,
+        player.trail
+      );
     }
 
     // Floating combat / score texts
@@ -569,36 +622,54 @@ export class GameRenderer {
     ctx.shadowBlur = 0;
   }
 
-  private drawPlayer(ctx: CanvasRenderingContext2D, player: PlayerState) {
+  private drawPlayerVisual(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    facing: 1 | -1,
+    squashX: number,
+    squashY: number,
+    width: number,
+    height: number,
+    vx: number,
+    grounded: boolean,
+    canDoubleJump: boolean,
+    color: string,
+    name: string,
+    isLeader: boolean,
+    emoji?: string,
+    invulnerableTimer: number = 0,
+    trail: Array<{ x: number; y: number; alpha: number }> = []
+  ) {
     ctx.save();
 
     // Invulnerability flashing
-    if (player.invulnerableTimer > 0 && Math.floor(player.invulnerableTimer * 12) % 2 === 0) {
+    if (invulnerableTimer > 0 && Math.floor(invulnerableTimer * 12) % 2 === 0) {
       ctx.globalAlpha = 0.35;
     }
 
     // Double jump ghosts / trail
-    for (const tr of player.trail) {
+    for (const tr of trail) {
       ctx.save();
       ctx.globalAlpha = tr.alpha * 0.4;
-      ctx.fillStyle = '#38bdf8';
-      this.roundRect(ctx, tr.x, tr.y, player.width, player.height, 8);
+      ctx.fillStyle = color;
+      this.roundRect(ctx, tr.x, tr.y, width, height, 8);
       ctx.fill();
       ctx.restore();
     }
 
     // Pivot around bottom-center for squash & stretch
-    const cx = player.x + player.width / 2;
-    const cy = player.y + player.height;
+    const cx = x + width / 2;
+    const cy = y + height;
 
     ctx.translate(cx, cy);
-    ctx.scale(player.facing * player.squashX, player.squashY);
+    ctx.scale(facing * squashX, squashY);
 
-    const w = player.width;
-    const h = player.height;
+    const w = width;
+    const h = height;
 
     // Cape / Scarf fluttering behind player
-    const capeTilt = -player.facing * (player.vx / 300) * 16;
+    const capeTilt = -facing * (vx / 300) * 16;
     const capeFlap = Math.sin(this.animTime * 12) * 5;
     ctx.fillStyle = '#f43f5e';
     ctx.beginPath();
@@ -608,8 +679,8 @@ export class GameRenderer {
     ctx.closePath();
     ctx.fill();
 
-    // Hero Main Body Suit
-    ctx.fillStyle = '#2563eb';
+    // Hero Main Body Suit with chosen color
+    ctx.fillStyle = color;
     this.roundRect(ctx, -w / 2, -h, w, h * 0.85, 8);
     ctx.fill();
 
@@ -618,37 +689,90 @@ export class GameRenderer {
     ctx.fillRect(-w / 2, -h * 0.42, w, 4);
 
     // Head / Helmet
-    ctx.fillStyle = '#1e40af';
+    ctx.fillStyle = color;
+    this.roundRect(ctx, -w * 0.45, -h * 0.95, w * 0.9, h * 0.45, 6);
+    ctx.fill();
+
+    // Helmet subtle shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
     this.roundRect(ctx, -w * 0.45, -h * 0.95, w * 0.9, h * 0.45, 6);
     ctx.fill();
 
     // Glowing Visor
-    ctx.fillStyle = '#38bdf8';
-    ctx.shadowColor = '#38bdf8';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = color;
     ctx.shadowBlur = 6;
     ctx.fillRect(-w * 0.05, -h * 0.85, w * 0.45, 7);
     ctx.shadowBlur = 0;
 
     // Feet / Shoes
     ctx.fillStyle = '#0f172a';
-    if (player.grounded) {
-      // Running bounce
-      const legRun = Math.sin(player.runFrame) * 4;
-      ctx.fillRect(-w * 0.4, -h * 0.15 + (player.vx !== 0 ? legRun : 0), w * 0.35, h * 0.15);
-      ctx.fillRect(w * 0.05, -h * 0.15 - (player.vx !== 0 ? legRun : 0), w * 0.35, h * 0.15);
+    if (grounded) {
+      const legRun = Math.sin(this.animTime * 14) * 4;
+      ctx.fillRect(-w * 0.4, -h * 0.15 + (vx !== 0 ? legRun : 0), w * 0.35, h * 0.15);
+      ctx.fillRect(w * 0.05, -h * 0.15 - (vx !== 0 ? legRun : 0), w * 0.35, h * 0.15);
     } else {
-      // Air jump pose
       ctx.fillRect(-w * 0.4, -h * 0.25, w * 0.35, h * 0.2);
       ctx.fillRect(w * 0.05, -h * 0.2, w * 0.35, h * 0.2);
     }
 
     // Double Jump Aura ring when in air with double jump ready
-    if (!player.grounded && player.canDoubleJump) {
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+    if (!grounded && canDoubleJump) {
+      ctx.strokeStyle = color;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(0, -h * 0.5, w * 0.8, 0, Math.PI * 2);
       ctx.stroke();
+    }
+
+    ctx.restore();
+
+    // ==========================================
+    // FLOATING HEAD OVERLAYS (Name Tag, Crown, Emote)
+    // ==========================================
+    ctx.save();
+    ctx.translate(cx, y);
+
+    // 1. Race Leader Crown 👑
+    if (isLeader) {
+      const crownBob = Math.sin(this.animTime * 6) * 3;
+      ctx.font = '16px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('👑', 0, -38 + crownBob);
+    }
+
+    // 2. Player Name Tag
+    if (name) {
+      ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      const textMetrics = ctx.measureText(name);
+      const tagW = Math.max(36, textMetrics.width + 12);
+      const tagH = 16;
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      this.roundRect(ctx, -tagW / 2, -22, tagW, tagH, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(name, 0, -10);
+    }
+
+    // 3. Active Emote Speech Bubble
+    if (emoji) {
+      const emoteBob = Math.sin(this.animTime * 8) * 4;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 2;
+      this.roundRect(ctx, -16, -58 + emoteBob, 32, 28, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.font = '16px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(emoji, 0, -39 + emoteBob);
     }
 
     ctx.restore();
