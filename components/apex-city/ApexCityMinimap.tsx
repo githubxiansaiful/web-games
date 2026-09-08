@@ -17,7 +17,7 @@ export const ApexCityMinimap: React.FC<ApexCityMinimapProps> = ({ onOpenFullMap 
   useEffect(() => {
     // Preload the real SVG map image
     const img = new Image();
-    img.src = '/maps/game-map.svg';
+    img.src = '/maps/apex-city-map.svg';
     img.onload = () => {
       mapImageRef.current = img;
       setImageLoaded(true);
