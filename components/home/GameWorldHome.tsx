@@ -581,7 +581,7 @@ export const GameWorldHome: React.FC = () => {
           {/* Map Content */}
           <div className="relative flex-1 my-3 rounded-2xl overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl flex items-center justify-center">
             <GameMap
-              src="/maps/apex-city-map.svg"
+              src="/maps/game-map.svg"
               className="w-full h-full"
               highlightId={previewDistrictId}
               onSelectDistrict={(id) => setPreviewDistrictId(id)}

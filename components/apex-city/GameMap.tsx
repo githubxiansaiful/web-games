@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { ISLAND_DISTRICTS, DistrictInfo } from "@/game/data/islandMapData";
 
 export interface GameMapProps {
   src?: string;
@@ -11,22 +10,42 @@ export interface GameMapProps {
   playerPos?: { x: number; z: number; angle?: number } | null;
   waypointPos?: { x: number; z: number } | null;
   vehicles?: Array<{ x: number; z: number; type: string }>;
-  showDistrictLabels?: boolean;
 }
 
+export const DISTRICT_LABEL_IDS = [
+  "label-mount-crest",
+  "label-caldera-pass",
+  "label-redwood",
+  "label-sandy-ridge",
+  "label-northwood",
+  "label-lakeview",
+  "label-eastvale",
+  "label-central-city",
+  "label-oak-heights",
+  "label-pacific-bluffs",
+  "label-riverside",
+  "label-harborview",
+  "label-southbridge",
+  "label-sunset-bay",
+  "label-dragon-island",
+  "label-west-end",
+  "label-skyline-airport",
+  "label-twin-beaches",
+  "label-southport",
+  "label-crescent-island",
+];
+
 export const GameMap: React.FC<GameMapProps> = ({
-  src = "/maps/apex-city-map.svg",
+  src = "/maps/game-map.svg",
   className,
   onSelectDistrict,
   highlightId,
   playerPos,
   waypointPos,
   vehicles,
-  showDistrictLabels = true,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(false);
-  const [hoveredDistrict, setHoveredDistrict] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,7 +57,6 @@ export const GameMap: React.FC<GameMapProps> = ({
         containerRef.current.innerHTML = svgText;
         setLoaded(true);
 
-        // Ensure the loaded SVG scales responsively and keeps aspect ratio
         const svgEl = containerRef.current.querySelector("svg");
         if (svgEl) {
           svgEl.setAttribute("width", "100%");
@@ -48,13 +66,47 @@ export const GameMap: React.FC<GameMapProps> = ({
           svgEl.style.maxWidth = "100%";
           svgEl.style.maxHeight = "100%";
         }
+
+        // Wire up interactivity on the district label groups
+        DISTRICT_LABEL_IDS.forEach((id) => {
+          const el = containerRef.current?.querySelector<SVGGElement>(`#${id}`);
+          if (!el) return;
+          el.style.cursor = "pointer";
+          el.style.transition = "opacity 0.2s ease, transform 0.2s ease";
+          el.addEventListener("click", () => {
+            const cleanId = id.replace("label-", "");
+            onSelectDistrict?.(cleanId);
+          });
+          el.addEventListener("mouseenter", () => {
+            el.setAttribute("opacity", "0.75");
+          });
+          el.addEventListener("mouseleave", () => {
+            el.setAttribute("opacity", "1");
+          });
+        });
       })
-      .catch((err) => console.error("Error loading apex city map SVG:", err));
+      .catch((err) => console.error("Error loading vector game map SVG:", err));
 
     return () => {
       cancelled = true;
     };
-  }, [src]);
+  }, [src, onSelectDistrict]);
+
+  // Highlight a district from outside
+  useEffect(() => {
+    if (!loaded || !containerRef.current) return;
+    DISTRICT_LABEL_IDS.forEach((id) => {
+      const el = containerRef.current?.querySelector<SVGGElement>(`#${id}`);
+      if (!el) return;
+      const cleanId = id.replace("label-", "");
+      const isTarget =
+        highlightId &&
+        (id === highlightId ||
+          cleanId === highlightId ||
+          `label-${highlightId}` === id);
+      el.setAttribute("opacity", highlightId && !isTarget ? "0.35" : "1");
+    });
+  }, [highlightId, loaded]);
 
   // Convert 3D world coords (centered at Central City 750, 440) to SVG coords (0..1536, 0..1024)
   const worldToSvg = (wx: number, wz: number) => {
@@ -71,13 +123,13 @@ export const GameMap: React.FC<GameMapProps> = ({
     <div
       className={`relative w-full h-full overflow-hidden flex items-center justify-center ${className || ""}`}
     >
-      {/* 1. Underlying SVG Map Base */}
+      {/* 1. Underlying Editable Vector SVG Map */}
       <div
         ref={containerRef}
         className="w-full h-full flex items-center justify-center select-none"
       />
 
-      {/* 2. Interactive SVG Vector Overlay (Labels, Blips, Waypoints) */}
+      {/* 2. Real-time Entities Overlay (Player, Waypoints, Vehicles) */}
       {loaded && (
         <svg
           viewBox="0 0 1536 1024"
@@ -85,143 +137,53 @@ export const GameMap: React.FC<GameMapProps> = ({
           className="absolute inset-0 w-full h-full pointer-events-none select-none"
         >
           <defs>
-            <filter id="badgeGlow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#06b6d4" floodOpacity="0.6" />
-            </filter>
             <filter id="playerGlow" x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#38bdf8" floodOpacity="0.9" />
+              <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#38bdf8" floodOpacity="0.9" />
             </filter>
             <filter id="waypointGlow" x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#facc15" floodOpacity="0.9" />
+              <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#facc15" floodOpacity="0.95" />
             </filter>
           </defs>
 
-          {/* 2A. Interactive District Pins & Badges */}
-          {showDistrictLabels &&
-            ISLAND_DISTRICTS.map((d: DistrictInfo) => {
-              const isSelected =
-                highlightId === d.id || highlightId === `label-${d.id}`;
-              const isHovered = hoveredDistrict === d.id;
-              const pillWidth = Math.max(90, d.name.length * 7.5 + 26);
-              const halfW = pillWidth / 2;
-
-              // Color accents by district category
-              const accentColor =
-                d.buildingType === "skyscraper"
-                  ? "#06b6d4" // Downtown Cyan
-                  : d.buildingType === "industrial"
-                  ? "#f59e0b" // Industrial Amber
-                  : d.buildingType === "airport"
-                  ? "#38bdf8" // Airport Sky
-                  : d.buildingType === "resort"
-                  ? "#14b8a6" // Resort Teal
-                  : "#a855f7"; // Residential Purple
-
-              return (
-                <g
-                  key={d.id}
-                  id={`label-${d.id}`}
-                  transform={`translate(${d.svgPos.x}, ${d.svgPos.y})`}
-                  className="pointer-events-auto cursor-pointer"
-                  onClick={() => onSelectDistrict?.(d.id)}
-                  onMouseEnter={() => setHoveredDistrict(d.id)}
-                  onMouseLeave={() => setHoveredDistrict(null)}
-                  opacity={
-                    highlightId && !isSelected && !isHovered ? 0.45 : 1
-                  }
-                  style={{ transition: "opacity 0.2s ease" }}
-                >
-                  {/* Badge Background Pill */}
-                  <rect
-                    x={-halfW}
-                    y={-14}
-                    width={pillWidth}
-                    height={28}
-                    rx={14}
-                    fill={
-                      isSelected
-                        ? "rgba(15, 23, 42, 0.95)"
-                        : isHovered
-                        ? "rgba(30, 41, 59, 0.95)"
-                        : "rgba(10, 15, 29, 0.85)"
-                    }
-                    stroke={
-                      isSelected
-                        ? "#06b6d4"
-                        : isHovered
-                        ? "#94a3b8"
-                        : "rgba(100, 116, 139, 0.5)"
-                    }
-                    strokeWidth={isSelected ? 2.5 : 1.2}
-                    filter={isSelected ? "url(#badgeGlow)" : undefined}
-                  />
-
-                  {/* Category Accent Dot */}
-                  <circle
-                    cx={-halfW + 12}
-                    cy={0}
-                    r={isSelected || isHovered ? 4.5 : 3.5}
-                    fill={accentColor}
-                  />
-
-                  {/* District Name */}
-                  <text
-                    x={-halfW + 22}
-                    y={4}
-                    fill={isSelected ? "#38bdf8" : "#f8fafc"}
-                    fontSize="11"
-                    fontWeight={isSelected ? "900" : "700"}
-                    fontFamily="system-ui, -apple-system, sans-serif"
-                    letterSpacing="0.3"
-                  >
-                    {d.name}
-                  </text>
-                </g>
-              );
-            })}
-
-          {/* 2B. Live Vehicle Blips */}
+          {/* Vehicles Blips */}
           {vehicles?.map((v, i) => {
             const pos = worldToSvg(v.x, v.z);
-            const isPolice = v.type === "police";
-            const isSports = v.type === "sports";
-            const fillColor = isPolice
-              ? "#3b82f6"
-              : isSports
-              ? "#06b6d4"
-              : "#eab308";
-
+            const color =
+              v.type === "police"
+                ? "#3b82f6"
+                : v.type === "sports"
+                ? "#06b6d4"
+                : "#eab308";
             return (
               <g key={i} transform={`translate(${pos.x}, ${pos.y})`}>
                 <circle
                   r="7"
-                  fill={fillColor}
+                  fill={color}
                   stroke="#ffffff"
                   strokeWidth="2"
-                  filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.5))"
+                  filter="drop-shadow(0 2px 4px rgba(0,0,0,0.5))"
                 />
               </g>
             );
           })}
 
-          {/* 2C. Mission Waypoint Pulsing Marker */}
+          {/* Mission Waypoint Pulsing Diamond */}
           {wSvg && (
             <g transform={`translate(${wSvg.x}, ${wSvg.y})`} filter="url(#waypointGlow)">
               <circle r="14" fill="#facc15" fillOpacity="0.35">
                 <animate
                   attributeName="r"
-                  values="10;22;10"
-                  dur="1.6s"
+                  values="10;24;10"
+                  dur="1.5s"
                   repeatCount="indefinite"
                 />
                 <animate
                   attributeName="fillOpacity"
                   values="0.5;0.1;0.5"
-                  dur="1.6s"
+                  dur="1.5s"
                   repeatCount="indefinite"
                 />
               </circle>
-              {/* Outer rotated diamond */}
               <polygon
                 points="0,-14 12,0 0,14 -12,0"
                 fill="#facc15"
@@ -232,15 +194,10 @@ export const GameMap: React.FC<GameMapProps> = ({
             </g>
           )}
 
-          {/* 2D. Live Player Blip & Heading Arrow */}
+          {/* Player Live Marker & Heading Direction Arrow */}
           {pSvg && (
             <g transform={`translate(${pSvg.x}, ${pSvg.y})`} filter="url(#playerGlow)">
-              <circle
-                r="10"
-                fill="#0ea5e9"
-                stroke="#ffffff"
-                strokeWidth="2.5"
-              />
+              <circle r="10" fill="#0ea5e9" stroke="#ffffff" strokeWidth="2.5" />
               {playerPos?.angle !== undefined && (
                 <path
                   d="M 0 -17 L 7 2 L 0 -2 L -7 2 Z"
@@ -258,7 +215,7 @@ export const GameMap: React.FC<GameMapProps> = ({
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 text-slate-400 gap-3">
           <div className="w-10 h-10 border-3 border-cyan-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-xs font-bold tracking-wider uppercase text-cyan-400">
-            Streaming Apex Island Vector Map...
+            Loading Vector Game Map...
           </span>
         </div>
       )}
