@@ -37,8 +37,8 @@ export class Player implements Damageable {
   private gunMesh!: THREE.Mesh;
   private animTimer: number = 0;
 
-  // Real Mixamo FBX Model & Animation Rig
-  public fbxModel: THREE.Group | null = null;
+  // Real Mixamo FBX / GLTF Character Model & Animation Rig
+  public fbxModel: THREE.Object3D | null = null;
   private mixer: THREE.AnimationMixer | null = null;
   private walkAction: THREE.AnimationAction | null = null;
   private idleAction: THREE.AnimationAction | null = null;
@@ -58,7 +58,7 @@ export class Player implements Damageable {
     this.mesh = new THREE.Group();
     this.mesh.name = 'PlayerCharacter';
 
-    // 1. Build Fallback Character Rig (active until FBX model finishes loading)
+    // 1. Build Fallback Character Rig (active until character model finishes loading)
     const rig = this.buildCharacterRig();
     this.placeholderRig = rig.root;
     this.torsoMesh = rig.torso;
@@ -72,45 +72,52 @@ export class Player implements Damageable {
 
     this.mesh.position.copy(this.position);
 
-    // 2. Asynchronously Load Real Mixamo Character Model & Walking Animation
-    this.loadMixamoModel();
+    // 2. Asynchronously Load Real Character Model & Walking/Idle Animation
+    this.loadCharacterModel();
   }
 
-  private loadMixamoModel(): void {
+  private loadCharacterModel(): void {
     if (typeof window === 'undefined') return;
 
-    import('three/examples/jsm/loaders/FBXLoader.js').then(({ FBXLoader }) => {
-      const loader = new FBXLoader();
+    Promise.all([
+      import('three/examples/jsm/loaders/GLTFLoader.js'),
+      import('three/examples/jsm/loaders/FBXLoader.js'),
+    ]).then(([{ GLTFLoader }, { FBXLoader }]) => {
+      const gltfLoader = new GLTFLoader();
+      const fbxLoader = new FBXLoader();
 
-      loader.load(
-        '/models/character/xbot.fbx',
-        (fbx) => {
-          this.fbxModel = fbx;
-          // Scale from centimeters to meters (180.9cm -> ~1.82m)
-          fbx.scale.setScalar(0.0102);
+      // Priority 1: Maria (realistic clothed character model)
+      gltfLoader.load(
+        '/models/character/maria.glb',
+        (gltf) => {
+          this.fbxModel = gltf.scene;
 
-          // Mixamo FBX models face -Z by default; rotate 180 degrees to face +Z
-          fbx.rotation.y = Math.PI;
-
-          // Enable soft shadows on all character meshes
-          fbx.traverse((child) => {
+          // Normalize bone names (Mixamo GLTF exporters often append _01, _02 suffixes)
+          gltf.scene.traverse((child) => {
+            if (child.name) {
+              child.name = child.name.replace(/^mixamorig:?/, 'mixamorig').replace(/_\d+$/, '');
+            }
             if ((child as THREE.Mesh).isMesh) {
               child.castShadow = true;
               child.receiveShadow = true;
-              const mesh = child as THREE.SkinnedMesh;
+              const mesh = child as THREE.Mesh;
               if (mesh.material) {
                 const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
                 mats.forEach((m) => {
-                  (m as THREE.MeshStandardMaterial).roughness = 0.65;
-                  (m as THREE.MeshStandardMaterial).metalness = 0.25;
+                  if ('roughness' in m) {
+                    (m as THREE.MeshStandardMaterial).roughness = Math.max(
+                      (m as THREE.MeshStandardMaterial).roughness ?? 0.65,
+                      0.5
+                    );
+                  }
                 });
               }
             }
           });
 
-          // Attach firearm weapon directly to the right hand bone
+          // Attach firearm weapon directly to right hand bone
           let rightHandBone: THREE.Bone | null = null;
-          fbx.traverse((child) => {
+          gltf.scene.traverse((child) => {
             if (child.name === 'mixamorigRightHand' && (child as THREE.Bone).isBone) {
               rightHandBone = child as THREE.Bone;
             }
@@ -126,70 +133,151 @@ export class Player implements Damageable {
             (rightHandBone as THREE.Bone).add(handGun);
           }
 
-          // Create AnimationMixer for the character skeleton
-          this.mixer = new THREE.AnimationMixer(fbx);
+          // Create AnimationMixer for Maria
+          this.mixer = new THREE.AnimationMixer(gltf.scene);
 
-          // Hide placeholder block model and display the realistic Mixamo character
+          // Hide placeholder block model and display Maria
           this.placeholderRig.visible = false;
-          this.mesh.add(fbx);
+          this.mesh.add(gltf.scene);
           this.isFbxLoaded = true;
 
-          // Load Walking animation
-          loader.load(
-            '/models/character/walking.fbx',
-            (animFbx) => {
-              if (animFbx.animations.length > 0 && this.mixer) {
-                const walkClip = animFbx.animations[0];
-                walkClip.name = 'walk';
+          // Load animations
+          this.loadAnimations(fbxLoader);
+        },
+        undefined,
+        (err) => {
+          console.warn('maria.glb not found or failed, trying xbot.fbx fallback:', err);
+          this.loadXBotFallback(fbxLoader);
+        }
+      );
+    });
+  }
 
-                // In-Place Root Motion Filtering:
-                // Mixamo walking animations by default translate the Hips bone forward along Z.
-                // Lock X and Z on the Hips position track so character walks in-place
-                // while maintaining natural pelvic bobbing (Y) and full leg/arm stride!
-                const hipPosTrack = walkClip.tracks.find((t) => t.name.includes('Hips.position'));
-                if (hipPosTrack && hipPosTrack.values) {
-                  const firstX = hipPosTrack.values[0];
-                  const firstZ = hipPosTrack.values[2];
-                  for (let i = 0; i < hipPosTrack.values.length; i += 3) {
-                    hipPosTrack.values[i] = firstX;
-                    hipPosTrack.values[i + 2] = firstZ;
-                  }
+  private loadXBotFallback(fbxLoader: any): void {
+    fbxLoader.load(
+      '/models/character/xbot.fbx',
+      (fbx: any) => {
+        this.fbxModel = fbx;
+        fbx.scale.setScalar(0.0102);
+        fbx.rotation.y = Math.PI;
+
+        fbx.traverse((child: any) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            if (child.material) {
+              const mats = Array.isArray(child.material) ? child.material : [child.material];
+              mats.forEach((m: any) => {
+                m.roughness = 0.65;
+                m.metalness = 0.25;
+              });
+            }
+          }
+        });
+
+        let rightHandBone: THREE.Bone | null = null;
+        fbx.traverse((child: any) => {
+          if (child.name === 'mixamorigRightHand' && child.isBone) {
+            rightHandBone = child as THREE.Bone;
+          }
+        });
+
+        if (rightHandBone) {
+          const gunGeo = new THREE.BoxGeometry(6, 12, 38);
+          const gunMat = new THREE.MeshStandardMaterial({ color: 0x09090b, metalness: 0.9, roughness: 0.2 });
+          const handGun = new THREE.Mesh(gunGeo, gunMat);
+          handGun.castShadow = true;
+          handGun.position.set(0, -6, 14);
+          handGun.rotation.x = -Math.PI / 2;
+          (rightHandBone as THREE.Bone).add(handGun);
+        }
+
+        this.mixer = new THREE.AnimationMixer(fbx);
+        this.placeholderRig.visible = false;
+        this.mesh.add(fbx);
+        this.isFbxLoaded = true;
+
+        this.loadAnimations(fbxLoader);
+      },
+      undefined,
+      (err: any) => console.warn('Failed loading xbot.fbx fallback:', err)
+    );
+  }
+
+  private loadAnimations(loader: any): void {
+    loader.load(
+      '/models/character/walking.fbx',
+      (animFbx: any) => {
+        if (animFbx.animations.length > 0 && this.mixer) {
+          const walkClip = animFbx.animations[0];
+          walkClip.name = 'walk';
+
+          // In-Place Root Motion Filtering:
+          // Lock horizontal X and Z on Hips position track so character walks in-place
+          // while maintaining natural pelvic bobbing (Y) and full leg/arm stride!
+          const hipPosTrack = walkClip.tracks.find((t: THREE.KeyframeTrack) => t.name.includes('Hips.position'));
+          if (hipPosTrack && hipPosTrack.values) {
+            const firstX = hipPosTrack.values[0];
+            const firstZ = hipPosTrack.values[2];
+            for (let i = 0; i < hipPosTrack.values.length; i += 3) {
+              hipPosTrack.values[i] = firstX;
+              hipPosTrack.values[i + 2] = firstZ;
+            }
+          }
+
+          this.walkAction = this.mixer.clipAction(walkClip);
+          this.walkAction.setLoop(THREE.LoopRepeat, Infinity);
+          this.walkAction.clampWhenFinished = false;
+          this.walkAction.play();
+          this.walkAction.setEffectiveWeight(0);
+
+          // Synthesize relaxed standing stance from frame 0 of walking animation
+          // so the character NEVER freezes in a rigid T-pose when standing still!
+          const restTracks: THREE.KeyframeTrack[] = [];
+          walkClip.tracks.forEach((track: THREE.KeyframeTrack) => {
+            if (track instanceof THREE.QuaternionKeyframeTrack) {
+              const q0 = track.values.slice(0, 4);
+              restTracks.push(new THREE.QuaternionKeyframeTrack(track.name, [0, 2], [...q0, ...q0]));
+            } else if (track instanceof THREE.VectorKeyframeTrack && track.name.includes('Hips.position')) {
+              const p0 = track.values.slice(0, 3);
+              restTracks.push(new THREE.VectorKeyframeTrack(track.name, [0, 2], [...p0, ...p0]));
+            }
+          });
+          const fallbackIdleClip = new THREE.AnimationClip('fallback_idle', 2, restTracks);
+          this.idleAction = this.mixer.clipAction(fallbackIdleClip);
+          this.idleAction.setLoop(THREE.LoopRepeat, Infinity);
+          this.idleAction.play();
+          this.idleAction.setEffectiveWeight(1.0);
+
+          // Check and load official Idle animation if available (overrides fallback)
+          loader.load(
+            '/models/character/idle.fbx',
+            (idleFbx: any) => {
+              if (idleFbx.animations.length > 0 && this.mixer) {
+                const idleClip = idleFbx.animations[0];
+                idleClip.name = 'idle';
+
+                // Stop previous fallback idle
+                if (this.idleAction) {
+                  this.idleAction.stop();
                 }
 
-                this.walkAction = this.mixer.clipAction(walkClip);
-                this.walkAction.setLoop(THREE.LoopRepeat, Infinity);
-                this.walkAction.clampWhenFinished = false;
-                this.walkAction.play();
-                this.walkAction.setEffectiveWeight(0);
-
-                // Check and load Idle animation if available
-                loader.load(
-                  '/models/character/idle.fbx',
-                  (idleFbx) => {
-                    if (idleFbx.animations.length > 0 && this.mixer) {
-                      const idleClip = idleFbx.animations[0];
-                      idleClip.name = 'idle';
-                      this.idleAction = this.mixer.clipAction(idleClip);
-                      this.idleAction.setLoop(THREE.LoopRepeat, Infinity);
-                      this.idleAction.play();
-                      this.idleAction.setEffectiveWeight(1.0);
-                    }
-                  },
-                  undefined,
-                  () => {
-                    // Idle animation not downloaded yet
-                  }
-                );
+                this.idleAction = this.mixer.clipAction(idleClip);
+                this.idleAction.setLoop(THREE.LoopRepeat, Infinity);
+                this.idleAction.play();
+                this.idleAction.setEffectiveWeight(1.0);
               }
             },
             undefined,
-            (err) => console.warn('Failed loading walking.fbx:', err)
+            () => {
+              // Idle animation not downloaded yet; fallback idle stance is active
+            }
           );
-        },
-        undefined,
-        (err) => console.warn('Failed loading xbot.fbx:', err)
-      );
-    });
+        }
+      },
+      undefined,
+      (err: any) => console.warn('Failed loading walking.fbx:', err)
+    );
   }
 
   private buildCharacterRig(): {
