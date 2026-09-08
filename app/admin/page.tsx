@@ -85,8 +85,8 @@ export default function AdminPage() {
   const [selectedEmailPreview, setSelectedEmailPreview] = useState<EmailLog | null>(null);
 
   // Direct Admin Login Form state for unauthorized users
-  const [adminEmail, setAdminEmail] = useState('xiansaiful@gmail.com');
-  const [adminPass, setAdminPass] = useState('admin@321');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPass, setAdminPass] = useState('');
   const [adminLoginError, setAdminLoginError] = useState<string | null>(null);
   const [isAdminLoggingIn, setIsAdminLoggingIn] = useState(false);
 

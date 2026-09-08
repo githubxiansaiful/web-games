@@ -62,12 +62,6 @@ export function hashPassword(password: string): string {
 }
 
 export function verifyPassword(password: string, hash: string): boolean {
-  if (password === 'admin@321' && (hash === 'admin@321' || hash === hashPassword('admin@321'))) {
-    return true;
-  }
-  if (password === 'player@123' && (hash === 'player@123' || hash === hashPassword('player@123'))) {
-    return true;
-  }
   return hashPassword(password) === hash;
 }
 
@@ -81,8 +75,8 @@ const DEFAULT_GAMES: GameInfo[] = [
     genre: '2D Platformer / Speedrun',
     tags: ['MULTIPLAYER', 'SOLO RACING', 'PARKOUR', 'RETRO NEON', 'LEADERBOARDS'],
     badge: 'POPULAR',
-    rating: 4.9,
-    playCount: 1420,
+    rating: 5.0,
+    playCount: 0,
     isActive: true,
     multiplayer: true,
     icon: '🏃‍♂️',
@@ -95,8 +89,8 @@ const DEFAULT_GAMES: GameInfo[] = [
     genre: 'Arcade Space Shooter',
     tags: ['ACTION ARCADE', 'SURVIVAL', 'BOSS FIGHTS', 'LASER POWERUPS', 'HIGH SCORES'],
     badge: 'NEW',
-    rating: 4.8,
-    playCount: 980,
+    rating: 5.0,
+    playCount: 0,
     isActive: true,
     multiplayer: false,
     icon: '🚀',
@@ -112,34 +106,14 @@ const DEFAULT_USERS: User[] = [
     role: 'admin',
     status: 'active',
     avatar: '👑',
-    createdAt: '2026-01-01T00:00:00.000Z',
+    createdAt: new Date().toISOString(),
     lastLoginAt: new Date().toISOString(),
     stats: {
-      runnerGames: 42,
-      runnerStars: 9,
-      runnerBestTime: 28.4,
-      spaceGames: 35,
-      spaceHighScore: 24850,
-      coinsTotal: 280,
-    },
-  },
-  {
-    id: 'usr_player_demo',
-    name: 'Retro Gamer',
-    email: 'player@xianworld.com',
-    passwordHash: hashPassword('player@123'),
-    role: 'user',
-    status: 'active',
-    avatar: '🎮',
-    createdAt: '2026-02-15T12:00:00.000Z',
-    lastLoginAt: new Date().toISOString(),
-    stats: {
-      runnerGames: 18,
-      runnerStars: 6,
-      runnerBestTime: 36.2,
-      spaceGames: 22,
-      spaceHighScore: 15400,
-      coinsTotal: 145,
+      runnerGames: 0,
+      runnerStars: 0,
+      spaceGames: 0,
+      spaceHighScore: 0,
+      coinsTotal: 0,
     },
   },
 ];

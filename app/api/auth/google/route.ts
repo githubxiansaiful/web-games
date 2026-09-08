@@ -4,22 +4,40 @@ import { sendWelcomeEmail } from '@/lib/email';
 
 export async function POST(req: Request) {
   try {
-    const { email, name, avatar } = await req.json();
+    const body = await req.json();
+    let email = body.email;
+    let name = body.name;
+    let avatar = body.avatar;
+
+    // If Google ID token credential is provided, verify it directly with Google
+    if (body.credential) {
+      try {
+        const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(body.credential)}`);
+        if (verifyRes.ok) {
+          const verifiedPayload = await verifyRes.json();
+          email = verifiedPayload.email;
+          name = verifiedPayload.name || email?.split('@')[0];
+          avatar = verifiedPayload.picture || '🌐';
+        }
+      } catch (e) {
+        console.warn('Could not verify Google ID token with tokeninfo:', e);
+      }
+    }
 
     if (!email) {
-      return NextResponse.json({ error: 'Google email is required.' }, { status: 400 });
+      return NextResponse.json({ error: 'Valid Google email is required.' }, { status: 400 });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
     let user = await db.getUserByEmail(normalizedEmail);
 
     if (!user) {
-      // Create new account for Google user
+      // Create new account for verified Google user
       user = await db.createUser({
         name: name || normalizedEmail.split('@')[0],
         email: normalizedEmail,
         role: normalizedEmail === 'xiansaiful@gmail.com' ? 'admin' : 'user',
-        avatar: avatar || '⚡',
+        avatar: avatar || '🌐',
       });
 
       // Send welcome email

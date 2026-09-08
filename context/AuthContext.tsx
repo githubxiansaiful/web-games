@@ -33,7 +33,7 @@ interface AuthContextType {
   closeAuthModal: () => void;
   login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, pass: string) => Promise<{ success: boolean; error?: string; message?: string }>;
-  loginWithGoogle: (customEmail?: string, customName?: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: (googleData: { email: string; name?: string; avatar?: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateProfile: (data: { name?: string; avatar?: string; newPassword?: string }) => Promise<{ success: boolean; error?: string }>;
@@ -137,17 +137,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithGoogle = async (customEmail?: string, customName?: string) => {
+  const loginWithGoogle = async (googleData: { email: string; name?: string; avatar?: string }) => {
     try {
-      // Allow custom email or default to user's google identity
-      const email = customEmail || 'player.google@xianworld.com';
-      const name = customName || (customEmail ? customEmail.split('@')[0] : 'Google Champion');
-      const avatar = '🌐';
+      if (!googleData?.email) {
+        return { success: false, error: 'Google authentication did not provide a valid email.' };
+      }
 
       const res = await fetch('/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name, avatar }),
+        body: JSON.stringify(googleData),
       });
       const data = await res.json();
       if (!res.ok) {

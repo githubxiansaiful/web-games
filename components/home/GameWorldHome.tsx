@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Gamepad2,
@@ -30,6 +30,21 @@ export const GameWorldHome: React.FC = () => {
 
   // Active game view: null (showcase home), 'runner' (Game 1), 'space' (Game 2)
   const [activeGame, setActiveGame] = useState<'runner' | 'space' | null>(null);
+  const [leaderboard, setLeaderboard] = useState<{ topSpace: any[]; topRunner: any[] }>({ topSpace: [], topRunner: [] });
+
+  useEffect(() => {
+    fetch('/api/games/leaderboard')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setLeaderboard({
+            topSpace: data.topSpace || [],
+            topRunner: data.topRunner || [],
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handlePlayGame = (gameKey: 'runner' | 'space') => {
     if (!user) {
@@ -337,34 +352,38 @@ export const GameWorldHome: React.FC = () => {
               <Trophy className="w-6 h-6 text-amber-400" />
               <div>
                 <h3 className="text-lg sm:text-xl font-black text-white">ARCADE HALL OF FAME</h3>
-                <span className="text-xs text-slate-400">All-time top champions on Xian&apos;s Game World</span>
+                <span className="text-xs text-slate-400">Live verified player rankings on Xian&apos;s Game World</span>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="bg-slate-850 p-4 rounded-2xl border border-slate-800 flex items-center gap-3">
-              <div className="text-2xl">🥇</div>
-              <div>
-                <div className="font-bold text-white text-xs sm:text-sm">Xian Saiful (Admin)</div>
-                <div className="text-[11px] text-amber-400">24,850 Pts in Space Survivor</div>
-              </div>
+          {leaderboard.topSpace.length === 0 && leaderboard.topRunner.length === 0 ? (
+            <div className="bg-slate-850/60 p-6 rounded-2xl border border-slate-800 text-center">
+              <p className="text-xs text-slate-400 mb-1">No community records set yet.</p>
+              <p className="text-xs font-bold text-indigo-300">Play any game above to claim your spot on the Hall of Fame!</p>
             </div>
-            <div className="bg-slate-850 p-4 rounded-2xl border border-slate-800 flex items-center gap-3">
-              <div className="text-2xl">🥈</div>
-              <div>
-                <div className="font-bold text-white text-xs sm:text-sm">Retro Gamer</div>
-                <div className="text-[11px] text-cyan-400">15,400 Pts in Space Survivor</div>
-              </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {leaderboard.topSpace.map((item, idx) => (
+                <div key={item.id} className="bg-slate-850 p-4 rounded-2xl border border-slate-800 flex items-center gap-3">
+                  <div className="text-2xl">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</div>
+                  <div>
+                    <div className="font-bold text-white text-xs sm:text-sm">{item.name}</div>
+                    <div className="text-[11px] text-cyan-400 font-mono">{item.score.toLocaleString()} Pts in Space Survivor</div>
+                  </div>
+                </div>
+              ))}
+              {leaderboard.topRunner.map((item) => (
+                <div key={item.id} className="bg-slate-850 p-4 rounded-2xl border border-slate-800 flex items-center gap-3">
+                  <div className="text-2xl">⚡</div>
+                  <div>
+                    <div className="font-bold text-white text-xs sm:text-sm">{item.name}</div>
+                    <div className="text-[11px] text-emerald-400 font-mono">★ {item.stars} Stars in Runner Royale</div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="bg-slate-850 p-4 rounded-2xl border border-slate-800 flex items-center gap-3">
-              <div className="text-2xl">⚡</div>
-              <div>
-                <div className="font-bold text-white text-xs sm:text-sm">Speed Demon</div>
-                <div className="text-[11px] text-emerald-400">28.4s Stage 1 Speedrun</div>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </section>
 

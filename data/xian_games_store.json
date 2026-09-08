@@ -8,34 +8,15 @@
       "role": "admin",
       "status": "active",
       "avatar": "👑",
-      "createdAt": "2026-01-01T00:00:00.000Z",
-      "lastLoginAt": "2026-09-08T20:07:52.946Z",
+      "createdAt": "2026-09-09T00:00:00.000Z",
+      "lastLoginAt": "2026-09-09T00:00:00.000Z",
       "stats": {
-        "runnerGames": 42,
-        "runnerStars": 9,
-        "runnerBestTime": 28.4,
-        "spaceGames": 35,
-        "spaceHighScore": 24850,
-        "coinsTotal": 280
-      }
-    },
-    {
-      "id": "usr_player_demo",
-      "name": "Retro Gamer",
-      "email": "player@xianworld.com",
-      "passwordHash": "77b5c837fa74adac4ad29e1543f3a9556d6cc212648b56a599fba42cdc49d932ffe7016b8eb41273f9842e5a1056481b14b5d5885851a59348379366d69d882f",
-      "role": "user",
-      "status": "active",
-      "avatar": "🎮",
-      "createdAt": "2026-02-15T12:00:00.000Z",
-      "lastLoginAt": "2026-09-08T20:07:52.947Z",
-      "stats": {
-        "runnerGames": 18,
-        "runnerStars": 6,
-        "runnerBestTime": 36.2,
-        "spaceGames": 22,
-        "spaceHighScore": 15400,
-        "coinsTotal": 145
+        "runnerGames": 0,
+        "runnerStars": 0,
+        "runnerBestTime": 0,
+        "spaceGames": 0,
+        "spaceHighScore": 0,
+        "coinsTotal": 0
       }
     }
   ],
@@ -55,8 +36,8 @@
         "LEADERBOARDS"
       ],
       "badge": "POPULAR",
-      "rating": 4.9,
-      "playCount": 1420,
+      "rating": 5.0,
+      "playCount": 0,
       "isActive": true,
       "multiplayer": true,
       "icon": "🏃‍♂️"
@@ -75,8 +56,8 @@
         "HIGH SCORES"
       ],
       "badge": "NEW",
-      "rating": 4.8,
-      "playCount": 980,
+      "rating": 5.0,
+      "playCount": 0,
       "isActive": true,
       "multiplayer": false,
       "icon": "🚀"
