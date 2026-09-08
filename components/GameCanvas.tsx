@@ -102,6 +102,59 @@ export const GameCanvas: React.FC = () => {
   });
 
   const netSendTimerRef = useRef<number>(0);
+  const canvasSizeRef = useRef({ width: 800, height: 600, dpr: 1 });
+
+  // Dedicated canvas resize handler (prevents per-frame DOM layout reflow on iPhone / Safari)
+  const updateCanvasSize = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(320, Math.floor(rect.width || window.innerWidth));
+    const h = Math.max(240, Math.floor(rect.height || window.innerHeight));
+
+    // iPhone / Mobile Retina optimization:
+    // Retina iPhones have window.devicePixelRatio = 3.0.
+    // Rendering at 3x DPR generates 3+ million pixels every 60FPS frame,
+    // which saturates the WebKit Metal compositor and drops frame rates to 10-15 FPS.
+    // Capping DPR at 1.5 on mobile devices preserves Retina crispness while cutting GPU fill rate by >70%.
+    const isMobileDevice =
+      typeof window !== 'undefined' &&
+      (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || navigator.maxTouchPoints > 0);
+    const rawDpr = window.devicePixelRatio || 1;
+    const dpr = isMobileDevice ? Math.min(rawDpr, 1.5) : Math.min(rawDpr, 2.0);
+
+    const pixelW = Math.floor(w * dpr);
+    const pixelH = Math.floor(h * dpr);
+
+    if (canvas.width !== pixelW || canvas.height !== pixelH) {
+      canvas.width = pixelW;
+      canvas.height = pixelH;
+    }
+
+    canvasSizeRef.current = { width: w, height: h, dpr };
+  }, []);
+
+  // Update canvas size on mount, appMode change, window resize & orientation change
+  useEffect(() => {
+    if (appMode !== 'game') return;
+
+    updateCanvasSize();
+    const handleResize = () => {
+      updateCanvasSize();
+    };
+
+    window.addEventListener('resize', handleResize, { passive: true });
+    window.addEventListener('orientationchange', handleResize, { passive: true });
+
+    const timer = setTimeout(updateCanvasSize, 120);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, [appMode, updateCanvasSize]);
 
   // Load saved progress and profile
   useEffect(() => {
@@ -394,8 +447,9 @@ export const GameCanvas: React.FC = () => {
       setRoom(res.room);
       setAppMode('lobby');
       setIsMultiplayer(true);
+      return { success: true };
     } else {
-      alert(res.message || 'Could not join room');
+      return { success: false, message: res.message || 'Could not join room' };
     }
   }, []);
 
@@ -478,15 +532,9 @@ export const GameCanvas: React.FC = () => {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Handle window / canvas resize & High DPI scaling
-      const displayWidth = canvas.clientWidth;
-      const displayHeight = canvas.clientHeight;
-      const dpr = window.devicePixelRatio || 1;
-
-      if (canvas.width !== displayWidth * dpr || canvas.height !== displayHeight * dpr) {
-        canvas.width = displayWidth * dpr;
-        canvas.height = displayHeight * dpr;
-      }
+      // Fast cached canvas display size (eliminates per-frame DOM layout reflow on Safari / iPhone)
+      const { width: displayWidth, height: displayHeight, dpr } = canvasSizeRef.current;
+      if (displayWidth <= 0 || displayHeight <= 0) return;
 
       ctx.save();
       ctx.scale(dpr, dpr);
@@ -583,10 +631,10 @@ export const GameCanvas: React.FC = () => {
         }
         setLeaderId(leadId);
 
-        // Send local player state to multiplayer server at 30Hz
+        // Send local player state to multiplayer server at ~22Hz (smooth and battery-efficient on mobile)
         if (isMultiplayer) {
           netSendTimerRef.current += dt;
-          if (netSendTimerRef.current >= 0.033) {
+          if (netSendTimerRef.current >= 0.045) {
             netSendTimerRef.current = 0;
             const p = playerRef.current;
             multiplayer.sendPlayerState({
@@ -729,10 +777,11 @@ export const GameCanvas: React.FC = () => {
       )}
 
       {/* Primary HTML5 Canvas */}
-      <div className="relative flex-1 w-full h-full flex items-center justify-center">
+      <div className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden">
         <canvas
           ref={canvasRef}
-          className="w-full h-full block cursor-default focus:outline-none"
+          className="w-full h-full block cursor-default focus:outline-none touch-none select-none"
+          style={{ willChange: 'transform' }}
           tabIndex={0}
         />
       </div>

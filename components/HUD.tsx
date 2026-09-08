@@ -16,7 +16,9 @@ import {
   Gamepad2,
   Home,
   Menu,
+  Sparkles,
 } from 'lucide-react';
+import { toggleFullscreen as executeToggleFullscreen, isFullscreenActive, isIPhone } from '@/lib/fullscreen';
 
 interface HUDProps {
   levelName: string;
@@ -56,26 +58,34 @@ export const HUD: React.FC<HUDProps> = ({
   onGoHome,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showIosTip, setShowIosTip] = useState(false);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      setIsFullscreen(isFullscreenActive());
     };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
+
+    const events = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'];
+    events.forEach((evt) => document.addEventListener(evt, handleFullscreenChange));
+
     return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      events.forEach((evt) => document.removeEventListener(evt, handleFullscreenChange));
     };
   }, []);
 
-  const toggleFullscreen = async () => {
-    try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
-      } else {
-        await document.exitFullscreen();
-      }
-    } catch {
-      // ignore
+  // Auto-dismiss iOS tip
+  useEffect(() => {
+    if (!showIosTip) return;
+    const timer = setTimeout(() => setShowIosTip(false), 7000);
+    return () => clearTimeout(timer);
+  }, [showIosTip]);
+
+  const handleToggleFullscreen = async () => {
+    const res = await executeToggleFullscreen();
+    if (res.isIPhoneDevice && !res.success) {
+      setShowIosTip(true);
+    } else {
+      setIsFullscreen(res.active);
     }
   };
 
@@ -185,7 +195,7 @@ export const HUD: React.FC<HUDProps> = ({
 
           {/* Fullscreen Toggle */}
           <button
-            onClick={toggleFullscreen}
+            onClick={handleToggleFullscreen}
             className="p-2 bg-slate-900/80 hover:bg-slate-800 backdrop-blur-md border border-slate-700/60 rounded-xl text-slate-200 hover:text-white transition active:scale-95 shadow-md cursor-pointer"
             title="Toggle Fullscreen"
           >
@@ -226,6 +236,30 @@ export const HUD: React.FC<HUDProps> = ({
           <Menu className="w-4 h-4" />
         </button>
       </div>
+
+      {/* iOS Safari Fullscreen Instructions Toast */}
+      {showIosTip && (
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 max-w-sm w-[92%] bg-slate-900/95 border border-indigo-500/70 text-white p-3.5 rounded-2xl shadow-2xl backdrop-blur-md pointer-events-auto animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2.5">
+              <span className="text-xl select-none">📱</span>
+              <div>
+                <h4 className="text-xs font-bold text-indigo-300">Fullscreen on iPhone</h4>
+                <p className="text-[11px] text-slate-300 leading-snug mt-1">
+                  Apple Safari restricts browser fullscreen. Tap Safari&apos;s <span className="font-bold text-white">Share icon (⎋)</span> below, then tap <span className="font-bold text-emerald-400">&apos;Add to Home Screen&apos;</span> to launch 100% borderless!
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowIosTip(false)}
+              className="p-1 text-slate-400 hover:text-white rounded-lg cursor-pointer text-xs"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

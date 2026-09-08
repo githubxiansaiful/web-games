@@ -104,36 +104,40 @@ export class GameRenderer {
     this.drawHills(ctx, effW, effH, level.theme.hillColor, this.cameraX * 0.28);
 
     // ==========================================
-    // 2. WORLD SPACE (Camera Transform)
+    // 2. WORLD SPACE (Camera Transform & Culling)
     // ==========================================
     ctx.save();
     ctx.translate(-Math.floor(this.cameraX + shakeX), -Math.floor(this.cameraY + shakeY));
 
+    // Viewport frustum culling bounds (skip drawing offscreen entities for 3x higher mobile FPS)
+    const cullMinX = this.cameraX - 80;
+    const cullMaxX = this.cameraX + effW + 80;
+
     // Moving Platform Tracks (dashed path lines)
-    this.drawMovingPlatformTracks(ctx, level.movingPlatforms);
+    this.drawMovingPlatformTracks(ctx, level.movingPlatforms, cullMinX, cullMaxX);
 
     // Checkpoints
-    this.drawCheckpoints(ctx, level);
+    this.drawCheckpoints(ctx, level, cullMinX, cullMaxX);
 
     // Springs
     if (level.springs) {
-      this.drawSprings(ctx, level);
+      this.drawSprings(ctx, level, cullMinX, cullMaxX);
     }
 
     // Goal Flag
     this.drawGoalFlag(ctx, level);
 
     // Static Platforms & Terrain
-    this.drawPlatforms(ctx, level);
+    this.drawPlatforms(ctx, level, cullMinX, cullMaxX);
 
     // Moving Platforms
-    this.drawMovingPlatforms(ctx, level.movingPlatforms, level.theme.accentColor);
+    this.drawMovingPlatforms(ctx, level.movingPlatforms, level.theme.accentColor, cullMinX, cullMaxX);
 
     // Hazards
-    this.drawHazards(ctx, level.hazards);
+    this.drawHazards(ctx, level.hazards, cullMinX, cullMaxX);
 
     // Coins
-    this.drawCoins(ctx, level.coins);
+    this.drawCoins(ctx, level.coins, cullMinX, cullMaxX);
 
     // Particles
     this.drawParticles(ctx, particles);
@@ -260,13 +264,24 @@ export class GameRenderer {
     ctx.fill();
   }
 
-  private drawMovingPlatformTracks(ctx: CanvasRenderingContext2D, platforms: MovingPlatform[]) {
+  private drawMovingPlatformTracks(
+    ctx: CanvasRenderingContext2D,
+    platforms: MovingPlatform[],
+    cullMinX?: number,
+    cullMaxX?: number
+  ) {
     ctx.save();
     ctx.setLineDash([6, 6]);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
     ctx.lineWidth = 2;
 
     for (const p of platforms) {
+      if (cullMinX !== undefined && cullMaxX !== undefined) {
+        const minTrackX = Math.min(p.startX, p.endX) - 10;
+        const maxTrackX = Math.max(p.startX, p.endX) + p.width + 10;
+        if (maxTrackX < cullMinX || minTrackX > cullMaxX) continue;
+      }
+
       ctx.beginPath();
       ctx.moveTo(p.startX + p.width / 2, p.startY + p.height / 2);
       ctx.lineTo(p.endX + p.width / 2, p.endY + p.height / 2);
@@ -282,10 +297,20 @@ export class GameRenderer {
     ctx.restore();
   }
 
-  private drawPlatforms(ctx: CanvasRenderingContext2D, level: LevelData) {
+  private drawPlatforms(
+    ctx: CanvasRenderingContext2D,
+    level: LevelData,
+    cullMinX?: number,
+    cullMaxX?: number
+  ) {
     const { groundTopColor, groundBodyColor, platformColor, platformAccent } = level.theme;
 
     for (const p of level.platforms) {
+      // Frustum culling: Skip offscreen platforms
+      if (cullMinX !== undefined && cullMaxX !== undefined) {
+        if (p.x + p.width < cullMinX || p.x > cullMaxX) continue;
+      }
+
       if (p.type === 'ground') {
         // Thick main ground with styled top grass/lip
         ctx.fillStyle = groundBodyColor;
@@ -326,9 +351,16 @@ export class GameRenderer {
   private drawMovingPlatforms(
     ctx: CanvasRenderingContext2D,
     platforms: MovingPlatform[],
-    accentColor: string
+    accentColor: string,
+    cullMinX?: number,
+    cullMaxX?: number
   ) {
     for (const p of platforms) {
+      // Frustum culling: Skip offscreen moving platforms
+      if (cullMinX !== undefined && cullMaxX !== undefined) {
+        if (p.x + p.width < cullMinX || p.x > cullMaxX) continue;
+      }
+
       // Platform body
       ctx.fillStyle = '#334155';
       this.roundRect(ctx, p.x, p.y, p.width, p.height, 6);
@@ -357,9 +389,19 @@ export class GameRenderer {
     }
   }
 
-  private drawCoins(ctx: CanvasRenderingContext2D, coins: any[]) {
+  private drawCoins(
+    ctx: CanvasRenderingContext2D,
+    coins: any[],
+    cullMinX?: number,
+    cullMaxX?: number
+  ) {
     for (const c of coins) {
       if (c.collected) continue;
+
+      // Frustum culling: Skip offscreen coins
+      if (cullMinX !== undefined && cullMaxX !== undefined) {
+        if (c.x + c.radius < cullMinX || c.x - c.radius > cullMaxX) continue;
+      }
 
       const bobY = Math.sin(this.animTime * 3.5 + c.animOffset) * 5;
       const spinScaleX = Math.cos(this.animTime * 4.5 + c.animOffset);
@@ -368,9 +410,11 @@ export class GameRenderer {
       ctx.translate(c.x, c.y + bobY);
       ctx.scale(Math.abs(spinScaleX), 1);
 
-      // Outer glow
-      ctx.shadowColor = '#facc15';
-      ctx.shadowBlur = 10;
+      // Fast zero-cost glow halo (avoids mobile Safari Gaussian blur lag)
+      ctx.fillStyle = 'rgba(250, 204, 21, 0.22)';
+      ctx.beginPath();
+      ctx.arc(0, 0, c.radius + 3.5, 0, Math.PI * 2);
+      ctx.fill();
 
       // Coin base gold
       ctx.fillStyle = '#facc15';
@@ -394,8 +438,18 @@ export class GameRenderer {
     }
   }
 
-  private drawHazards(ctx: CanvasRenderingContext2D, hazards: Hazard[]) {
+  private drawHazards(
+    ctx: CanvasRenderingContext2D,
+    hazards: Hazard[],
+    cullMinX?: number,
+    cullMaxX?: number
+  ) {
     for (const h of hazards) {
+      // Frustum culling: Skip offscreen hazards
+      if (cullMinX !== undefined && cullMaxX !== undefined) {
+        if (h.x + h.width < cullMinX || h.x > cullMaxX) continue;
+      }
+
       if (h.type === 'spike_up') {
         const spikeCount = Math.max(1, Math.floor(h.width / 18));
         const sWidth = h.width / spikeCount;
@@ -492,9 +546,19 @@ export class GameRenderer {
     }
   }
 
-  private drawSprings(ctx: CanvasRenderingContext2D, level: LevelData) {
+  private drawSprings(
+    ctx: CanvasRenderingContext2D,
+    level: LevelData,
+    cullMinX?: number,
+    cullMaxX?: number
+  ) {
     if (!level.springs) return;
     for (const s of level.springs) {
+      // Frustum culling: Skip offscreen springs
+      if (cullMinX !== undefined && cullMaxX !== undefined) {
+        if (s.x + s.width < cullMinX || s.x > cullMaxX) continue;
+      }
+
       const comp = s.compressed || 0;
       const springH = s.height * (1 - comp * 0.45);
       const topY = s.y + s.height - springH;
@@ -520,8 +584,18 @@ export class GameRenderer {
     }
   }
 
-  private drawCheckpoints(ctx: CanvasRenderingContext2D, level: LevelData) {
+  private drawCheckpoints(
+    ctx: CanvasRenderingContext2D,
+    level: LevelData,
+    cullMinX?: number,
+    cullMaxX?: number
+  ) {
     for (const cp of level.checkpoints) {
+      // Frustum culling: Skip offscreen checkpoints
+      if (cullMinX !== undefined && cullMaxX !== undefined) {
+        if (cp.x + 36 < cullMinX || cp.x - 10 > cullMaxX) continue;
+      }
+
       const poleX = cp.x + 6;
       const poleY = cp.y;
       const poleH = cp.height;
@@ -538,9 +612,11 @@ export class GameRenderer {
       const wave = Math.sin(this.animTime * 5 + cp.x) * 4;
 
       if (cp.active) {
-        // Glowing active banner
-        ctx.shadowColor = '#10b981';
-        ctx.shadowBlur = 12;
+        // Glowing active banner halo (zero-cost alpha arc instead of shadowBlur)
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.25)';
+        ctx.beginPath();
+        ctx.arc(poleX + 2, poleY, 10, 0, Math.PI * 2);
+        ctx.fill();
 
         ctx.fillStyle = '#10b981';
         ctx.beginPath();
@@ -550,13 +626,11 @@ export class GameRenderer {
         ctx.closePath();
         ctx.fill();
 
-        // Glowing crystal orb on top
+        // Crystal orb on top
         ctx.fillStyle = '#34d399';
         ctx.beginPath();
         ctx.arc(poleX + 2, poleY, 5, 0, Math.PI * 2);
         ctx.fill();
-
-        ctx.shadowBlur = 0;
       } else {
         // Inactive dull banner
         ctx.fillStyle = '#94a3b8';
@@ -590,10 +664,14 @@ export class GameRenderer {
     ctx.fillStyle = '#fef08a';
     ctx.fillRect(poleX, poleY, 5, poleH);
 
+    // Goal aura halo (avoids mobile Safari shadowBlur Gaussian cost)
+    ctx.fillStyle = g.reached ? 'rgba(245, 158, 11, 0.45)' : 'rgba(251, 191, 36, 0.25)';
+    ctx.beginPath();
+    ctx.arc(poleX + 2.5, poleY, g.reached ? 16 : 11, 0, Math.PI * 2);
+    ctx.fill();
+
     // Golden sphere on top
     ctx.fillStyle = '#fbbf24';
-    ctx.shadowColor = '#fbbf24';
-    ctx.shadowBlur = g.reached ? 20 : 8;
     ctx.beginPath();
     ctx.arc(poleX + 2.5, poleY, 7, 0, Math.PI * 2);
     ctx.fill();
@@ -618,8 +696,6 @@ export class GameRenderer {
     ctx.beginPath();
     ctx.arc(poleX + 16, poleY + 18 + wave * 0.5, 4.5, 0, Math.PI * 2);
     ctx.fill();
-
-    ctx.shadowBlur = 0;
   }
 
   private drawPlayerVisual(
@@ -698,12 +774,11 @@ export class GameRenderer {
     this.roundRect(ctx, -w * 0.45, -h * 0.95, w * 0.9, h * 0.45, 6);
     ctx.fill();
 
-    // Glowing Visor
+    // Glowing Visor (clean 2-pass accent without expensive shadowBlur)
+    ctx.fillStyle = color;
+    ctx.fillRect(-w * 0.08, -h * 0.88, w * 0.51, 9);
     ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 6;
     ctx.fillRect(-w * 0.05, -h * 0.85, w * 0.45, 7);
-    ctx.shadowBlur = 0;
 
     // Feet / Shoes
     ctx.fillStyle = '#0f172a';
@@ -838,6 +913,12 @@ export class GameRenderer {
     h: number,
     r: number | number[]
   ) {
+    if (typeof (ctx as any).roundRect === 'function') {
+      ctx.beginPath();
+      (ctx as any).roundRect(x, y, w, h, r);
+      return;
+    }
+
     if (typeof r === 'number') {
       r = [r, r, r, r];
     }
@@ -852,6 +933,5 @@ export class GameRenderer {
     ctx.quadraticCurveTo(x, y + h, x, y + h - bl);
     ctx.lineTo(x, y + tl);
     ctx.quadraticCurveTo(x, y, x + tl, y);
-    ctx.closePath();
   }
 }

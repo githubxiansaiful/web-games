@@ -22,7 +22,11 @@ import { sounds } from '@/lib/audio';
 interface HomePageProps {
   onStartSolo: (stageId?: number) => void;
   onCreateRoom: (code: string, playerName: string, playerColor: string, stageId: number) => void;
-  onJoinRoom: (code: string, playerName: string, playerColor: string) => void;
+  onJoinRoom: (
+    code: string,
+    playerName: string,
+    playerColor: string
+  ) => Promise<{ success: boolean; message?: string } | void> | void;
   onOpenSoloStages: () => void;
 }
 
@@ -102,7 +106,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     onCreateRoom(code, playerName.trim() || 'Runner', selectedColor.primary, selectedStage);
   };
 
-  const handleJoinRoom = () => {
+  const handleJoinRoom = async () => {
     const code = joinCode.trim();
     if (!code) {
       setJoinError('Please enter a room code');
@@ -113,7 +117,10 @@ export const HomePage: React.FC<HomePageProps> = ({
       return;
     }
     setJoinError('');
-    onJoinRoom(code, playerName.trim() || 'Runner', selectedColor.primary);
+    const res = await onJoinRoom(code, playerName.trim() || 'Runner', selectedColor.primary);
+    if (res && !res.success && res.message) {
+      setJoinError(res.message);
+    }
   };
 
   return (
@@ -361,7 +368,10 @@ export const HomePage: React.FC<HomePageProps> = ({
                     />
                   </div>
                   {joinError && (
-                    <p className="text-rose-400 text-xs font-semibold mb-3">{joinError}</p>
+                    <div className="text-rose-300 text-xs font-semibold mb-3.5 bg-rose-950/60 p-3 rounded-xl border border-rose-800/60 flex items-start gap-2 text-left leading-relaxed">
+                      <span className="text-sm flex-shrink-0">⚠️</span>
+                      <span>{joinError}</span>
+                    </div>
                   )}
                 </div>
 

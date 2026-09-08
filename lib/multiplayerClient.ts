@@ -274,7 +274,11 @@ class MultiplayerClient {
     }
 
     if (!existingRoom) {
-      return { success: false, message: 'Room not found! Check the room code or start socket server.' };
+      return {
+        success: false,
+        message:
+          'Room not found! If the room was created on another phone/device, online multiplayer requires connecting a free socket server (NEXT_PUBLIC_SOCKET_URL) because Vercel is serverless.',
+      };
     }
 
     const newPlayer: RoomPlayer = {

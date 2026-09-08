@@ -108,6 +108,17 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
           </button>
         </div>
 
+        {/* Fallback Notice Banner (When running on serverless Vercel without socket server) */}
+        {multiplayer.isFallback() && (
+          <div className="mb-6 p-3.5 bg-amber-950/40 border border-amber-500/40 rounded-2xl text-xs text-amber-200 flex items-start gap-2.5">
+            <span className="text-base flex-shrink-0">⚠️</span>
+            <div className="leading-relaxed">
+              <span className="font-bold text-amber-300">Single-Device Tab Sync: </span>
+              This room is synced only across browser tabs on this device because Vercel is a serverless platform. To let friends on other phones or computers join over the internet, connect a free WebSocket server URL (<code className="bg-amber-900/60 px-1.5 py-0.5 rounded text-[11px] font-mono text-amber-100">NEXT_PUBLIC_SOCKET_URL</code>).
+            </div>
+          </div>
+        )}
+
         {/* Stage Selection Preview */}
         <div className="mb-6 bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4">
           <div className="flex items-center justify-between mb-2.5">
