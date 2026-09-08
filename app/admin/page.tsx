@@ -27,6 +27,7 @@ import {
   Play,
 } from 'lucide-react';
 import { useAuth, AuthUser } from '@/context/AuthContext';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 
 interface EmailLog {
   id: string;
@@ -373,7 +374,7 @@ export default function AdminPage() {
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-indigo-400' : ''}`} />
           </button>
           <div className="hidden sm:flex items-center gap-2 bg-slate-850 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <UserAvatar avatar={user?.avatar} name={user?.name} size="xs" fallbackEmoji="👑" />
             <span className="font-semibold text-slate-200">{user?.email}</span>
             <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold px-1.5 py-0.5 rounded">
               SUPER ADMIN
@@ -549,7 +550,7 @@ export default function AdminPage() {
                   {usersList.slice(0, 4).map((u) => (
                     <div key={u.id} className="py-2.5 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2.5">
-                        <span className="text-lg">{u.avatar || '🎮'}</span>
+                        <UserAvatar avatar={u.avatar} name={u.name} size="md" />
                         <div>
                           <div className="font-bold text-white">{u.name}</div>
                           <div className="text-[11px] text-slate-400">{u.email}</div>
@@ -641,7 +642,7 @@ export default function AdminPage() {
                         <tr key={u.id} className="hover:bg-slate-850/50 transition">
                           <td className="p-3">
                             <div className="flex items-center gap-2">
-                              <span className="text-base">{u.avatar || '🕹️'}</span>
+                              <UserAvatar avatar={u.avatar} name={u.name} size="sm" />
                               <span className="font-bold text-white">{u.name}</span>
                             </div>
                           </td>

@@ -25,6 +25,7 @@ import { useAuth } from '@/context/AuthContext';
 import { GameCanvas } from '@/components/GameCanvas';
 import { SpaceGameCanvas } from '@/components/space-game/SpaceGameCanvas';
 import { AuthModal } from '@/components/auth/AuthModal';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 
 export const GameWorldHome: React.FC = () => {
   const { user, isAdmin, logout, openAuthModal } = useAuth();
@@ -124,8 +125,8 @@ export const GameWorldHome: React.FC = () => {
           {user ? (
             <div className="flex items-center gap-2">
               {/* Player Profile Capsule */}
-              <div className="flex items-center gap-2 bg-slate-900 border border-slate-700/80 rounded-2xl px-3 py-1.5 text-xs shadow-md">
-                <span className="text-base">{user.avatar || '🎮'}</span>
+              <div className="flex items-center gap-2.5 bg-slate-900 border border-slate-700/80 rounded-2xl px-3 py-1.5 text-xs shadow-md">
+                <UserAvatar avatar={user.avatar} name={user.name} size="sm" />
                 <div className="text-left hidden sm:block">
                   <div className="font-bold text-white leading-none">{user.name}</div>
                   <div className="text-[10px] text-amber-400 font-semibold flex items-center gap-1 mt-0.5">
@@ -411,18 +412,20 @@ export const GameWorldHome: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {leaderboard.topSpace.map((item, idx) => (
                 <div key={item.id} className="bg-slate-850 p-4 rounded-2xl border border-slate-800 flex items-center gap-3">
-                  <div className="text-2xl">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</div>
-                  <div>
-                    <div className="font-bold text-white text-xs sm:text-sm">{item.name}</div>
+                  <div className="text-xl shrink-0">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</div>
+                  <UserAvatar avatar={item.avatar} name={item.name} size="md" fallbackEmoji="🚀" />
+                  <div className="overflow-hidden">
+                    <div className="font-bold text-white text-xs sm:text-sm truncate">{item.name}</div>
                     <div className="text-[11px] text-cyan-400 font-mono">{item.score.toLocaleString()} Pts in Space Survivor</div>
                   </div>
                 </div>
               ))}
               {leaderboard.topRunner.map((item) => (
                 <div key={item.id} className="bg-slate-850 p-4 rounded-2xl border border-slate-800 flex items-center gap-3">
-                  <div className="text-2xl">⚡</div>
-                  <div>
-                    <div className="font-bold text-white text-xs sm:text-sm">{item.name}</div>
+                  <div className="text-xl shrink-0">⚡</div>
+                  <UserAvatar avatar={item.avatar} name={item.name} size="md" fallbackEmoji="🏃‍♂️" />
+                  <div className="overflow-hidden">
+                    <div className="font-bold text-white text-xs sm:text-sm truncate">{item.name}</div>
                     <div className="text-[11px] text-emerald-400 font-mono">★ {item.stars} Stars in Runner Royale</div>
                   </div>
                 </div>

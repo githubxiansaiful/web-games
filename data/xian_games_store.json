@@ -18,9 +18,37 @@
         "spaceHighScore": 0,
         "coinsTotal": 0
       }
+    },
+    {
+      "id": "usr_1788899103371_km4hi",
+      "name": "GPT XIAN",
+      "email": "gptxian@gmail.com",
+      "passwordHash": "909ca78ea0ce94af86e9cdde58342b3576e54475103b0d562d304bbb568178dac026152b261eb816e8432ab3efd6d21881424c845c84ff25534c3fd13af2e8f1",
+      "role": "user",
+      "status": "active",
+      "avatar": "https://lh3.googleusercontent.com/a/ACg8ocLRIhZJgnEIALJUXCnPI5AwOGv5HAAj0bQNy54JMQLnTYwa=s96-c",
+      "createdAt": "2026-09-08T20:25:03.372Z",
+      "lastLoginAt": "2026-09-08T20:25:03.372Z",
+      "stats": {
+        "runnerGames": 0,
+        "runnerStars": 0,
+        "runnerBestTime": 0,
+        "spaceGames": 0,
+        "spaceHighScore": 0,
+        "coinsTotal": 0
+      }
     }
   ],
-  "emailLogs": [],
+  "emailLogs": [
+    {
+      "id": "mail_1788899106789_0bhy",
+      "to": "gptxian@gmail.com",
+      "subject": "🎮 Welcome to Xian's Game World, GPT XIAN!",
+      "template": "welcome",
+      "status": "sent",
+      "sentAt": "2026-09-08T20:25:06.789Z"
+    }
+  ],
   "games": [
     {
       "id": "runner-royale",
