@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { EventBus } from '@/game/core/EventBus';
 import { SoundManager } from '@/game/core/SoundManager';
 import { ApexCityMinimap } from './ApexCityMinimap';
+import { GameMap } from './GameMap';
+import { ISLAND_DISTRICTS, DistrictInfo } from '@/game/data/islandMapData';
 import {
   Volume2,
   VolumeX,
@@ -15,7 +17,25 @@ import {
   Crosshair,
   AlertTriangle,
   Compass,
+  Map as MapIcon,
+  X,
+  Navigation,
 } from 'lucide-react';
+
+function getClosestDistrict(x: number, z: number): DistrictInfo {
+  let closest = ISLAND_DISTRICTS[0];
+  let minDistSq = Infinity;
+  for (const d of ISLAND_DISTRICTS) {
+    const dx = d.worldPos.x - x;
+    const dz = d.worldPos.z - z;
+    const dSq = dx * dx + dz * dz;
+    if (dSq < minDistSq) {
+      minDistSq = dSq;
+      closest = d;
+    }
+  }
+  return closest;
+}
 
 interface PlayerStats {
   health: number;
@@ -83,6 +103,21 @@ export const ApexCityHUD: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const [bannerNotice, setBannerNotice] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
 
+  // Full Map and GPS State
+  const [showFullMap, setShowFullMap] = useState(false);
+  const [selectedDistrictId, setSelectedDistrictId] = useState<string | null>(null);
+  const [mapData, setMapData] = useState<{
+    playerPos: { x: number; z: number } | null;
+    playerAngle: number;
+    waypoint: { x: number; z: number } | null;
+    vehicles: Array<{ x: number; z: number; type: string }>;
+  }>({
+    playerPos: null,
+    playerAngle: 0,
+    waypoint: null,
+    vehicles: [],
+  });
+
   useEffect(() => {
     const eventBus = EventBus.getInstance();
     const sound = SoundManager.getInstance();
@@ -94,6 +129,20 @@ export const ApexCityHUD: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       setWanted({ level: data.wantedLevel, isEscaping: data.isEscaping });
     const onPrompt = (data: { text: string; visible: boolean }) =>
       setInteractionPrompt(data);
+
+    const onMinimap = (data: {
+      playerPos: { x: number; z: number };
+      playerAngle: number;
+      waypoint: { x: number; z: number } | null;
+      vehicles: Array<{ x: number; z: number; type: string }>;
+    }) => {
+      setMapData({
+        playerPos: data.playerPos,
+        playerAngle: data.playerAngle,
+        waypoint: data.waypoint,
+        vehicles: data.vehicles,
+      });
+    };
 
     const onMissionStart = (data: any) => {
       setMission({
@@ -133,6 +182,7 @@ export const ApexCityHUD: React.FC<{ onExit: () => void }> = ({ onExit }) => {
     eventBus.on('WEAPON_STATE_CHANGED', onWeapon);
     eventBus.on('WANTED_LEVEL_CHANGED', onWanted);
     eventBus.on('INTERACTION_PROMPT', onPrompt);
+    eventBus.on('MINIMAP_UPDATE', onMinimap);
     eventBus.on('MISSION_STARTED', onMissionStart);
     eventBus.on('MISSION_OBJECTIVE_COMPLETED', onMissionObjComplete);
     eventBus.on('MISSION_PROGRESS_UPDATE', onMissionProgress);
@@ -144,6 +194,7 @@ export const ApexCityHUD: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       eventBus.off('WEAPON_STATE_CHANGED', onWeapon);
       eventBus.off('WANTED_LEVEL_CHANGED', onWanted);
       eventBus.off('INTERACTION_PROMPT', onPrompt);
+      eventBus.off('MINIMAP_UPDATE', onMinimap);
       eventBus.off('MISSION_STARTED', onMissionStart);
       eventBus.off('MISSION_OBJECTIVE_COMPLETED', onMissionObjComplete);
       eventBus.off('MISSION_PROGRESS_UPDATE', onMissionProgress);
@@ -151,6 +202,25 @@ export const ApexCityHUD: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       eventBus.off('HEAT_ESCAPED', onHeatEscaped);
     };
   }, []);
+
+  // Keyboard shortcut listener for Full Map [M] and Escape to close
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'KeyM') {
+        setShowFullMap((prev) => {
+          const next = !prev;
+          if (next && document.pointerLockElement) {
+            document.exitPointerLock();
+          }
+          return next;
+        });
+      } else if (e.code === 'Escape' && showFullMap) {
+        setShowFullMap(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showFullMap]);
 
   const showBanner = (text: string) => {
     setBannerNotice(text);
@@ -281,8 +351,18 @@ export const ApexCityHUD: React.FC<{ onExit: () => void }> = ({ onExit }) => {
           </div>
         </div>
 
-        {/* Audio Mute & Exit Game Buttons */}
+        {/* Map, Audio Mute & Exit Game Buttons */}
         <div className="flex flex-col gap-2">
+          <button
+            onClick={() => {
+              setShowFullMap(true);
+              if (document.pointerLockElement) document.exitPointerLock();
+            }}
+            className="p-2.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-cyan-400 hover:text-cyan-300 transition cursor-pointer shadow-lg flex items-center justify-center"
+            title="Open Full Map [M]"
+          >
+            <MapIcon className="w-4 h-4" />
+          </button>
           <button
             onClick={toggleSound}
             className="p-2.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-slate-200 transition cursor-pointer shadow-lg"
@@ -310,7 +390,12 @@ export const ApexCityHUD: React.FC<{ onExit: () => void }> = ({ onExit }) => {
 
       {/* 6. Bottom Left: Radar Minimap */}
       <div className="absolute bottom-4 left-4">
-        <ApexCityMinimap />
+        <ApexCityMinimap
+          onOpenFullMap={() => {
+            setShowFullMap(true);
+            if (document.pointerLockElement) document.exitPointerLock();
+          }}
+        />
       </div>
 
       {/* 7. Bottom Right: Speedometer Gauge (When in Vehicle) OR Mission Card (On Foot) */}
@@ -357,12 +442,120 @@ export const ApexCityHUD: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         <span>•</span>
         <span>[F] Enter/Exit Car</span>
         <span>•</span>
+        <span>[M] Full Map</span>
+        <span>•</span>
         <span>[Click] Fire</span>
         <span>•</span>
         <span>[R] Reload</span>
         <span>•</span>
         <span>[1-3] Weapons</span>
       </div>
+
+      {/* 9. Interactive Full-Screen Map Overlay [M] */}
+      {showFullMap && (
+        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col pointer-events-auto p-4 md:p-6 select-none animate-in fade-in duration-200">
+          {/* Header Bar */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                <MapIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-black text-white tracking-wider uppercase flex items-center gap-2">
+                  <span>San Andreas Archipelago</span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800/80 font-bold">
+                    GPS TRACKER
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400 flex items-center gap-2">
+                  <span>Current Sector:</span>
+                  <strong className="text-cyan-300 font-bold">
+                    {getClosestDistrict(mapData.playerPos?.x ?? 0, mapData.playerPos?.z ?? 0).name} ({getClosestDistrict(mapData.playerPos?.x ?? 0, mapData.playerPos?.z ?? 0).category})
+                  </strong>
+                  <span className="text-slate-600">•</span>
+                  <span className="font-mono text-slate-500 text-[11px]">
+                    X: {Math.round(mapData.playerPos?.x ?? 0)}m, Z: {Math.round(mapData.playerPos?.z ?? 0)}m
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="hidden sm:inline text-xs font-semibold text-slate-500">
+                Press <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-mono text-[10px]">M</kbd> or <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-mono text-[10px]">ESC</kbd> to resume
+              </span>
+              <button
+                onClick={() => setShowFullMap(false)}
+                className="p-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-slate-300 hover:text-white transition shadow-lg cursor-pointer"
+                title="Close Map"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Map Viewer Container */}
+          <div className="relative flex-1 my-3 rounded-2xl overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl flex items-center justify-center">
+            <GameMap
+              className="w-full h-full"
+              playerPos={mapData.playerPos ? { x: mapData.playerPos.x, z: mapData.playerPos.z, angle: mapData.playerAngle } : null}
+              waypointPos={mapData.waypoint}
+              vehicles={mapData.vehicles}
+              highlightId={selectedDistrictId ? `label-${selectedDistrictId}` : null}
+              onSelectDistrict={(id) => {
+                const cleanId = id.replace('label-', '');
+                setSelectedDistrictId(cleanId);
+              }}
+            />
+          </div>
+
+          {/* Bottom Bar: Legend & District Info */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs border-t border-slate-800/80">
+            {/* Legend */}
+            <div className="flex flex-wrap items-center gap-4 text-slate-400">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-sky-400 border border-white shadow-sm" />
+                <span className="font-semibold text-slate-200">Player</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rotate-45 bg-yellow-400 border border-black shadow-sm" />
+                <span className="font-semibold text-slate-200">Mission Waypoint</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-blue-500 border border-white" />
+                <span>Police Patrol</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-cyan-500 border border-white" />
+                <span>Sports Coupe</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500 border border-white" />
+                <span>Taxi Cab</span>
+              </div>
+            </div>
+
+            {/* Selected District Details */}
+            {selectedDistrictId && (
+              <div className="flex items-center gap-2 bg-slate-900/90 px-3 py-1.5 rounded-xl border border-cyan-500/40 text-cyan-300 text-xs">
+                <Navigation className="w-3.5 h-3.5 text-cyan-400" />
+                <span>
+                  <strong>
+                    {ISLAND_DISTRICTS.find((d) => d.id === selectedDistrictId)?.name ?? selectedDistrictId}
+                  </strong>{' '}
+                  ({ISLAND_DISTRICTS.find((d) => d.id === selectedDistrictId)?.category ?? 'DISTRICT'})
+                </span>
+                <button
+                  onClick={() => setSelectedDistrictId(null)}
+                  className="ml-2 text-slate-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -45,11 +45,11 @@ export class NPCManager {
   }
 
   public spawnMissionGuards(): void {
-    // 3 Hostile syndicate guards stationed at Northside Port Warehouse (Z = -140)
+    // 3 Hostile syndicate guards stationed at Harborview Port Warehouse (X = 280, Z = 108)
     const guardSpawns = [
-      new THREE.Vector3(-12, 0, -135),
-      new THREE.Vector3(0, 0, -145),
-      new THREE.Vector3(12, 0, -138),
+      new THREE.Vector3(274, 0, 104),
+      new THREE.Vector3(282, 0, 114),
+      new THREE.Vector3(288, 0, 106),
     ];
 
     guardSpawns.forEach((pos) => {

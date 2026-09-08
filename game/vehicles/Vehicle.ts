@@ -215,6 +215,7 @@ export class Vehicle implements Damageable {
     this.velocity.set(forwardX * this.speed, 0, forwardZ * this.speed);
     this.position.x += this.velocity.x * deltaTime;
     this.position.z += this.velocity.z * deltaTime;
+    this.position.y = this.world.getGroundHeight(this.position.x, this.position.z);
 
     // 5. Collision Resolution with World Buildings
     const col = this.world.resolveCollision(this.position, 1.4);
