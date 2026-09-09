@@ -42,6 +42,7 @@ export class Player implements Damageable {
   private mixer: THREE.AnimationMixer | null = null;
   private walkAction: THREE.AnimationAction | null = null;
   private idleAction: THREE.AnimationAction | null = null;
+  private jumpAction: THREE.AnimationAction | null = null;
   public isFbxLoaded: boolean = false;
 
   private world: World;
@@ -311,6 +312,40 @@ export class Player implements Damageable {
               // Idle animation not downloaded yet; fallback idle stance is active
             }
           );
+
+          // Check and load Jump animation
+          loader.load(
+            '/models/character/jump.fbx',
+            (jumpFbx: any) => {
+              const jumpClip = jumpFbx.animations.find((a: THREE.AnimationClip) => a.tracks.length > 0) || jumpFbx.animations[0];
+              if (jumpClip && jumpClip.tracks.length > 0 && this.mixer) {
+                jumpClip.name = 'jump';
+
+                // Retarget Hips.position to character bind hip height (105.25cm)
+                const hipPosTrack = jumpClip.tracks.find((t: THREE.KeyframeTrack) => t.name.includes('Hips.position'));
+                if (hipPosTrack && hipPosTrack.values) {
+                  const firstY = hipPosTrack.values[1];
+                  const bindY = 105.25;
+                  for (let i = 0; i < hipPosTrack.values.length; i += 3) {
+                    const deltaY = (hipPosTrack.values[i + 1] - firstY) * (bindY / (firstY || 1));
+                    hipPosTrack.values[i] = 0;
+                    hipPosTrack.values[i + 1] = bindY + deltaY;
+                    hipPosTrack.values[i + 2] = 1.765;
+                  }
+                }
+
+                this.jumpAction = this.mixer.clipAction(jumpClip);
+                this.jumpAction.setLoop(THREE.LoopRepeat, Infinity);
+                this.jumpAction.clampWhenFinished = false;
+                this.jumpAction.play();
+                this.jumpAction.setEffectiveWeight(0);
+              }
+            },
+            undefined,
+            () => {
+              // Jump animation not downloaded yet
+            }
+          );
         }
       },
       undefined,
@@ -489,28 +524,58 @@ export class Player implements Damageable {
     if (this.isFbxLoaded && this.mixer) {
       this.mixer.update(deltaTime);
 
-      if (this.walkAction) {
-        if (this.isGrounded && horizontalSpeed > 0.3) {
+      if (!this.isGrounded) {
+        // Player is leaping in the air
+        if (this.jumpAction) {
+          const curJump = this.jumpAction.getEffectiveWeight();
+          this.jumpAction.setEffectiveWeight(THREE.MathUtils.lerp(curJump, 1.0, 16 * deltaTime));
+        }
+        if (this.walkAction) {
           const curWalk = this.walkAction.getEffectiveWeight();
-          this.walkAction.setEffectiveWeight(THREE.MathUtils.lerp(curWalk, 1.0, 12 * deltaTime));
-          this.walkAction.timeScale = horizontalSpeed > 6.0 ? 1.6 : 1.1;
+          this.walkAction.setEffectiveWeight(THREE.MathUtils.lerp(curWalk, 0.0, 14 * deltaTime));
+        }
+        if (this.idleAction) {
+          const curIdle = this.idleAction.getEffectiveWeight();
+          this.idleAction.setEffectiveWeight(THREE.MathUtils.lerp(curIdle, 0.0, 14 * deltaTime));
+        }
+      } else {
+        // Player is grounded: fade out jump action
+        if (this.jumpAction) {
+          const curJump = this.jumpAction.getEffectiveWeight();
+          this.jumpAction.setEffectiveWeight(THREE.MathUtils.lerp(curJump, 0.0, 16 * deltaTime));
+        }
 
-          if (this.idleAction) {
-            const curIdle = this.idleAction.getEffectiveWeight();
-            this.idleAction.setEffectiveWeight(THREE.MathUtils.lerp(curIdle, 0.0, 12 * deltaTime));
-          }
-        } else {
-          const curWalk = this.walkAction.getEffectiveWeight();
-          this.walkAction.setEffectiveWeight(THREE.MathUtils.lerp(curWalk, 0.0, 10 * deltaTime));
+        if (this.walkAction) {
+          if (horizontalSpeed > 0.3) {
+            const curWalk = this.walkAction.getEffectiveWeight();
+            this.walkAction.setEffectiveWeight(THREE.MathUtils.lerp(curWalk, 1.0, 12 * deltaTime));
+            this.walkAction.timeScale = horizontalSpeed > 6.0 ? 1.6 : 1.1;
 
-          if (this.idleAction) {
-            const curIdle = this.idleAction.getEffectiveWeight();
-            this.idleAction.setEffectiveWeight(THREE.MathUtils.lerp(curIdle, 1.0, 10 * deltaTime));
+            if (this.idleAction) {
+              const curIdle = this.idleAction.getEffectiveWeight();
+              this.idleAction.setEffectiveWeight(THREE.MathUtils.lerp(curIdle, 0.0, 12 * deltaTime));
+            }
+          } else {
+            const curWalk = this.walkAction.getEffectiveWeight();
+            this.walkAction.setEffectiveWeight(THREE.MathUtils.lerp(curWalk, 0.0, 10 * deltaTime));
+
+            if (this.idleAction) {
+              const curIdle = this.idleAction.getEffectiveWeight();
+              this.idleAction.setEffectiveWeight(THREE.MathUtils.lerp(curIdle, 1.0, 10 * deltaTime));
+            }
           }
         }
       }
     } else {
       this.animateLimbs(deltaTime);
+    }
+  }
+
+  public triggerJump(): void {
+    if (this.jumpAction) {
+      this.jumpAction.reset();
+      this.jumpAction.setEffectiveWeight(1.0);
+      this.jumpAction.play();
     }
   }
 

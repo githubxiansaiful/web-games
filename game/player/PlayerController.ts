@@ -123,6 +123,7 @@ export class PlayerController {
       this.player.velocity.y = 8.5;
       this.player.isGrounded = false;
       this.player.state = 'jump';
+      this.player.triggerJump();
     }
 
     // 5. Reload (Press R)
