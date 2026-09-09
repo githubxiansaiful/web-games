@@ -239,15 +239,17 @@ export class Player implements Damageable {
           walkClip.name = 'walk';
 
           // In-Place Root Motion Filtering:
-          // Lock horizontal X and Z on Hips position track so character walks in-place
+          // Lock horizontal X and Z on Hips position track and align base height to Maria bind pose (105.25cm)
           // while maintaining natural pelvic bobbing (Y) and full leg/arm stride!
           const hipPosTrack = walkClip.tracks.find((t: THREE.KeyframeTrack) => t.name.includes('Hips.position'));
           if (hipPosTrack && hipPosTrack.values) {
-            const firstX = hipPosTrack.values[0];
-            const firstZ = hipPosTrack.values[2];
+            const firstY = hipPosTrack.values[1];
+            const bindY = 105.25;
             for (let i = 0; i < hipPosTrack.values.length; i += 3) {
-              hipPosTrack.values[i] = firstX;
-              hipPosTrack.values[i + 2] = firstZ;
+              const bobY = hipPosTrack.values[i + 1] - firstY;
+              hipPosTrack.values[i] = 0;
+              hipPosTrack.values[i + 1] = bindY + bobY;
+              hipPosTrack.values[i + 2] = 1.765;
             }
           }
 
@@ -496,9 +498,20 @@ export class Player implements Damageable {
     this.position.y += this.velocity.y * deltaTime;
     this.position.z += this.velocity.z * deltaTime;
 
-    // 3. Ground Elevation Floor Check
+    // 3. Ground Elevation Floor Check with Step-Down Snapping
     const groundY = this.world.getGroundHeight(this.position.x, this.position.z);
-    if (this.position.y <= groundY) {
+    const dropDist = this.position.y - groundY;
+
+    if (dropDist <= 0.001) {
+      this.position.y = groundY;
+      this.velocity.y = 0;
+      this.isGrounded = true;
+      if (this.state === 'jump') {
+        const hSpd = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z);
+        this.state = hSpd > 0.3 ? (hSpd > 6.0 ? 'run' : 'walk') : 'idle';
+      }
+    } else if (dropDist < 0.45 && this.velocity.y <= 0.1 && this.state !== 'jump') {
+      // Step-down snap: keep character grounded on gentle terrain slopes and road curbs
       this.position.y = groundY;
       this.velocity.y = 0;
       this.isGrounded = true;
@@ -525,8 +538,11 @@ export class Player implements Damageable {
     if (this.isFbxLoaded && this.mixer) {
       this.mixer.update(deltaTime);
 
-      if (!this.isGrounded) {
-        // Player is leaping in the air
+      // Jump animation only activates when intentionally leaping (Space) or falling from high ledge (>0.65m)
+      const isAirborneJump = !this.isGrounded && (this.state === 'jump' || dropDist > 0.65);
+
+      if (isAirborneJump) {
+        // Player is leaping or falling through the air
         if (this.jumpAction) {
           const curJump = this.jumpAction.getEffectiveWeight();
           this.jumpAction.setEffectiveWeight(THREE.MathUtils.lerp(curJump, 1.0, 16 * deltaTime));
@@ -540,10 +556,10 @@ export class Player implements Damageable {
           this.idleAction.setEffectiveWeight(THREE.MathUtils.lerp(curIdle, 0.0, 14 * deltaTime));
         }
       } else {
-        // Player is grounded: fade out jump action
+        // Player is grounded or walking: smoothly silence jump action
         if (this.jumpAction) {
           const curJump = this.jumpAction.getEffectiveWeight();
-          this.jumpAction.setEffectiveWeight(THREE.MathUtils.lerp(curJump, 0.0, 16 * deltaTime));
+          this.jumpAction.setEffectiveWeight(THREE.MathUtils.lerp(curJump, 0.0, 20 * deltaTime));
         }
 
         if (this.walkAction) {
