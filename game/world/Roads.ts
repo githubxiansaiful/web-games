@@ -21,20 +21,20 @@ interface MultiJunction {
   x: number;
   z: number;
   radius: number;
-  isRoundabout: boolean;
+  isCadIntersection?: boolean;
 }
 
 const MULTI_JUNCTIONS: MultiJunction[] = [
-  { x: 0, z: -22, radius: 18.0, isRoundabout: true },
-  { x: 15, z: 188, radius: 14.0, isRoundabout: false },
-  { x: -215, z: 65, radius: 14.0, isRoundabout: false },
-  { x: -220, z: 248, radius: 14.0, isRoundabout: false },
-  { x: 280, z: 108, radius: 14.0, isRoundabout: false },
-  { x: 280, z: -58, radius: 14.0, isRoundabout: false },
-  { x: 45, z: -248, radius: 14.0, isRoundabout: false },
-  { x: 335, z: 278, radius: 13.0, isRoundabout: false },
-  { x: -445, z: 100, radius: 14.0, isRoundabout: false },
-  { x: -515, z: 318, radius: 14.0, isRoundabout: false },
+  { x: 0, z: -22, radius: 18.0, isCadIntersection: true },
+  { x: 15, z: 188, radius: 14.0 },
+  { x: -215, z: 65, radius: 14.0 },
+  { x: -220, z: 248, radius: 14.0 },
+  { x: 280, z: 108, radius: 14.0 },
+  { x: 280, z: -58, radius: 14.0 },
+  { x: 45, z: -248, radius: 14.0 },
+  { x: 335, z: 278, radius: 13.0 },
+  { x: -445, z: 100, radius: 14.0 },
+  { x: -515, z: 318, radius: 14.0 },
 ];
 
 function resamplePoints(points: THREE.Vector3[], maxStep: number = 8): THREE.Vector3[] {
@@ -106,6 +106,7 @@ export class Roads {
     this.group.name = 'IslandRoads';
     this.roadSegments = getIslandRoadNetwork();
     this.buildIslandRoads(getHeight);
+    this.loadRoadCompleteModel();
     this.loadStreetFurniture();
   }
 
@@ -135,12 +136,6 @@ export class Roads {
       color: 0x475569, // Clean slate pedestrian sidewalk paving
       roughness: 0.88,
       metalness: 0.05,
-    });
-
-    const islandGrassMaterial = new THREE.MeshStandardMaterial({
-      color: 0x1e3a24, // Central roundabout lawn green
-      roughness: 0.92,
-      metalness: 0.04,
     });
 
     // 2. Geometry Buffers for High Performance (Single draw call per material)
@@ -475,58 +470,10 @@ export class Roads {
       }
     }
 
-    // 4. Grand Roundabout ("4 road circle") at (0, -22)
-    // Seamless circulating asphalt ring, raised central curb, green grass island, and circulating lane guide
-    const rCenter = new THREE.Vector3(0, 0.03, -22);
-    const rOuter = 18.8;
-    const rInner = 6.0;
-
-    // Asphalt Circulating Roadway Ring
-    const ringGeo = new THREE.RingGeometry(rInner, rOuter, 48);
-    ringGeo.rotateX(-Math.PI / 2);
-    const ringMesh = new THREE.Mesh(ringGeo, asphaltMaterial);
-    ringMesh.position.set(rCenter.x, 0.03, rCenter.z);
-    ringMesh.receiveShadow = true;
-    this.group.add(ringMesh);
-
-    // Central Island Curb Ring
-    const islandCurbGeo = new THREE.RingGeometry(rInner - 0.5, rInner, 48);
-    islandCurbGeo.rotateX(-Math.PI / 2);
-    const islandCurbMesh = new THREE.Mesh(islandCurbGeo, curbMaterial);
-    islandCurbMesh.position.set(rCenter.x, 0.055, rCenter.z);
-    islandCurbMesh.receiveShadow = true;
-    this.group.add(islandCurbMesh);
-
-    // Central Island Green Grass Lawn
-    const islandGrassGeo = new THREE.CircleGeometry(rInner - 0.5, 48);
-    islandGrassGeo.rotateX(-Math.PI / 2);
-    const islandGrassMesh = new THREE.Mesh(islandGrassGeo, islandGrassMaterial);
-    islandGrassMesh.position.set(rCenter.x, 0.05, rCenter.z);
-    islandGrassMesh.receiveShadow = true;
-    this.group.add(islandGrassMesh);
-
-    // Circulating Dashed White Lane Guide at R = 12.5m
-    const rGuide = 12.5;
-    const guideDashCount = 24;
-    for (let i = 0; i < guideDashCount; i++) {
-      const theta1 = (i / guideDashCount) * Math.PI * 2;
-      const theta2 = ((i + 0.6) / guideDashCount) * Math.PI * 2;
-      const steps = 3;
-      for (let s = 0; s < steps; s++) {
-        const a1 = theta1 + (s / steps) * (theta2 - theta1);
-        const a2 = theta1 + ((s + 1) / steps) * (theta2 - theta1);
-        const w = 0.25;
-        const p1Left = new THREE.Vector3(rCenter.x + (rGuide - w / 2) * Math.cos(a1), 0.035, rCenter.z + (rGuide - w / 2) * Math.sin(a1));
-        const p1Right = new THREE.Vector3(rCenter.x + (rGuide + w / 2) * Math.cos(a1), 0.035, rCenter.z + (rGuide + w / 2) * Math.sin(a1));
-        const p2Left = new THREE.Vector3(rCenter.x + (rGuide - w / 2) * Math.cos(a2), 0.035, rCenter.z + (rGuide - w / 2) * Math.sin(a2));
-        const p2Right = new THREE.Vector3(rCenter.x + (rGuide + w / 2) * Math.cos(a2), 0.035, rCenter.z + (rGuide + w / 2) * Math.sin(a2));
-        addQuad(p1Left, p1Right, p2Right, p2Left, 0.035, whitePos, whiteNorm, whiteInd, () => whiteVO, (v) => (whiteVO = v));
-      }
-    }
-
-    // 5. Clean Asphalt Discs for all other 3-Way Intersections (100% flat and open)
+    // 4. Clean Asphalt Discs for Multi-Way Intersections (100% flat and open)
+    // Note: Central junction (0, -22) is handled by the high-detail 3D CAD road model road_complete.glb
     for (const junc of MULTI_JUNCTIONS) {
-      if (junc.isRoundabout) continue; // Roundabout handled above
+      if (junc.isCadIntersection) continue;
       const juncGeo = new THREE.CircleGeometry(junc.radius + 0.5, 36);
       juncGeo.rotateX(-Math.PI / 2);
       const juncMesh = new THREE.Mesh(juncGeo, asphaltMaterial);
@@ -586,6 +533,76 @@ export class Roads {
       swMesh.receiveShadow = true;
       this.group.add(swMesh);
     }
+  }
+
+  /**
+   * Load and integrate the 3D CAD road structure model (road_complete.glb)
+   * into the road network.
+   * This provides a CAD-quality 4-way intersection (Plane.006) with realistic geometry,
+   * smooth lane curves, PBR road atlas textures, and seamless connections
+   * to road-3, road-4, road-13, and road-18 at (0, -22).
+   */
+  private loadRoadCompleteModel(): void {
+    const loader = new GLTFLoader();
+    const texLoader = new THREE.TextureLoader();
+
+    // Pre-load texture atlas backup to ensure full sharpness and PBR color fidelity
+    const atlasTex = texLoader.load('/models/roads/road_complete_atlas.png');
+    atlasTex.colorSpace = THREE.SRGBColorSpace;
+    atlasTex.generateMipmaps = true;
+    atlasTex.anisotropy = 8;
+    atlasTex.wrapS = THREE.RepeatWrapping;
+    atlasTex.wrapT = THREE.RepeatWrapping;
+
+    loader.load(
+      '/models/roads/road_complete.glb',
+      (gltf) => {
+        const model = gltf.scene;
+        model.name = 'CAD_Road_Complete';
+
+        // Scale factor 6.4x scales the road lane width to ~16.8m and the 4-way intersection
+        // to ~37.9m x 37.9m, perfectly matching our 16m-18m island road network!
+        const S = 6.4;
+
+        // In road_complete.glb local coordinates, the central 4-way intersection (Plane.006)
+        // is centered at (0.17478, -0.59237).
+        // Calculate the exact world offset to place Plane.006 directly at (0, 0.035, -22):
+        const posX = -S * 0.17478;
+        const posZ = -22 - S * (-0.59237);
+        model.scale.set(S, S, S);
+        model.position.set(posX, 0.035, posZ);
+
+        model.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            mesh.receiveShadow = true;
+            mesh.castShadow = false;
+
+            if (mesh.material) {
+              const mat = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.MeshStandardMaterial;
+              mat.roughness = 0.82;
+              mat.metalness = 0.08;
+              mat.polygonOffset = true;
+              mat.polygonOffsetFactor = -1.0;
+              mat.polygonOffsetUnits = -2.0;
+
+              if (!mat.map) {
+                mat.map = atlasTex;
+              } else {
+                mat.map.anisotropy = 8;
+                mat.map.generateMipmaps = true;
+                mat.map.colorSpace = THREE.SRGBColorSpace;
+              }
+              mat.needsUpdate = true;
+            }
+          }
+        });
+
+        this.group.add(model);
+      },
+      undefined,
+      (err) => console.warn('Could not load road_complete.glb:', err)
+    );
   }
 
   private loadStreetFurniture(): void {
@@ -722,22 +739,32 @@ export class Roads {
       (err) => console.warn('Could not load light_curved.glb:', err)
     );
 
-    // 2. Central Island Double Street Light at (0, -22) in the Grand Roundabout
-    loader.load('/models/roads/light_curvedDouble.glb', (gltf) => {
-      const centerLight = gltf.scene;
-      centerLight.scale.set(8.5, 8.5, 8.5);
-      centerLight.position.set(0, 0.055, -22);
-      centerLight.traverse((c) => {
-        if ((c as THREE.Mesh).isMesh) {
-          c.castShadow = true;
-          const mesh = c as THREE.Mesh;
-          if (mesh.material && (mesh.material as THREE.Material).name === 'light') {
-            (mesh.material as THREE.MeshStandardMaterial).emissive = new THREE.Color(0xfef08a);
-            (mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.0;
+    // 2. Corner Street Lights around the 4-Way Intersection of road_complete.glb
+    const cornerLightCoords = [
+      { x: 20.5, z: -3.5, rotY: -Math.PI * 0.75 },   // South-East corner
+      { x: -20.5, z: -3.5, rotY: Math.PI * 0.75 },    // South-West corner
+      { x: 20.5, z: -40.5, rotY: -Math.PI * 0.25 },  // North-East corner
+      { x: -20.5, z: -40.5, rotY: Math.PI * 0.25 },   // North-West corner
+    ];
+
+    loader.load('/models/roads/light_curved.glb', (gltf) => {
+      for (const pos of cornerLightCoords) {
+        const light = gltf.scene.clone();
+        light.scale.set(8.5, 8.5, 8.5);
+        light.position.set(pos.x, 0.045, pos.z);
+        light.rotation.y = pos.rotY;
+        light.traverse((c) => {
+          if ((c as THREE.Mesh).isMesh) {
+            c.castShadow = true;
+            const mesh = c as THREE.Mesh;
+            if (mesh.material && (mesh.material as THREE.Material).name === 'light') {
+              (mesh.material as THREE.MeshStandardMaterial).emissive = new THREE.Color(0xfef08a);
+              (mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.0;
+            }
           }
-        }
-      });
-      this.group.add(centerLight);
+        });
+        this.group.add(light);
+      }
     });
 
     // 3. Roadside Safety Work Zone (Kenney Traffic Cones, Barriers, Hazard Beacon)
