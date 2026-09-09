@@ -33,8 +33,12 @@ export class Vehicle implements Damageable {
   public customModel: THREE.Object3D | null = null;
   public isCustomModelLoaded: boolean = false;
   private proceduralRig: THREE.Group | null = null;
-  private frontWheelBones: THREE.Bone[] = [];
-  private rearWheelBones: THREE.Bone[] = [];
+  private frontLeftCaliper: THREE.Bone | null = null;
+  private frontRightCaliper: THREE.Bone | null = null;
+  private frontLeftWheel: THREE.Bone | null = null;
+  private frontRightWheel: THREE.Bone | null = null;
+  private rearLeftWheel: THREE.Bone | null = null;
+  private rearRightWheel: THREE.Bone | null = null;
   private steeringWheelBone: THREE.Bone | null = null;
   private spoilerBone: THREE.Bone | null = null;
   private wheelSpinAngle: number = 0;
@@ -77,7 +81,7 @@ export class Vehicle implements Damageable {
         (gltf) => {
           this.customModel = gltf.scene;
 
-          // Enable shadows and enhance PBR paint reflectiveness
+          // Enable shadows and enhance glossy PBR automotive lacquer paint
           gltf.scene.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
               child.castShadow = true;
@@ -87,8 +91,18 @@ export class Vehicle implements Damageable {
                 const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
                 mats.forEach((m) => {
                   if (m.name === 'Paint' && 'roughness' in m) {
-                    (m as THREE.MeshStandardMaterial).roughness = 0.2;
-                    (m as THREE.MeshStandardMaterial).metalness = 0.85;
+                    // Vibrant exotic pearl yellow with glossy clearcoat (dielectric, no dark 0.85 metalness)
+                    (m as THREE.MeshStandardMaterial).color = new THREE.Color(this.config.primaryColor);
+                    (m as THREE.MeshStandardMaterial).roughness = 0.16;
+                    (m as THREE.MeshStandardMaterial).metalness = 0.10;
+                  } else if (m.name === 'CaliperAZonePaint' && 'color' in m) {
+                    (m as THREE.MeshStandardMaterial).color = new THREE.Color(this.config.primaryColor);
+                    (m as THREE.MeshStandardMaterial).roughness = 0.22;
+                    (m as THREE.MeshStandardMaterial).metalness = 0.12;
+                  } else if (m.name === 'Coloured' && 'roughness' in m) {
+                    // Sleek carbon aero accents & splitter
+                    (m as THREE.MeshStandardMaterial).roughness = 0.35;
+                    (m as THREE.MeshStandardMaterial).metalness = 0.15;
                   }
                 });
               }
@@ -96,19 +110,24 @@ export class Vehicle implements Damageable {
           });
 
           // Identify skeletal animation bones for steering, spinning, and active aero
-          const fl = gltf.scene.getObjectByName('Wheel_Front_L_28');
-          const fr = gltf.scene.getObjectByName('Wheel_Front_R_30');
-          const rl = gltf.scene.getObjectByName('Wheel_Rear_L_32');
-          const rr = gltf.scene.getObjectByName('Wheel_Rear_R_34');
-          const sw = gltf.scene.getObjectByName('Animate_SteeringWheel_20');
-          const sp = gltf.scene.getObjectByName('Animate_Spoiler_16');
+          const findBone = (pattern: RegExp): THREE.Bone | null => {
+            let found: THREE.Bone | null = null;
+            gltf.scene.traverse((child) => {
+              if (!found && (child as THREE.Bone).isBone && pattern.test(child.name)) {
+                found = child as THREE.Bone;
+              }
+            });
+            return found;
+          };
 
-          if (fl && (fl as THREE.Bone).isBone) this.frontWheelBones.push(fl as THREE.Bone);
-          if (fr && (fr as THREE.Bone).isBone) this.frontWheelBones.push(fr as THREE.Bone);
-          if (rl && (rl as THREE.Bone).isBone) this.rearWheelBones.push(rl as THREE.Bone);
-          if (rr && (rr as THREE.Bone).isBone) this.rearWheelBones.push(rr as THREE.Bone);
-          if (sw && (sw as THREE.Bone).isBone) this.steeringWheelBone = sw as THREE.Bone;
-          if (sp && (sp as THREE.Bone).isBone) this.spoilerBone = sp as THREE.Bone;
+          this.frontLeftCaliper = findBone(/Calliper[_\s]Front[_\s]L/i);
+          this.frontRightCaliper = findBone(/Calliper[_\s]Front[_\s]R/i);
+          this.frontLeftWheel = findBone(/Wheel[_\s]Front[_\s]L/i);
+          this.frontRightWheel = findBone(/Wheel[_\s]Front[_\s]R/i);
+          this.rearLeftWheel = findBone(/Wheel[_\s]Rear[_\s]L/i);
+          this.rearRightWheel = findBone(/Wheel[_\s]Rear[_\s]R/i);
+          this.steeringWheelBone = findBone(/Animate[_\s]SteeringWheel/i);
+          this.spoilerBone = findBone(/Animate[_\s]Spoiler[_\s]16/i);
 
           // Hide procedural box car and display the realistic 3D vehicle
           if (this.proceduralRig) {
@@ -240,22 +259,19 @@ export class Vehicle implements Damageable {
 
     // 1. Progressive Keyboard Steering with Speed-Dependent Lock & Stability
     const absSpeed = Math.abs(this.speed);
-    // Smooth turn-in rate (7.0) and fast re-centering (12.0) for natural feel on A/D keys
-    const steerResponseSpeed = Math.abs(steer) > 0.01 ? 7.0 : 12.0;
+    // Responsive turn-in rate (12.0) and fast re-centering (16.0) for snappy feel on A/D keys
+    const steerResponseSpeed = Math.abs(steer) > 0.01 ? 12.0 : 16.0;
     const steerLerp = 1 - Math.exp(-steerResponseSpeed * deltaTime);
 
-    // Speed-dependent max lock:
-    // Full steering lock (~24 deg) at parking/city speeds for sharp intersections.
-    // Clamped down smoothly to ~8 deg at high speeds so tapping A/D doesn't snap out of control!
-    const speedRatio = Math.min(absSpeed / 30, 1.0);
-    const maxLock = handbrake ? 0.46 : (0.42 - speedRatio * 0.28); // 0.42 -> 0.14 rad
+    // Speed-dependent max lock: 0.52 rad (~30 deg) at parking/city speeds, 0.28 rad (~16 deg) at top speed
+    const maxLock = handbrake ? 0.60 : (0.52 - Math.min(absSpeed / 40, 1.0) * 0.24);
 
     const targetSteerAngle = steer * maxLock;
     this.steerAngle = THREE.MathUtils.lerp(this.steerAngle, targetSteerAngle, steerLerp);
 
     // Update front wheel visual turning (fallback procedural mesh)
     this.frontWheelAnchors.forEach((a) => {
-      a.rotation.y = this.steerAngle;
+      a.rotation.y = -this.steerAngle;
     });
 
     // 2. Throttle & Acceleration
@@ -289,11 +305,12 @@ export class Vehicle implements Damageable {
     // 3. Heading rotation from front wheel steering (controlled understeer curve + handbrake drift)
     if (absSpeed > 0.1) {
       const turnFactor = this.speed >= 0 ? 1 : -1;
-      // Realistic tire grip curve: nimble in streets, stable on straights without violent twitching
-      const speedFactor = Math.min(absSpeed / 7, 1.0) / (1.0 + absSpeed * 0.032);
-      const driftMultiplier = handbrake ? 2.2 : 1.0;
+      // Responsive tire grip at all speeds without sluggish lag
+      const speedFactor = Math.min(absSpeed / 3.0, 1.0) / (1.0 + absSpeed * 0.012);
+      const driftMultiplier = handbrake ? 2.4 : 1.0;
       const turnRate = this.steerAngle * this.config.turnSpeed * speedFactor * turnFactor * driftMultiplier;
-      this.heading += turnRate * deltaTime;
+      // Minus sign: A (steer < 0) turns LEFT (+heading), D (steer > 0) turns RIGHT (-heading)
+      this.heading -= turnRate * deltaTime;
     }
 
     // 4. Update Position along Forward Heading Vector
@@ -321,7 +338,7 @@ export class Vehicle implements Damageable {
     const rollAngle = (this.steerAngle * (this.speed / 15)) * 0.15;
     this.mesh.rotation.z = -rollAngle;
 
-    // Spin wheels according to speed
+    // Spin wheels according to speed (procedural fallback)
     const wheelRotDelta = (this.speed / 0.38) * deltaTime;
     this.wheels.forEach((w) => {
       w.rotation.x += wheelRotDelta;
@@ -331,14 +348,29 @@ export class Vehicle implements Damageable {
     if (this.isCustomModelLoaded) {
       this.wheelSpinAngle += (this.speed / 0.35) * deltaTime;
 
-      this.frontWheelBones.forEach((b) => {
-        b.rotation.x = this.wheelSpinAngle;
-        b.rotation.y = this.steerAngle;
-      });
+      // Front steering: calipers steer together in parallel unison (mirrored bone signs)
+      if (this.frontLeftCaliper) {
+        this.frontLeftCaliper.rotation.y = -this.steerAngle;
+      }
+      if (this.frontRightCaliper) {
+        this.frontRightCaliper.rotation.y = this.steerAngle;
+      }
 
-      this.rearWheelBones.forEach((b) => {
-        b.rotation.x = this.wheelSpinAngle;
-      });
+      // Front wheels spin forward/backward (children of calipers)
+      if (this.frontLeftWheel) {
+        this.frontLeftWheel.rotation.x = this.wheelSpinAngle;
+      }
+      if (this.frontRightWheel) {
+        this.frontRightWheel.rotation.x = -this.wheelSpinAngle;
+      }
+
+      // Rear wheels spin forward/backward
+      if (this.rearLeftWheel) {
+        this.rearLeftWheel.rotation.x = this.wheelSpinAngle;
+      }
+      if (this.rearRightWheel) {
+        this.rearRightWheel.rotation.x = -this.wheelSpinAngle;
+      }
 
       if (this.steeringWheelBone) {
         this.steeringWheelBone.rotation.z = -this.steerAngle * 2.2;

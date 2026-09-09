@@ -24,10 +24,10 @@ export const VEHICLE_CONFIGS: Record<string, VehicleConfig> = {
     reverseMaxSpeed: 14,
     acceleration: 22, // Progressive, punchy V12 launch
     brakeForce: 45, // Carbon ceramic brakes
-    turnSpeed: 1.8, // Smooth, realistic turning rate
+    turnSpeed: 2.6, // Nimble, responsive supercar turning
     mass: 1420,
     health: 600,
-    primaryColor: 0xeab308, // Giallo Auge Lamborghini Yellow
+    primaryColor: 0xfacc15, // Vibrant Giallo Auge Lamborghini Pearl Yellow
     roofColor: 0x09090b,
     hasSiren: false,
     modelPath: '/models/vehicles/lamborghini.glb',

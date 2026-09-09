@@ -21,7 +21,7 @@ export class VehicleManager {
     const lambo = new Vehicle(
       VEHICLE_CONFIGS.lamborghini_fenomeno,
       new THREE.Vector3(4, 0, 10),
-      0, // Facing North
+      Math.PI, // Facing North (matches player orientation)
       this.world
     );
     this.vehicles.push(lambo);
