@@ -131,6 +131,7 @@ export class Roads {
   constructor(getHeight?: (x: number, z: number) => number) {
     this.group = new THREE.Group();
     this.group.name = 'IslandRoads';
+    this.group.renderOrder = 2;
     this.roadSegments = getIslandRoadNetwork();
     this.buildIslandRoads(getHeight);
     this.loadStreetFurniture();
@@ -161,39 +162,60 @@ export class Roads {
     sidewalkTexture.generateMipmaps = true;
     sidewalkTexture.anisotropy = 16;
 
-    // 2. High-Performance Materials
+    // 2. High-Performance Materials with DoubleSide & PolygonOffset
     const roadMaterial = new THREE.MeshStandardMaterial({
       map: roadTexture,
       roughness: 0.82,
       metalness: 0.05,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -1.0,
+      polygonOffsetUnits: -2.0,
     });
 
     const intersectionMaterial = new THREE.MeshStandardMaterial({
       map: asphaltTexture,
       roughness: 0.82,
       metalness: 0.05,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -1.0,
+      polygonOffsetUnits: -2.0,
     });
 
     const sidewalkMaterial = new THREE.MeshStandardMaterial({
       map: sidewalkTexture,
       roughness: 0.86,
       metalness: 0.04,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -1.0,
+      polygonOffsetUnits: -2.0,
     });
 
     const curbStoneMaterial = new THREE.MeshStandardMaterial({
       color: 0x94a3b8,
       roughness: 0.65,
       metalness: 0.12,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -1.0,
+      polygonOffsetUnits: -2.0,
     });
 
     const whitePaintMaterial = new THREE.MeshBasicMaterial({
       color: 0xf8fafc,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -2.0,
+      polygonOffsetUnits: -4.0,
     });
 
     const islandGrassMaterial = new THREE.MeshStandardMaterial({
       color: 0x1e3a24,
       roughness: 0.92,
       metalness: 0.04,
+      side: THREE.DoubleSide,
     });
 
     // 3. Assemble Unified Road Network
@@ -311,7 +333,8 @@ export class Roads {
       const base = getVO();
       posArr.push(c0.x, yElev, c0.z, c1.x, yElev, c1.z, c2.x, yElev, c2.z, c3.x, yElev, c3.z);
       normArr.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
-      indArr.push(base, base + 1, base + 2, base, base + 2, base + 3);
+      // Upward counter-clockwise winding: (base, base + 2, base + 1) and (base, base + 3, base + 2)
+      indArr.push(base, base + 2, base + 1, base, base + 3, base + 2);
       setVO(base + 4);
     };
 
@@ -497,13 +520,14 @@ export class Roads {
           );
 
           // 9 Quad strips connecting step i to step i + 1
+          // Correct upward counter-clockwise winding: (b0+s, b1+s+1, b1+s) and (b0+s, b0+s+1, b1+s+1)
           if (i < sPts.length - 1) {
             const b0 = rVO + i * 10;
             const b1 = rVO + (i + 1) * 10;
             for (let s = 0; s < 9; s++) {
               roadInd.push(
-                b0 + s, b1 + s, b1 + s + 1,
-                b0 + s, b1 + s + 1, b0 + s + 1
+                b0 + s, b1 + s + 1, b1 + s,
+                b0 + s, b0 + s + 1, b1 + s + 1
               );
             }
           }
@@ -583,6 +607,7 @@ export class Roads {
         const ringMesh = new THREE.Mesh(ringGeo, intersectionMaterial);
         ringMesh.position.set(rCenter.x, 0.042, rCenter.z);
         ringMesh.receiveShadow = true;
+        ringMesh.renderOrder = 2;
         this.group.add(ringMesh);
 
         // Raised Central Island Curb Stone (Y = 0.20m)
@@ -591,6 +616,7 @@ export class Roads {
         const islandCurbMesh = new THREE.Mesh(islandCurbGeo, curbStoneMaterial);
         islandCurbMesh.position.set(rCenter.x, 0.20, rCenter.z);
         islandCurbMesh.receiveShadow = true;
+        islandCurbMesh.renderOrder = 2;
         this.group.add(islandCurbMesh);
 
         // Landscaped Central Green Grass Lawn (Y = 0.18m)
@@ -599,6 +625,7 @@ export class Roads {
         const islandGrassMesh = new THREE.Mesh(islandGrassGeo, islandGrassMaterial);
         islandGrassMesh.position.set(rCenter.x, 0.18, rCenter.z);
         islandGrassMesh.receiveShadow = true;
+        islandGrassMesh.renderOrder = 2;
         this.group.add(islandGrassMesh);
 
         // Circulating Dashed White Lane Divider at R = 16.5m
@@ -634,6 +661,7 @@ export class Roads {
         const juncMesh = new THREE.Mesh(juncGeo, intersectionMaterial);
         juncMesh.position.set(junc.x, 0.041, junc.z);
         juncMesh.receiveShadow = true;
+        juncMesh.renderOrder = 2;
         this.group.add(juncMesh);
       }
 
@@ -686,7 +714,7 @@ export class Roads {
             arcSwPts.push(swPt);
           }
 
-          // Build sidewalk fillet quads
+          // Build sidewalk fillet quads with correct upward winding
           const baseSW = swVO;
           for (let s = 0; s <= numArcSteps; s++) {
             const cp = arcCurbPts[s];
@@ -697,7 +725,7 @@ export class Roads {
           }
           for (let s = 0; s < numArcSteps; s++) {
             const b = baseSW + s * 2;
-            swInd.push(b, b + 1, b + 3, b, b + 3, b + 2);
+            swInd.push(b, b + 2, b + 1, b + 1, b + 2, b + 3);
           }
           swVO = baseSW + (numArcSteps + 1) * 2;
         }
@@ -719,6 +747,7 @@ export class Roads {
       const deMesh = new THREE.Mesh(deGeo, intersectionMaterial);
       deMesh.position.set(de.x, 0.041, de.z);
       deMesh.receiveShadow = true;
+      deMesh.renderOrder = 2;
       this.group.add(deMesh);
 
       // Raised perimeter curb ring around the cul-de-sac
@@ -727,6 +756,7 @@ export class Roads {
       const deCurbMesh = new THREE.Mesh(deCurbGeo, curbStoneMaterial);
       deCurbMesh.position.set(de.x, 0.12, de.z);
       deCurbMesh.receiveShadow = true;
+      deCurbMesh.renderOrder = 2;
       this.group.add(deCurbMesh);
     }
 
@@ -740,6 +770,7 @@ export class Roads {
       rGeo.setIndex(roadInd);
       const roadMesh = new THREE.Mesh(rGeo, roadMaterial);
       roadMesh.receiveShadow = true;
+      roadMesh.renderOrder = 2;
       this.group.add(roadMesh);
     }
 
@@ -752,6 +783,7 @@ export class Roads {
       swGeo.setIndex(swInd);
       const swMesh = new THREE.Mesh(swGeo, sidewalkMaterial);
       swMesh.receiveShadow = true;
+      swMesh.renderOrder = 2;
       this.group.add(swMesh);
     }
 
@@ -762,6 +794,7 @@ export class Roads {
       whiteGeo.setAttribute('normal', new THREE.Float32BufferAttribute(whiteNorm, 3));
       whiteGeo.setIndex(whiteInd);
       const whiteMesh = new THREE.Mesh(whiteGeo, whitePaintMaterial);
+      whiteMesh.renderOrder = 3;
       this.group.add(whiteMesh);
     }
 
@@ -773,6 +806,7 @@ export class Roads {
       curbGeo.setIndex(curbInd);
       const curbMesh = new THREE.Mesh(curbGeo, curbStoneMaterial);
       curbMesh.receiveShadow = true;
+      curbMesh.renderOrder = 2;
       this.group.add(curbMesh);
     }
   }
