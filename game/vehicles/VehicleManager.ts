@@ -53,6 +53,102 @@ export class VehicleManager {
     }
   }
 
+  public resolveCollision(
+    position: THREE.Vector3,
+    radius: number,
+    excludeVehicle?: Vehicle | null
+  ): { collided: boolean; normal: THREE.Vector3 } {
+    let anyCollided = false;
+    const finalNormal = new THREE.Vector3();
+
+    for (const vehicle of this.vehicles) {
+      if (vehicle === excludeVehicle || vehicle.isDead) continue;
+
+      // Quick broadphase distance check (sphere radius ~3.0m + character radius ~0.5m = 3.5m)
+      const dx = position.x - vehicle.position.x;
+      const dz = position.z - vehicle.position.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > 16) continue;
+
+      // Vertical height check: vehicle roof is ~1.25m above ground
+      if (position.y > vehicle.position.y + 1.35 || position.y < vehicle.position.y - 0.5) {
+        continue;
+      }
+
+      // Exact OBB collision box for Lamborghini Fenomeno (half-width 1.15m, half-length 2.50m)
+      const hw = 1.15;
+      const hl = 2.50;
+
+      const cos = Math.cos(vehicle.heading);
+      const sin = Math.sin(vehicle.heading);
+
+      let lx = dx * cos - dz * sin;
+      let lz = dx * sin + dz * cos;
+
+      const cx = Math.max(-hw, Math.min(hw, lx));
+      const cz = Math.max(-hl, Math.min(hl, lz));
+
+      const diffX = lx - cx;
+      const diffZ = lz - cz;
+      const dSq = diffX * diffX + diffZ * diffZ;
+
+      if (dSq > 0.00001) {
+        if (dSq < radius * radius) {
+          anyCollided = true;
+          const dist = Math.sqrt(dSq);
+          const overlap = radius - dist;
+          const nx = diffX / dist;
+          const nz = diffZ / dist;
+
+          lx += nx * overlap;
+          lz += nz * overlap;
+
+          // Convert local normal to world space
+          finalNormal.x += nx * cos + nz * sin;
+          finalNormal.z += -nx * sin + nz * cos;
+        }
+      } else {
+        // Deep inside box: push out to nearest edge
+        anyCollided = true;
+        const dLeft = lx + hw;
+        const dRight = hw - lx;
+        const dBack = lz + hl;
+        const dFront = hl - lz;
+        const minD = Math.min(dLeft, dRight, dBack, dFront);
+
+        if (minD === dLeft) {
+          lx = -hw - radius;
+          finalNormal.x += -cos;
+          finalNormal.z += sin;
+        } else if (minD === dRight) {
+          lx = hw + radius;
+          finalNormal.x += cos;
+          finalNormal.z += -sin;
+        } else if (minD === dBack) {
+          lz = -hl - radius;
+          finalNormal.x += -sin;
+          finalNormal.z += -cos;
+        } else {
+          lz = hl + radius;
+          finalNormal.x += sin;
+          finalNormal.z += cos;
+        }
+      }
+
+      if (anyCollided) {
+        // Project corrected local position back to world coordinates
+        position.x = vehicle.position.x + lx * cos + lz * sin;
+        position.z = vehicle.position.z - lx * sin + lz * cos;
+      }
+    }
+
+    if (anyCollided && (finalNormal.x !== 0 || finalNormal.z !== 0)) {
+      finalNormal.normalize();
+    }
+
+    return { collided: anyCollided, normal: finalNormal };
+  }
+
   public destroy(): void {
     for (const v of this.vehicles) {
       this.scene.remove(v.mesh);

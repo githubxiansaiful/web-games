@@ -86,6 +86,7 @@ export class GameEngine {
 
     // 7. Vehicles
     this.vehicleManager = new VehicleManager(this.scene, this.world);
+    this.world.vehicleManager = this.vehicleManager;
 
     // 8. Player & Controller
     const spawnPos = new THREE.Vector3(0, 0, 10);

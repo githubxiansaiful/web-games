@@ -16,6 +16,7 @@ export class World {
   public gridHelper: THREE.GridHelper;
   public sunLight!: THREE.DirectionalLight;
   public bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
+  public vehicleManager: any = null;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -126,6 +127,15 @@ export class World {
       pos.z = this.bounds.maxZ - radius;
       normal.z = -1;
       collided = true;
+    }
+
+    // Vehicle Collisions (Solid obstacles)
+    if (this.vehicleManager) {
+      const vCol = this.vehicleManager.resolveCollision(pos, radius);
+      if (vCol.collided) {
+        collided = true;
+        normal.copy(vCol.normal);
+      }
     }
 
     return { collided, normal };

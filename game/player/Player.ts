@@ -519,11 +519,20 @@ export class Player implements Damageable {
       this.isGrounded = false;
     }
 
-    // 4. World Collision Resolution with City Buildings
+    // 4. World & Obstacle Collision Resolution (Buildings & Vehicles)
     const col = this.world.resolveCollision(this.position, 0.45);
     if (col.collided) {
-      this.velocity.x = 0;
-      this.velocity.z = 0;
+      if (col.normal.x !== 0 || col.normal.z !== 0) {
+        // Slide smoothly along the collision surface instead of abruptly halting
+        const dot = this.velocity.x * col.normal.x + this.velocity.z * col.normal.z;
+        if (dot < 0) {
+          this.velocity.x -= dot * col.normal.x;
+          this.velocity.z -= dot * col.normal.z;
+        }
+      } else {
+        this.velocity.x = 0;
+        this.velocity.z = 0;
+      }
     }
 
     // 5. Update Visual Mesh Position & Rotation
