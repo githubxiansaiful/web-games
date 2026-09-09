@@ -26,37 +26,11 @@ export class NPCManager {
   }
 
   private spawnCivilians(): void {
-    const civilianSpawns = [
-      { pos: new THREE.Vector3(-14, 0, -25), color: 0x3b82f6 },
-      { pos: new THREE.Vector3(14, 0, -20), color: 0xec4899 },
-      { pos: new THREE.Vector3(-14, 0, 25), color: 0x10b981 },
-      { pos: new THREE.Vector3(14, 0, 30), color: 0xf59e0b },
-      { pos: new THREE.Vector3(25, 0, 10), color: 0x8b5cf6 },
-      { pos: new THREE.Vector3(-25, 0, -10), color: 0x06b6d4 },
-      { pos: new THREE.Vector3(60, 0, 40), color: 0xf43f5e },
-      { pos: new THREE.Vector3(40, 0, 60), color: 0x64748b },
-    ];
-
-    civilianSpawns.forEach((s) => {
-      const npc = new NPC('civilian', s.pos, this.world, s.color);
-      this.npcs.push(npc);
-      this.scene.add(npc.mesh);
-    });
+    // Flat test map - no civilian objects
   }
 
   public spawnMissionGuards(): void {
-    // 3 Hostile syndicate guards stationed at Harborview Port Warehouse (X = 280, Z = 108)
-    const guardSpawns = [
-      new THREE.Vector3(274, 0, 104),
-      new THREE.Vector3(282, 0, 114),
-      new THREE.Vector3(288, 0, 106),
-    ];
-
-    guardSpawns.forEach((pos) => {
-      const guard = new NPC('hostile', pos, this.world);
-      this.npcs.push(guard);
-      this.scene.add(guard.mesh);
-    });
+    // Flat test map - no guard objects
   }
 
   public update(deltaTime: number, playerPosition: THREE.Vector3): number {

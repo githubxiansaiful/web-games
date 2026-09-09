@@ -4,7 +4,6 @@ import { Buildings } from './Buildings';
 import { Props } from './Props';
 import { Terrain } from './Terrain';
 import { Landmarks } from './Landmarks';
-import { svgToWorld } from '../data/islandMapData';
 
 export class World {
   public scene: THREE.Scene;
@@ -13,51 +12,54 @@ export class World {
   public buildings: Buildings;
   public props: Props;
   public landmarks: Landmarks;
-  public oceanMesh: THREE.Mesh;
-  public lakeMesh: THREE.Mesh;
+  public groundPlane: THREE.Mesh;
+  public gridHelper: THREE.GridHelper;
   public sunLight!: THREE.DirectionalLight;
   public bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
-    // Generous open world perimeter allowing exploration of all districts, mountains, and beaches
+    // Expansive 4km x 4km open boundary
     this.bounds = { minX: -2000, maxX: 2000, minZ: -2000, maxZ: 2000 };
 
-    // 1. Atmospheric Fog & Sky Horizon
-    const skyColor = new THREE.Color(0x60a5fa);    // Bright Clear Sky Blue
-    const horizonColor = new THREE.Color(0xcce2f8); // Soft Atmospheric Horizon
+    // 1. Clear Atmospheric Sky Horizon
+    const skyColor = new THREE.Color(0x60a5fa); // Bright Clear Sky Blue
+    const horizonColor = new THREE.Color(0xcce2f8); // Soft Horizon
     this.scene.background = skyColor;
-    this.scene.fog = new THREE.FogExp2(0xcce2f8, 0.0012);
+    this.scene.fog = new THREE.FogExp2(0xcce2f8, 0.0007);
 
     // 2. Daytime Sunlight & PBR Atmospheric Lighting
     this.setupLighting();
 
-    // 3. Ocean Water Plane (Covering vast territory)
-    this.oceanMesh = this.createOcean();
-    this.scene.add(this.oceanMesh);
+    // 3. Full Flat Ground Plane at Y = 0 (No hills, water, or elevation changes)
+    const groundGeo = new THREE.PlaneGeometry(4000, 4000, 1, 1);
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b, // Clean dark asphalt slate
+      roughness: 0.85,
+      metalness: 0.15,
+    });
+    this.groundPlane = new THREE.Mesh(groundGeo, groundMat);
+    this.groundPlane.rotation.x = -Math.PI / 2;
+    this.groundPlane.position.y = 0;
+    this.groundPlane.receiveShadow = true;
+    this.groundPlane.name = 'FlatGroundPlane';
+    this.scene.add(this.groundPlane);
 
-    // 4. Procedural 3D Terrain System (Multi-surface: Grass, Dirt, Rock, Sand)
+    // 4. Subtle distance grid markings for clear speed and motion perception
+    this.gridHelper = new THREE.GridHelper(3000, 300, 0x38bdf8, 0x334155);
+    this.gridHelper.position.y = 0.01;
+    (this.gridHelper.material as THREE.Material).transparent = true;
+    (this.gridHelper.material as THREE.Material).opacity = 0.4;
+    this.scene.add(this.gridHelper);
+
+    // Clean stubs for external references to maintain full type compatibility
+    // (None of their visual meshes or collision obstacles are added to the scene)
     this.terrain = new Terrain();
-    this.scene.add(this.terrain.group);
-
-    // 5. Inland Lake (Lakeview)
-    this.lakeMesh = this.createInlandLake();
-    this.scene.add(this.lakeMesh);
-
-    // 6. SVG Roads & Arched Bridges (anchored to terrain elevation with sidewalks & curbs)
-    this.roads = new Roads(this.terrain.getHeightAt);
-    this.scene.add(this.roads.group);
-
-    // 7. Buildings across all 20 Districts (with road clearance & architecture)
-    this.buildings = new Buildings(this.roads, this.terrain.getHeightAt);
-    this.scene.add(this.buildings.group);
-
-    // 8. Props (Trees, Streetlights, Dumpsters, Barriers) strictly off roads
-    this.props = new Props(this.buildings, this.roads, this.terrain.getHeightAt);
-    this.scene.add(this.props.group);
-
-    // 9. 3D Architectural & Environment Landmarks (Town Bank, Townhouse, Landing Strip, Grass Verges)
-    this.landmarks = new Landmarks(this.scene, this.buildings, this.terrain.getHeightAt);
+    this.roads = new Roads(() => 0);
+    this.buildings = new Buildings();
+    this.buildings.colliders = []; // Zero building colliders
+    this.props = new Props(this.buildings);
+    this.landmarks = new Landmarks(new THREE.Scene(), this.buildings);
   }
 
   private setupLighting(): void {
@@ -75,13 +77,12 @@ export class World {
     this.sunLight.position.set(120, 220, 90);
     this.sunLight.castShadow = true;
 
-    // Crisp high-resolution shadow map
+    // Crisp shadow map
     this.sunLight.shadow.mapSize.width = 2048;
     this.sunLight.shadow.mapSize.height = 2048;
     this.sunLight.shadow.camera.near = 10;
     this.sunLight.shadow.camera.far = 650;
 
-    // Shadow frustum covering 400m active player radius
     const d = 200;
     this.sunLight.shadow.camera.left = -d;
     this.sunLight.shadow.camera.right = d;
@@ -94,44 +95,9 @@ export class World {
     this.scene.add(this.sunLight.target);
   }
 
-  private createOcean(): THREE.Mesh {
-    const oceanGeo = new THREE.PlaneGeometry(8000, 8000, 16, 16);
-    const oceanMat = new THREE.MeshStandardMaterial({
-      color: 0x0c3852, // Coastal navy turquoise ocean
-      roughness: 0.12,
-      metalness: 0.75,
-    });
-    const ocean = new THREE.Mesh(oceanGeo, oceanMat);
-    ocean.rotation.x = -Math.PI / 2;
-    ocean.position.y = -0.2; // Ocean water level
-    ocean.receiveShadow = true;
-    ocean.name = 'Ocean';
-    return ocean;
-  }
-
-  private createInlandLake(): THREE.Mesh {
-    // Lakeview recreation lake at SVG (535, 325) -> World (-215, -115)
-    const lakePos = svgToWorld(535, 325);
-    const lakeGeo = new THREE.CircleGeometry(65, 32);
-    const lakeMat = new THREE.MeshStandardMaterial({
-      color: 0x1a4a5e,
-      roughness: 0.15,
-      metalness: 0.65,
-    });
-    const lake = new THREE.Mesh(lakeGeo, lakeMat);
-    lake.rotation.x = -Math.PI / 2;
-    lake.position.set(lakePos.x, 0.02, lakePos.z);
-    lake.receiveShadow = true;
-    lake.name = 'LakeviewLake';
-    return lake;
-  }
-
-  public getGroundHeight(x: number, z: number): number {
-    const bridgeElev = this.roads.getBridgeElevation(x, z);
-    if (bridgeElev > 0.05) {
-      return bridgeElev;
-    }
-    return this.terrain.getHeightAt(x, z);
+  public getGroundHeight(_x: number, _z: number): number {
+    // 100% Flat Ground Elevation everywhere
+    return 0;
   }
 
   public resolveCollision(
@@ -141,7 +107,7 @@ export class World {
     let collided = false;
     const normal = new THREE.Vector3();
 
-    // 1. Check world perimeter bounds
+    // World perimeter bounds check
     if (pos.x < this.bounds.minX + radius) {
       pos.x = this.bounds.minX + radius;
       normal.x = 1;
@@ -162,65 +128,26 @@ export class World {
       collided = true;
     }
 
-    // 2. Physical Obstacle Colliders (Buildings, Trees, Streetlights, Dumpsters, Barriers)
-    const obstRes = this.buildings.resolveCircleCollision(pos, radius);
-    if (obstRes.collided) {
-      collided = true;
-      normal.copy(obstRes.normal);
-    }
-
     return { collided, normal };
   }
 
   public raycastObstacle(
-    origin: THREE.Vector3,
-    direction: THREE.Vector3,
+    _origin: THREE.Vector3,
+    _direction: THREE.Vector3,
     maxDist: number
   ): { hit: boolean; distance: number; point: THREE.Vector3; colliderId?: string } {
-    const ray = new THREE.Ray(origin, direction.clone().normalize());
-    let closestDist = maxDist;
-    let hitPoint: THREE.Vector3 = new THREE.Vector3();
-    let hitFound = false;
-    let hitColliderId: string | undefined;
-
-    const intersectionPoint = new THREE.Vector3();
-
-    for (const c of this.buildings.colliders) {
-      const box = new THREE.Box3(
-        new THREE.Vector3(c.minX, 0, c.minZ),
-        new THREE.Vector3(c.maxX, c.height || 40, c.maxZ)
-      );
-
-      const hit = ray.intersectBox(box, intersectionPoint);
-      if (hit) {
-        const dist = origin.distanceTo(intersectionPoint);
-        if (dist < closestDist) {
-          closestDist = dist;
-          hitPoint.copy(intersectionPoint);
-          hitFound = true;
-          hitColliderId = c.id;
-        }
-      }
-    }
-
+    // Flat open world - no obstacles blocking bullets or camera
     return {
-      hit: hitFound,
-      distance: closestDist,
-      point: hitPoint,
-      colliderId: hitColliderId,
+      hit: false,
+      distance: maxDist,
+      point: new THREE.Vector3(),
     };
   }
 
-  /**
-   * Per-frame update for dynamic terrain chunk streaming and player-focused shadow frustum.
-   */
   public update(_deltaTime: number, playerPos?: THREE.Vector3): void {
     if (!playerPos) return;
 
-    // 1. Update procedural terrain chunk streaming and LOD around player
-    this.terrain.update(playerPos);
-
-    // 2. Center directional sun shadow frustum on player position
+    // Center directional sun shadow frustum on player position
     this.sunLight.position.set(playerPos.x + 120, playerPos.y + 220, playerPos.z + 90);
     this.sunLight.target.position.copy(playerPos);
     this.sunLight.target.updateMatrixWorld();

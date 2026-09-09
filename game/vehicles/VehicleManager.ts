@@ -17,47 +17,16 @@ export class VehicleManager {
   }
 
   private spawnInitialVehicles(): void {
-    // 1. Player's 2026 Lamborghini Fenomeno parked right in downtown plaza
+    // Keep ONLY the one 3D vehicle: 2026 Lamborghini Fenomeno parked next to player
     const lambo = new Vehicle(
       VEHICLE_CONFIGS.lamborghini_fenomeno,
-      new THREE.Vector3(6, 0, 15),
+      new THREE.Vector3(4, 0, 10),
       0, // Facing North
       this.world
     );
     this.vehicles.push(lambo);
     this.playerVehicle = lambo;
     this.scene.add(lambo.mesh);
-
-    // 2. Cyan Apex GT-99 sports car
-    const gtCar = new Vehicle(
-      VEHICLE_CONFIGS.gt_coupe,
-      new THREE.Vector3(26, 0, 15),
-      0,
-      this.world
-    );
-    this.vehicles.push(gtCar);
-    this.scene.add(gtCar.mesh);
-
-    // 2. Metro Police Interceptor parked near Police Station HQ
-    const policeCar = new Vehicle(
-      VEHICLE_CONFIGS.police_cruiser,
-      new THREE.Vector3(-18, 0, 45),
-      Math.PI / 2, // Facing East
-      this.world
-    );
-    this.vehicles.push(policeCar);
-    this.policeVehicle = policeCar;
-    this.scene.add(policeCar.mesh);
-
-    // 3. City Taxi Cab on boulevard
-    const taxiCar = new Vehicle(
-      VEHICLE_CONFIGS.taxi_sedan,
-      new THREE.Vector3(18, 0, -35),
-      Math.PI, // Facing South
-      this.world
-    );
-    this.vehicles.push(taxiCar);
-    this.scene.add(taxiCar.mesh);
   }
 
   public findNearestVehicle(position: THREE.Vector3, maxDist: number = 4.5): Vehicle | null {
