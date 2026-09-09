@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { getIslandRoadNetwork, svgToWorld, RoadSegment } from '../data/islandMapData';
 
 export interface RoadRibbon {
@@ -43,6 +44,7 @@ export class Roads {
     this.group.name = 'IslandRoads';
     this.roadSegments = getIslandRoadNetwork();
     this.buildIslandRoads(getHeight);
+    this.loadStreetFurniture();
   }
 
   private buildIslandRoads(_getHeight?: (x: number, z: number) => number): void {
@@ -280,6 +282,171 @@ export class Roads {
       swMesh.receiveShadow = true;
       this.group.add(swMesh);
     }
+  }
+
+  private loadStreetFurniture(): void {
+    const loader = new GLTFLoader();
+
+    // 1. Calculate transforms for street lights along all road segments
+    const lightTransforms: THREE.Matrix4[] = [];
+    let lightIndex = 0;
+
+    for (const segment of this.roadSegments) {
+      const rawPoints = segment.points.map((pt) => {
+        const w = svgToWorld(pt.x, pt.y);
+        return new THREE.Vector3(w.x, 0, w.z);
+      });
+      if (rawPoints.length < 2) continue;
+
+      const pts = resamplePoints(rawPoints, 14);
+      const halfW = segment.width / 2;
+
+      const cumDists = [0];
+      for (let i = 0; i < pts.length - 1; i++) {
+        cumDists.push(cumDists[i] + pts[i].distanceTo(pts[i + 1]));
+      }
+      const totalLen = cumDists[cumDists.length - 1];
+      const period = 38.0; // 38m between street lamps
+      const numLights = Math.floor(totalLen / period);
+
+      let curIdx = 0;
+      for (let d = 0; d < numLights; d++) {
+        const targetDist = (d + 0.5) * period;
+        while (curIdx < cumDists.length - 2 && cumDists[curIdx + 1] < targetDist) {
+          curIdx++;
+        }
+        const p1 = pts[curIdx];
+        const p2 = pts[curIdx + 1];
+        const segSpan = cumDists[curIdx + 1] - cumDists[curIdx];
+        const alpha = segSpan > 0.001 ? (targetDist - cumDists[curIdx]) / segSpan : 0;
+        const center = new THREE.Vector3().lerpVectors(p1, p2, alpha);
+        const tangent = new THREE.Vector3().subVectors(p2, p1).normalize();
+        const perp = new THREE.Vector3(-tangent.z, 0, tangent.x);
+
+        // Alternate left and right sidewalks
+        const side = lightIndex % 2 === 0 ? 1 : -1;
+        lightIndex++;
+
+        // Place on sidewalk just past the curb (halfW + curbW + 0.65m)
+        const curbW = 0.35;
+        const lampPos = center.clone().addScaledVector(perp, side * (halfW + curbW + 0.65));
+
+        // Arm points inward toward the road center
+        const inward = perp.clone().multiplyScalar(-side);
+        const angle = Math.atan2(inward.x, inward.z);
+
+        const dummy = new THREE.Object3D();
+        dummy.position.set(lampPos.x, 0.045, lampPos.z);
+        dummy.rotation.set(0, angle, 0);
+        dummy.scale.set(8.5, 8.5, 8.5);
+        dummy.updateMatrix();
+
+        lightTransforms.push(dummy.matrix.clone());
+      }
+    }
+
+    // Load light_curved.glb from Kenney City Kit Roads and create InstancedMeshes
+    loader.load(
+      '/models/roads/light_curved.glb',
+      (gltf) => {
+        const meshes: THREE.Mesh[] = [];
+        gltf.scene.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            meshes.push(child as THREE.Mesh);
+          }
+        });
+
+        meshes.forEach((m) => {
+          let instMat: THREE.Material;
+          if (m.material) {
+            const originalMat = Array.isArray(m.material) ? m.material[0] : m.material;
+            if (originalMat.name === 'light') {
+              // Glowing warm bulb
+              instMat = new THREE.MeshStandardMaterial({
+                color: 0xfffbeb,
+                emissive: new THREE.Color(0xfef08a),
+                emissiveIntensity: 0.9,
+                roughness: 0.2,
+              });
+            } else {
+              // Dark metallic street light pole
+              instMat = new THREE.MeshStandardMaterial({
+                color: 0x475569,
+                metalness: 0.7,
+                roughness: 0.35,
+              });
+            }
+          } else {
+            instMat = new THREE.MeshStandardMaterial({ color: 0x64748b });
+          }
+
+          const instancedMesh = new THREE.InstancedMesh(m.geometry, instMat, lightTransforms.length);
+          instancedMesh.castShadow = true;
+          instancedMesh.receiveShadow = true;
+
+          for (let i = 0; i < lightTransforms.length; i++) {
+            instancedMesh.setMatrixAt(i, lightTransforms[i]);
+          }
+          instancedMesh.instanceMatrix.needsUpdate = true;
+          this.group.add(instancedMesh);
+        });
+      },
+      undefined,
+      (err) => console.warn('Could not load light_curved.glb:', err)
+    );
+
+    // 2. Roadside Safety Work Zone (Kenney Traffic Cones, Barriers, Hazard Beacon)
+    // Placed curbside on the right shoulder of road-3 between spawn and central junction
+    loader.load('/models/roads/construction_pylon.glb', (gltf) => {
+      // 6 orange traffic cones along the shoulder line
+      for (let i = 0; i < 6; i++) {
+        const cone = gltf.scene.clone();
+        cone.scale.set(8.5, 8.5, 8.5);
+        cone.position.set(6.8 + i * 0.15, 0.045, 2.0 - i * 3.5);
+        cone.rotation.y = Math.PI * 0.1 * i;
+        cone.traverse((c) => {
+          if ((c as THREE.Mesh).isMesh) {
+            c.castShadow = true;
+            c.receiveShadow = true;
+          }
+        });
+        this.group.add(cone);
+      }
+    });
+
+    loader.load('/models/roads/construction_barrier.glb', (gltf) => {
+      // 2 construction barriers behind the cones
+      for (let i = 0; i < 2; i++) {
+        const barrier = gltf.scene.clone();
+        barrier.scale.set(8.5, 8.5, 8.5);
+        barrier.position.set(8.5, 0.045, -2.0 - i * 4.5);
+        barrier.rotation.y = -Math.PI / 16;
+        barrier.traverse((c) => {
+          if ((c as THREE.Mesh).isMesh) {
+            c.castShadow = true;
+            c.receiveShadow = true;
+          }
+        });
+        this.group.add(barrier);
+      }
+    });
+
+    loader.load('/models/roads/construction_light.glb', (gltf) => {
+      const beacon = gltf.scene.clone();
+      beacon.scale.set(8.5, 8.5, 8.5);
+      beacon.position.set(8.5, 0.045, 3.5);
+      beacon.traverse((c) => {
+        if ((c as THREE.Mesh).isMesh) {
+          c.castShadow = true;
+          const mesh = c as THREE.Mesh;
+          if (mesh.material && (mesh.material as THREE.Material).name === 'light') {
+            (mesh.material as THREE.MeshStandardMaterial).emissive = new THREE.Color(0xf59e0b);
+            (mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.2;
+          }
+        }
+      });
+      this.group.add(beacon);
+    });
   }
 
   /**
