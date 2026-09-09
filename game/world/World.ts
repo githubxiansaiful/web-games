@@ -3,6 +3,7 @@ import { Roads } from './Roads';
 import { Buildings } from './Buildings';
 import { Props } from './Props';
 import { Terrain } from './Terrain';
+import { Landmarks } from './Landmarks';
 import { svgToWorld } from '../data/islandMapData';
 
 export class World {
@@ -11,6 +12,7 @@ export class World {
   public roads: Roads;
   public buildings: Buildings;
   public props: Props;
+  public landmarks: Landmarks;
   public oceanMesh: THREE.Mesh;
   public lakeMesh: THREE.Mesh;
   public sunLight!: THREE.DirectionalLight;
@@ -53,6 +55,9 @@ export class World {
     // 8. Props (Trees, Streetlights, Dumpsters, Barriers) strictly off roads
     this.props = new Props(this.buildings, this.roads, this.terrain.getHeightAt);
     this.scene.add(this.props.group);
+
+    // 9. 3D Architectural & Environment Landmarks (Town Bank, Townhouse, Landing Strip, Grass Verges)
+    this.landmarks = new Landmarks(this.scene, this.buildings, this.terrain.getHeightAt);
   }
 
   private setupLighting(): void {
