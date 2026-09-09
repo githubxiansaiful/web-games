@@ -35,9 +35,9 @@ export class World {
     // 3. Full Flat Ground Plane at Y = 0 (No hills, water, or elevation changes)
     const groundGeo = new THREE.PlaneGeometry(4000, 4000, 1, 1);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x1e293b, // Clean dark asphalt slate
-      roughness: 0.85,
-      metalness: 0.15,
+      color: 0x1e3a24, // Clean natural meadow terrain green
+      roughness: 0.92,
+      metalness: 0.04,
     });
     this.groundPlane = new THREE.Mesh(groundGeo, groundMat);
     this.groundPlane.rotation.x = -Math.PI / 2;
@@ -46,17 +46,20 @@ export class World {
     this.groundPlane.name = 'FlatGroundPlane';
     this.scene.add(this.groundPlane);
 
-    // 4. Subtle distance grid markings for clear speed and motion perception
+    // 4. Subtle distance grid markings (hidden now that realistic roads provide visual motion)
     this.gridHelper = new THREE.GridHelper(3000, 300, 0x38bdf8, 0x334155);
     this.gridHelper.position.y = 0.01;
     (this.gridHelper.material as THREE.Material).transparent = true;
-    (this.gridHelper.material as THREE.Material).opacity = 0.4;
-    this.scene.add(this.gridHelper);
+    (this.gridHelper.material as THREE.Material).opacity = 0.0;
+    this.gridHelper.visible = false;
+
+    // 5. Flat Road Network (Asphalt ribbons, junction pads, markings, curbs, and sidewalks)
+    this.terrain = new Terrain();
+    this.roads = new Roads(() => 0);
+    this.scene.add(this.roads.group);
 
     // Clean stubs for external references to maintain full type compatibility
     // (None of their visual meshes or collision obstacles are added to the scene)
-    this.terrain = new Terrain();
-    this.roads = new Roads(() => 0);
     this.buildings = new Buildings();
     this.buildings.colliders = []; // Zero building colliders
     this.props = new Props(this.buildings);
