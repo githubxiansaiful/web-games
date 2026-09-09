@@ -261,9 +261,13 @@ export class GameEngine {
       ? this.player.currentVehicle.heading
       : this.player.facingAngle;
 
+    const horizontalSpeed = Math.sqrt(
+      this.player.velocity.x * this.player.velocity.x + this.player.velocity.z * this.player.velocity.z
+    );
+
     const speed = this.player.state === 'driving' && this.player.currentVehicle
       ? this.player.currentVehicle.speed
-      : 0;
+      : horizontalSpeed;
 
     this.tpCamera.update(dt, followTarget, followHeading, speed);
 

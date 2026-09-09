@@ -26,6 +26,7 @@ export class ThirdPersonCamera {
   private world: World;
   private sensitivity: number = 0.0022;
   private userOrbitTimer: number = 0;
+  private recentMovementTimer: number = 0;
 
   // GTA V View Presets & Look-Behind
   public viewPreset: CameraViewPreset = CameraViewPreset.MEDIUM;
@@ -33,6 +34,10 @@ export class ThirdPersonCamera {
 
   // Shake timer for high-speed rumble
   private speedShakeTimer: number = 0;
+
+  public resetUserOrbit(): void {
+    this.userOrbitTimer = 0;
+  }
 
   constructor(camera: THREE.PerspectiveCamera, world: World) {
     this.camera = camera;
@@ -96,6 +101,8 @@ export class ThirdPersonCamera {
     } else {
       // On-foot GTA V pitch: look up at skyscrapers or down at boots
       this.pitch = Math.max(-0.75, Math.min(1.20, this.pitch));
+      // Manual mouse look active; auto-recenters after 0.8s of inactivity or on A/D steering
+      this.userOrbitTimer = 0.8;
     }
   }
 
@@ -106,6 +113,18 @@ export class ThirdPersonCamera {
     speed?: number
   ): void {
     const absSpeed = speed ? Math.abs(speed) : 0;
+
+    // Decrement manual inspection timer across all camera modes
+    if (this.userOrbitTimer > 0) {
+      this.userOrbitTimer -= deltaTime;
+    }
+
+    // Track recent movement to finish settling camera smoothly after walking/turning
+    if (absSpeed > 0.4) {
+      this.recentMovementTimer = 0.5;
+    } else if (this.recentMovementTimer > 0) {
+      this.recentMovementTimer -= deltaTime;
+    }
 
     // 1. Calculate Target Parameters based on GTA V camera specifications
     let targetDistance: number;
@@ -149,11 +168,6 @@ export class ThirdPersonCamera {
       targetFov = 60 + Math.min(absSpeed / 3.0, 13);
       posLerpSpeed = 10; // Smooth elastic lag behind vehicle momentum
       lookLerpSpeed = 12;
-
-      // Decrement manual inspection timer
-      if (this.userOrbitTimer > 0) {
-        this.userOrbitTimer -= deltaTime;
-      }
 
       // GTA V Auto-recenter behind vehicle
       if (facingAngle !== undefined && !this.isLookingBehind) {
@@ -202,6 +216,19 @@ export class ThirdPersonCamera {
 
       posLerpSpeed = 14;
       lookLerpSpeed = 18;
+
+      // GTA V Auto-follow behind character when walking or steering with A / D
+      if (facingAngle !== undefined && !this.isLookingBehind && this.userOrbitTimer <= 0) {
+        if (this.recentMovementTimer > 0) {
+          const targetYaw = facingAngle + Math.PI;
+          const diff = targetYaw - this.yaw;
+          const normalizedDiff = Math.atan2(Math.sin(diff), Math.cos(diff));
+
+          // Responsive turning rate when steering with A/D; smooth follow when moving straight
+          const followRate = Math.abs(normalizedDiff) > 0.5 ? 4.8 : 2.8;
+          this.yaw += normalizedDiff * Math.min(1, followRate * deltaTime);
+        }
+      }
     }
 
     // 2. Smooth FOV transitions

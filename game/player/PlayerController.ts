@@ -77,6 +77,11 @@ export class PlayerController {
     const fwdAxis = this.input.getForwardAxis();
     const rightAxis = this.input.getRightAxis();
 
+    // If player is actively steering with A / D or reversing, reset manual orbit timer so camera follows immediately
+    if (rightAxis !== 0 || fwdAxis < 0) {
+      this.camera.resetUserOrbit();
+    }
+
     const camForward = this.camera.getForwardVector();
     const camRight = this.camera.getRightVector();
 
