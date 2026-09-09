@@ -442,7 +442,9 @@ export const ApexCityHUD: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         <span>•</span>
         <span>[F] Enter/Exit Car</span>
         <span>•</span>
-        <span>[M] Full Map</span>
+        <span>[V] Camera View</span>
+        <span>•</span>
+        <span>[C] Look Behind</span>
         <span>•</span>
         <span>[Click] Fire</span>
         <span>•</span>

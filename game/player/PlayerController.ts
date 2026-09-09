@@ -93,12 +93,15 @@ export class PlayerController {
     const isSprinting = this.input.isSprinting() && !isAiming && fwdAxis > 0;
     const moveSpeed = isSprinting ? 9.2 : 4.6;
 
+    const isShooting = this.input.isShooting();
+    const lockFacing = isAiming || isShooting;
+
     if (hasInput) {
       this.player.velocity.x = moveDir.x * moveSpeed;
       this.player.velocity.z = moveDir.z * moveSpeed;
 
-      // Face direction of movement or face camera aim direction
-      if (isAiming) {
+      // Face direction of movement or face camera aim/fire direction (GTA V style)
+      if (lockFacing) {
         this.player.facingAngle = this.camera.yaw + Math.PI;
       } else {
         const targetAngle = Math.atan2(moveDir.x, moveDir.z);
@@ -112,7 +115,7 @@ export class PlayerController {
       // Decelerate
       this.player.velocity.x = 0;
       this.player.velocity.z = 0;
-      if (isAiming) {
+      if (lockFacing) {
         this.player.facingAngle = this.camera.yaw + Math.PI;
       }
       this.player.state = 'idle';

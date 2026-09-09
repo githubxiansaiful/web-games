@@ -72,7 +72,7 @@ export class GameEngine {
     // 3. Scene & Camera
     this.scene = new THREE.Scene();
     const aspect = container.clientWidth / container.clientHeight;
-    this.camera = new THREE.PerspectiveCamera(65, aspect, 0.2, 1200);
+    this.camera = new THREE.PerspectiveCamera(58, aspect, 0.1, 1200);
 
     // 4. World Environment
     this.world = new World(this.scene);
@@ -206,10 +206,24 @@ export class GameEngine {
     this.time.update();
     const dt = this.time.deltaTime;
 
-    // 2. Process Mouse Rotation
+    // 2. Process Mouse Rotation & GTA V Camera Controls
     if (this.input.mouseDeltaX !== 0 || this.input.mouseDeltaY !== 0) {
       this.tpCamera.handleMouseMove(this.input.mouseDeltaX, this.input.mouseDeltaY);
     }
+
+    // GTA V 'V' Key: Cycle Camera View Presets (Close -> Medium -> Far)
+    if (this.input.wasCameraViewToggled()) {
+      this.tpCamera.cycleView();
+    }
+
+    // Mouse Wheel: Dynamic Camera Distance Zoom
+    const wheelDelta = this.input.getMouseWheelDelta();
+    if (wheelDelta !== 0) {
+      this.tpCamera.adjustDistance(wheelDelta > 0 ? 1 : -1);
+    }
+
+    // GTA V 'C' Key: Quick Look-Behind Glance
+    this.tpCamera.setLookBehind(this.input.isLookingBehind());
 
     // 3. Update Combat & Weapons
     this.weaponManager.update();

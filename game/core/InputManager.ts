@@ -5,6 +5,7 @@ export class InputManager {
 
   public mouseDeltaX: number = 0;
   public mouseDeltaY: number = 0;
+  public mouseWheelDelta: number = 0;
   public isPointerLocked: boolean = false;
 
   public mouseButtons: { [btn: number]: boolean } = {};
@@ -26,6 +27,7 @@ export class InputManager {
   private boundMouseMove: (e: MouseEvent) => void;
   private boundMouseDown: (e: MouseEvent) => void;
   private boundMouseUp: (e: MouseEvent) => void;
+  private boundWheel: (e: WheelEvent) => void;
   private boundPointerLockChange: () => void;
   private boundBlur: () => void;
 
@@ -35,6 +37,7 @@ export class InputManager {
     this.boundMouseMove = this.onMouseMove.bind(this);
     this.boundMouseDown = this.onMouseDown.bind(this);
     this.boundMouseUp = this.onMouseUp.bind(this);
+    this.boundWheel = this.onWheel.bind(this);
     this.boundPointerLockChange = this.onPointerLockChange.bind(this);
     this.boundBlur = this.onBlur.bind(this);
   }
@@ -49,6 +52,7 @@ export class InputManager {
     element.addEventListener('mousedown', this.boundMouseDown);
     window.addEventListener('mouseup', this.boundMouseUp);
     window.addEventListener('mousemove', this.boundMouseMove);
+    element.addEventListener('wheel', this.boundWheel, { passive: false });
     document.addEventListener('pointerlockchange', this.boundPointerLockChange);
   }
 
@@ -59,6 +63,7 @@ export class InputManager {
 
     if (this.domElement) {
       this.domElement.removeEventListener('mousedown', this.boundMouseDown);
+      this.domElement.removeEventListener('wheel', this.boundWheel);
     }
     window.removeEventListener('mouseup', this.boundMouseUp);
     window.removeEventListener('mousemove', this.boundMouseMove);
@@ -86,6 +91,7 @@ export class InputManager {
     this.mouseButtonsJustPressed = {};
     this.mouseDeltaX = 0;
     this.mouseDeltaY = 0;
+    this.mouseWheelDelta = 0;
     this.virtualActionF = false;
     this.virtualActionE = false;
     this.virtualJump = false;
@@ -133,6 +139,13 @@ export class InputManager {
     this.mouseButtons[e.button] = false;
   }
 
+  private onWheel(e: WheelEvent): void {
+    if (this.isPointerLocked) {
+      this.mouseWheelDelta += e.deltaY;
+      e.preventDefault();
+    }
+  }
+
   private onPointerLockChange(): void {
     this.isPointerLocked = document.pointerLockElement === this.domElement;
   }
@@ -142,6 +155,7 @@ export class InputManager {
     this.mouseButtons = {};
     this.mouseDeltaX = 0;
     this.mouseDeltaY = 0;
+    this.mouseWheelDelta = 0;
   }
 
   // Helper querying methods
@@ -151,6 +165,10 @@ export class InputManager {
 
   public wasJustPressed(code: string): boolean {
     return !!this.justPressed[code];
+  }
+
+  public wasJustReleased(code: string): boolean {
+    return !!this.justReleased[code];
   }
 
   public isMouseDown(button: number): boolean {
@@ -204,5 +222,17 @@ export class InputManager {
 
   public isShooting(): boolean {
     return this.isMouseDown(0) || this.virtualShoot;
+  }
+
+  public isLookingBehind(): boolean {
+    return this.isDown('KeyC');
+  }
+
+  public wasCameraViewToggled(): boolean {
+    return this.wasJustPressed('KeyV');
+  }
+
+  public getMouseWheelDelta(): number {
+    return this.mouseWheelDelta;
   }
 }

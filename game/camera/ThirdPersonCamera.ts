@@ -3,12 +3,19 @@ import { World } from '../world/World';
 
 export type CameraMode = 'on_foot' | 'aim' | 'vehicle';
 
+export enum CameraViewPreset {
+  CLOSE = 0,
+  MEDIUM = 1, // Standard GTA V default
+  FAR = 2,
+}
+
 export class ThirdPersonCamera {
   public camera: THREE.PerspectiveCamera;
   public mode: CameraMode = 'on_foot';
 
+  // Base spherical orbit coordinates
   public yaw: number = 0; // Horizontal orbit angle (radians)
-  public pitch: number = 0.25; // Vertical orbit angle (radians)
+  public pitch: number = 0.13; // Vertical orbit angle (radians) - GTA V eye-level slight downward tilt
 
   public currentPosition: THREE.Vector3 = new THREE.Vector3();
   public currentLookAt: THREE.Vector3 = new THREE.Vector3();
@@ -20,34 +27,75 @@ export class ThirdPersonCamera {
   private sensitivity: number = 0.0022;
   private userOrbitTimer: number = 0;
 
+  // GTA V View Presets & Look-Behind
+  public viewPreset: CameraViewPreset = CameraViewPreset.MEDIUM;
+  public isLookingBehind: boolean = false;
+
+  // Shake timer for high-speed rumble
+  private speedShakeTimer: number = 0;
+
   constructor(camera: THREE.PerspectiveCamera, world: World) {
     this.camera = camera;
     this.world = world;
+
+    // Set authentic GTA V base FOV and near clipping plane
+    this.camera.fov = 58;
+    this.camera.near = 0.1;
+    this.camera.updateProjectionMatrix();
   }
 
   public setMode(mode: CameraMode, initialHeading?: number): void {
+    if (this.mode === mode) return;
+
     this.mode = mode;
     if (mode === 'vehicle') {
       if (initialHeading !== undefined) {
         this.yaw = initialHeading + Math.PI;
       }
-      this.pitch = 0.22;
+      // Low, sleek GTA V vehicle camera pitch
+      this.pitch = 0.11;
       this.userOrbitTimer = 0;
+    } else if (mode === 'aim') {
+      // Keep current yaw/pitch for instant aim alignment
+    } else {
+      // Returning on foot
+      this.pitch = 0.13;
     }
+  }
+
+  public cycleView(): void {
+    // Cycle: Close (0) -> Medium (1) -> Far (2) -> Close (0)
+    this.viewPreset = ((this.viewPreset + 1) % 3) as CameraViewPreset;
+  }
+
+  public adjustDistance(direction: number): void {
+    // direction > 0 zooms out (towards Far), < 0 zooms in (towards Close)
+    if (direction > 0 && this.viewPreset < CameraViewPreset.FAR) {
+      this.viewPreset++;
+    } else if (direction < 0 && this.viewPreset > CameraViewPreset.CLOSE) {
+      this.viewPreset--;
+    }
+  }
+
+  public setLookBehind(active: boolean): void {
+    this.isLookingBehind = active;
   }
 
   public handleMouseMove(deltaX: number, deltaY: number): void {
     this.yaw -= deltaX * this.sensitivity;
     this.pitch -= deltaY * this.sensitivity;
 
-    // In vehicle mode, flag that player is manually orbiting camera
     if (this.mode === 'vehicle') {
-      this.userOrbitTimer = 1.2; // 1.2s before auto-re-centering behind vehicle
-      this.pitch = Math.max(0.04, Math.min(0.55, this.pitch));
+      // Flag manual orbit to allow inspecting car; auto-recenters after 1.2s
+      this.userOrbitTimer = 1.2;
+      // Vehicle pitch clamp: can look slightly up from pavement, or down at roof
+      this.pitch = Math.max(-0.15, Math.min(0.52, this.pitch));
     } else if (this.mode === 'aim') {
-      this.pitch = Math.max(-0.6, Math.min(1.1, this.pitch));
+      // Wide vertical aiming clamp for high vantage points and ground targets
+      this.pitch = Math.max(-0.75, Math.min(1.15, this.pitch));
     } else {
-      this.pitch = Math.max(-0.4, Math.min(1.25, this.pitch));
+      // On-foot GTA V pitch: look up at skyscrapers or down at boots
+      this.pitch = Math.max(-0.75, Math.min(1.20, this.pitch));
     }
   }
 
@@ -57,116 +105,186 @@ export class ThirdPersonCamera {
     facingAngle?: number,
     speed?: number
   ): void {
-    // 1. Determine camera offsets based on mode
-    let targetDistance = 4.5;
-    let targetHeight = 1.9;
-    let shoulderOffset = 0.45;
-    let targetFov = 65;
-    let lerpFactor = 1 - Math.exp(-14 * deltaTime);
+    const absSpeed = speed ? Math.abs(speed) : 0;
+
+    // 1. Calculate Target Parameters based on GTA V camera specifications
+    let targetDistance: number;
+    let lookAtHeight: number;
+    let shoulderOffset: number;
+    let targetFov: number;
+    let posLerpSpeed: number;
+    let lookLerpSpeed: number;
 
     if (this.mode === 'aim') {
-      targetDistance = 2.2;
-      targetHeight = 1.7;
-      shoulderOffset = 0.85;
-      targetFov = 48;
-      lerpFactor = 1 - Math.exp(-22 * deltaTime);
+      // GTA V Over-The-Shoulder (OTS) Aiming:
+      // Tight, zoomed over right shoulder with clear reticle line of fire
+      targetDistance = 1.65;
+      lookAtHeight = 1.36; // Chest / upper torso
+      shoulderOffset = 0.62; // Pushes character into left third of screen
+      targetFov = 48; // Snappy zoom
+      posLerpSpeed = 24;
+      lookLerpSpeed = 24;
     } else if (this.mode === 'vehicle') {
-      const absSpeed = speed ? Math.abs(speed) : 0;
-      // GTA chase camera distance scales with driving velocity
-      targetDistance = 6.8 + Math.min(absSpeed / 7, 2.5);
-      targetHeight = 2.2 + Math.min(absSpeed / 18, 0.6);
-      shoulderOffset = 0.0;
-      // Wide FOV sensation at high speed
-      targetFov = 66 + Math.min(absSpeed / 3.2, 11);
-      lerpFactor = 1 - Math.exp(-10 * deltaTime);
+      // GTA V Low-Slung Supercar Chase Camera:
+      // Planted low behind rear bumper/taillights looking down the road
+      const speedDistanceOffset = Math.min(absSpeed / 10, 1.2);
+      switch (this.viewPreset) {
+        case CameraViewPreset.CLOSE:
+          targetDistance = 4.5 + speedDistanceOffset * 0.8;
+          lookAtHeight = 0.82;
+          break;
+        case CameraViewPreset.FAR:
+          targetDistance = 6.4 + speedDistanceOffset * 1.3;
+          lookAtHeight = 0.90;
+          break;
+        case CameraViewPreset.MEDIUM:
+        default:
+          targetDistance = 5.3 + speedDistanceOffset;
+          lookAtHeight = 0.85;
+          break;
+      }
 
-      // Decrement manual orbit timer
+      shoulderOffset = 0.0;
+      // High-speed FOV tunnel effect (60° -> up to 73° at top speed)
+      targetFov = 60 + Math.min(absSpeed / 3.0, 13);
+      posLerpSpeed = 10; // Smooth elastic lag behind vehicle momentum
+      lookLerpSpeed = 12;
+
+      // Decrement manual inspection timer
       if (this.userOrbitTimer > 0) {
         this.userOrbitTimer -= deltaTime;
       }
 
-      // Auto-center camera behind the vehicle (GTA 5 style)
-      if (facingAngle !== undefined) {
+      // GTA V Auto-recenter behind vehicle
+      if (facingAngle !== undefined && !this.isLookingBehind) {
         const targetYaw = facingAngle + Math.PI;
         const diff = targetYaw - this.yaw;
         const normalizedDiff = Math.atan2(Math.sin(diff), Math.cos(diff));
 
-        // When user is not manually rotating or when moving at speed, swing behind car
-        const autoCenterStrength = this.userOrbitTimer > 0
-          ? (absSpeed > 6 ? 2.0 : 0.0)
-          : (absSpeed > 1 ? 4.5 : 2.2);
+        // When moving or when manual orbit timer expires, swing behind car
+        const autoCenterRate = this.userOrbitTimer > 0
+          ? (absSpeed > 6 ? 2.2 : 0.0)
+          : (absSpeed > 1 ? 4.8 : 2.4);
 
-        if (autoCenterStrength > 0) {
-          this.yaw += normalizedDiff * Math.min(1, autoCenterStrength * deltaTime);
+        if (autoCenterRate > 0) {
+          this.yaw += normalizedDiff * Math.min(1, autoCenterRate * deltaTime);
         }
 
-        // Return pitch smoothly to standard driving vantage (0.22 rad)
+        // Return pitch smoothly to sleek driving angle (~0.11 rad)
         if (this.userOrbitTimer <= 0) {
-          this.pitch = THREE.MathUtils.lerp(this.pitch, 0.22, 3.5 * deltaTime);
+          this.pitch = THREE.MathUtils.lerp(this.pitch, 0.11, 3.5 * deltaTime);
         }
       }
+    } else {
+      // GTA V Standard On-Foot Third-Person Camera:
+      // Eye-level / upper-back framing. Full character visible, boots near bottom edge.
+      switch (this.viewPreset) {
+        case CameraViewPreset.CLOSE:
+          targetDistance = 2.15;
+          lookAtHeight = 1.25;
+          shoulderOffset = 0.28;
+          targetFov = 58;
+          break;
+        case CameraViewPreset.FAR:
+          targetDistance = 3.80;
+          lookAtHeight = 1.32;
+          shoulderOffset = 0.16;
+          targetFov = 60;
+          break;
+        case CameraViewPreset.MEDIUM:
+        default:
+          targetDistance = 2.85;
+          lookAtHeight = 1.28; // Upper chest / between shoulder blades
+          shoulderOffset = 0.22; // Subtle right offset for clear forward line of sight
+          targetFov = 58;
+          break;
+      }
+
+      posLerpSpeed = 14;
+      lookLerpSpeed = 18;
     }
 
-    // Smooth FOV transitions
-    if (Math.abs(this.camera.fov - targetFov) > 0.1) {
-      this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, lerpFactor);
+    // 2. Smooth FOV transitions
+    const fovLerpFactor = 1 - Math.exp(-posLerpSpeed * deltaTime);
+    if (Math.abs(this.camera.fov - targetFov) > 0.05) {
+      this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, fovLerpFactor);
       this.camera.updateProjectionMatrix();
     }
 
-    // 2. Compute LookAt Target point (player head / vehicle forward lookahead)
+    // 3. Compute LookAt Target Point
     const lookAtOrigin = followPosition.clone();
-    if (this.mode === 'vehicle') {
-      lookAtOrigin.y += 1.2;
-      // Look slightly forward ahead over the hood of the vehicle (GTA style)
-      if (facingAngle !== undefined) {
-        const fwdX = Math.sin(facingAngle) * 2.8;
-        const fwdZ = Math.cos(facingAngle) * 2.8;
-        lookAtOrigin.x += fwdX;
-        lookAtOrigin.z += fwdZ;
-      }
-    } else {
-      lookAtOrigin.y += targetHeight * 0.9;
+    lookAtOrigin.y += lookAtHeight;
+
+    if (this.mode === 'vehicle' && facingAngle !== undefined) {
+      // Look forward through the car over the hood / down the street (GTA V signature)
+      const leadDistance = 2.4;
+      lookAtOrigin.x += Math.sin(facingAngle) * leadDistance;
+      lookAtOrigin.z += Math.cos(facingAngle) * leadDistance;
     }
 
-    // 3. Compute Ideal Camera Position in spherical coordinates around target
-    const cosPitch = Math.cos(this.pitch);
-    const sinPitch = Math.sin(this.pitch);
-    const sinYaw = Math.sin(this.yaw);
-    const cosYaw = Math.cos(this.yaw);
+    // 4. Effective Yaw & Pitch (Handle GTA V Look-Behind "C" Key)
+    let effectiveYaw = this.yaw;
+    let effectivePitch = this.pitch;
+    let effectiveShoulderOffset = shoulderOffset;
 
-    // Vector from target to camera
+    if (this.isLookingBehind) {
+      effectiveYaw += Math.PI; // Flip 180 degrees
+      effectiveShoulderOffset = 0; // Centered rearview
+      if (this.mode === 'vehicle') {
+        effectivePitch = 0.08; // Level rear window glance
+      }
+    }
+
+    // High-speed subtle road rumble
+    if (this.mode === 'vehicle' && absSpeed > 16) {
+      this.speedShakeTimer += deltaTime * 28;
+      const shakeMagnitude = Math.min((absSpeed - 16) / 40, 1.0) * 0.003;
+      effectiveYaw += Math.sin(this.speedShakeTimer) * shakeMagnitude;
+      effectivePitch += Math.cos(this.speedShakeTimer * 1.3) * shakeMagnitude;
+    }
+
+    // 5. Spherical Coordinate Geometry for Ideal Camera Position
+    const cosPitch = Math.cos(effectivePitch);
+    const sinPitch = Math.sin(effectivePitch);
+    const sinYaw = Math.sin(effectiveYaw);
+    const cosYaw = Math.cos(effectiveYaw);
+
     const orbitDir = new THREE.Vector3(
       sinYaw * cosPitch,
       sinPitch,
       cosYaw * cosPitch
     ).normalize();
 
-    // Right vector for shoulder offset
     const rightDir = new THREE.Vector3(cosYaw, 0, -sinYaw).normalize();
 
     let idealCamPos = lookAtOrigin
       .clone()
       .add(orbitDir.clone().multiplyScalar(targetDistance))
-      .add(rightDir.clone().multiplyScalar(shoulderOffset));
+      .add(rightDir.clone().multiplyScalar(effectiveShoulderOffset));
 
-    // 4. Raycast Camera Collision with Buildings / World
+    // 6. Raycast Obstacle Collision (Buildings / Walls) with Anti-Clipping Buffer
     const rayDir = idealCamPos.clone().sub(lookAtOrigin).normalize();
     const maxRayDist = idealCamPos.distanceTo(lookAtOrigin);
     const hitTest = this.world.raycastObstacle(lookAtOrigin, rayDir, maxRayDist);
 
     if (hitTest.hit) {
-      // Pull camera forward ahead of the obstacle with 0.3m safety margin
-      const safeDist = Math.max(0.8, hitTest.distance - 0.3);
+      // Pull camera forward with safety buffer
+      const safeDist = Math.max(0.6, hitTest.distance - 0.25);
       idealCamPos = lookAtOrigin.clone().add(rayDir.multiplyScalar(safeDist));
+
+      // If compressed against player, raise slightly and center to prevent clipping
+      if (safeDist < 1.1) {
+        idealCamPos.y += (1.1 - safeDist) * 0.25;
+      }
     }
 
-    // Prevent camera dipping below ground or mountain terrain
+    // Ground clearance: ensure camera never dips below asphalt or terrain
     const groundUnderCam = this.world.getGroundHeight(idealCamPos.x, idealCamPos.z);
-    if (idealCamPos.y < groundUnderCam + 0.6) {
-      idealCamPos.y = groundUnderCam + 0.6;
+    if (idealCamPos.y < groundUnderCam + 0.45) {
+      idealCamPos.y = groundUnderCam + 0.45;
     }
 
-    // 5. Apply smooth damping
+    // 7. Apply Dual-Stage Frame-Rate Independent Exponential Smoothing
     this.targetPosition.copy(idealCamPos);
     this.targetLookAt.copy(lookAtOrigin);
 
@@ -174,8 +292,10 @@ export class ThirdPersonCamera {
       this.currentPosition.copy(this.targetPosition);
       this.currentLookAt.copy(this.targetLookAt);
     } else {
-      this.currentPosition.lerp(this.targetPosition, lerpFactor);
-      this.currentLookAt.lerp(this.targetLookAt, lerpFactor);
+      const posFactor = 1 - Math.exp(-posLerpSpeed * deltaTime);
+      const lookFactor = 1 - Math.exp(-lookLerpSpeed * deltaTime);
+      this.currentPosition.lerp(this.targetPosition, posFactor);
+      this.currentLookAt.lerp(this.targetLookAt, lookFactor);
     }
 
     this.camera.position.copy(this.currentPosition);
