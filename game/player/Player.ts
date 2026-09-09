@@ -21,7 +21,7 @@ export class Player implements Damageable {
 
   public position: THREE.Vector3 = new THREE.Vector3(0, 0, 10);
   public velocity: THREE.Vector3 = new THREE.Vector3();
-  public facingAngle: number = 0; // Radians around Y
+  public facingAngle: number = Math.PI; // Radians around Y (faces forward along -Z, back to camera)
   public isGrounded: boolean = true;
 
   public currentVehicle: Vehicle | null = null;
@@ -72,6 +72,7 @@ export class Player implements Damageable {
     this.mesh.add(this.placeholderRig);
 
     this.mesh.position.copy(this.position);
+    this.mesh.rotation.y = this.facingAngle;
 
     // 2. Asynchronously Load Real Character Model & Walking/Idle Animation
     this.loadCharacterModel();
@@ -638,14 +639,17 @@ export class Player implements Damageable {
 
   public exitVehicle(): void {
     if (!this.currentVehicle) return;
+    const vehicleHeading = this.currentVehicle.heading;
     const exitPos = this.currentVehicle.exit();
     this.position.copy(exitPos);
     this.position.y = this.world.getGroundHeight(exitPos.x, exitPos.z);
+    this.facingAngle = vehicleHeading;
     this.velocity.set(0, 0, 0);
     this.currentVehicle = null;
     this.state = 'idle';
     this.mesh.visible = true;
     this.mesh.position.copy(this.position);
+    this.mesh.rotation.y = this.facingAngle;
     this.eventBus.emit('PLAYER_EXITED_VEHICLE');
   }
 

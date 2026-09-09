@@ -165,15 +165,17 @@ export class PlayerController {
     });
 
     if (this.input.isInteractingF()) {
+      const vHeading = vehicle.heading;
       this.player.exitVehicle();
       this.camera.setMode('on_foot');
+      this.camera.yaw = vHeading + Math.PI;
       this.eventBus.emit('INTERACTION_PROMPT', { visible: false });
       return;
     }
 
     // 2. Throttle & Steering Controls
     const throttle = this.input.getForwardAxis();
-    const steer = -this.input.getRightAxis(); // A/D
+    const steer = this.input.getRightAxis(); // A (-1 = Left), D (+1 = Right)
     const handbrake = this.input.isDown('Space');
 
     // Car horn (H or E)
