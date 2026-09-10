@@ -567,11 +567,11 @@ export default function ProfilePage() {
               <div>
                 <h3 className="text-lg font-black text-white">Arcade Records & Progression</h3>
                 <p className="text-xs text-slate-400">
-                  Track your race times, star counts, coins, and high scores across all 3 games.
+                  Track your race times, star counts, coins, and high scores across both games.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Cyber Runner Royale Card */}
                 <div className="bg-slate-850 p-5 rounded-2xl border border-slate-800 space-y-4">
                   <div className="flex items-center justify-between">
@@ -656,47 +656,6 @@ export default function ProfilePage() {
                     className="w-full py-2 bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/40 rounded-xl text-xs font-bold text-cyan-300 flex items-center justify-center gap-1.5 transition"
                   >
                     <span>Launch Space Survivor</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </Link>
-                </div>
-
-                {/* Apex City 3D Card */}
-                <div className="bg-slate-850 p-5 rounded-2xl border border-slate-800 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xl">
-                        🏙️
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-sm text-white">Apex City 3D</h4>
-                        <span className="text-[10px] text-amber-400 font-semibold uppercase">3D Open-World Driving</span>
-                      </div>
-                    </div>
-                    <span className="px-2.5 py-0.5 bg-amber-950 text-amber-300 text-[10px] font-black rounded-full border border-amber-500/40">
-                      NEW 3D
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 text-xs">
-                    <div className="flex justify-between py-1 border-b border-slate-800/80">
-                      <span className="text-slate-400">Environment:</span>
-                      <span className="font-bold text-white">4km Open World</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-slate-800/80">
-                      <span className="text-slate-400">Vehicle:</span>
-                      <span className="font-bold text-amber-400">2026 Lamborghini</span>
-                    </div>
-                    <div className="flex justify-between py-1">
-                      <span className="text-slate-400">Features:</span>
-                      <span className="font-bold text-cyan-400">CAD Roads & 3D Cam</span>
-                    </div>
-                  </div>
-
-                  <Link
-                    href="/?game=apex"
-                    className="w-full py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 rounded-xl text-xs font-bold text-amber-300 flex items-center justify-center gap-1.5 transition"
-                  >
-                    <span>Play Apex City 3D</span>
                     <ExternalLink className="w-3 h-3" />
                   </Link>
                 </div>

@@ -95,20 +95,6 @@ const DEFAULT_GAMES: GameInfo[] = [
     multiplayer: false,
     icon: '🚀',
   },
-  {
-    id: 'apex-city-3d',
-    title: 'Apex City 3D: Underground',
-    tagline: 'Open-World Metro Action, Sports Cars & Police Pursuits',
-    description: 'Explore an open-world 3D metropolis. Drive high-speed sports coupes, engage in shootouts with syndicate guards, evade 5-star police chases, and complete high-stakes underground contracts in a standalone 60 FPS Three.js engine.',
-    genre: '3D Open World / Action Driving',
-    tags: ['3D OPEN WORLD', 'GTA STYLE', 'DRIVING', 'POLICE PURSUIT', 'MISSIONS'],
-    badge: 'NEW 3D',
-    rating: 5.0,
-    playCount: 1420,
-    isActive: true,
-    multiplayer: false,
-    icon: '🏙️',
-  },
 ];
 
 function getInitialAdminUsers(): User[] {

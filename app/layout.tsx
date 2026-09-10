@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   ),
   title: "Xian's Game World - Cyber Arcade & Multiplayer Platform",
   description:
-    "Play epic web games on Xian's Game World: Cyber Runner Royale multiplayer platformer, Neon Space Survivor arcade shooter, and Apex City 3D open-world driving. Real-time multiplayer rooms, solo speedruns, and live leaderboards.",
+    "Play epic web games on Xian's Game World: Cyber Runner Royale multiplayer platformer and Neon Space Survivor arcade shooter. Real-time multiplayer rooms, solo speedruns, and live leaderboards.",
   applicationName: "Xian's Game World",
   keywords: [
     "xian games",
@@ -29,8 +29,6 @@ export const metadata: Metadata = {
     "arcade",
     "runner royale",
     "space survivor",
-    "apex city 3d",
-    "open world",
     "html5 games",
     "nextjs",
   ],
@@ -47,14 +45,14 @@ export const metadata: Metadata = {
     locale: "en_US",
     title: "Xian's Game World - Cyber Arcade & Multiplayer",
     description:
-      "Play epic web games on Xian's Game World: Cyber Runner Royale multiplayer platformer, Neon Space Survivor arcade shooter, and Apex City 3D open-world driving.",
+      "Play epic web games on Xian's Game World: Cyber Runner Royale multiplayer platformer and Neon Space Survivor arcade shooter.",
     siteName: "Xian's Game World",
   },
   twitter: {
     card: "summary_large_image",
     title: "Xian's Game World - Cyber Arcade & Multiplayer",
     description:
-      "Play epic web games on Xian's Game World: Cyber Runner Royale multiplayer platformer, Neon Space Survivor arcade shooter, and Apex City 3D open-world driving.",
+      "Play epic web games on Xian's Game World: Cyber Runner Royale multiplayer platformer and Neon Space Survivor arcade shooter.",
   },
 };
 

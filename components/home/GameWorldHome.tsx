@@ -18,40 +18,32 @@ import {
   Gamepad2,
   Volume2,
   VolumeX,
-  Map as MapIcon,
-  X,
-  Navigation,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { GameCanvas } from '@/components/GameCanvas';
 import { SpaceGameCanvas } from '@/components/space-game/SpaceGameCanvas';
-import { ApexCityCanvas } from '@/components/apex-city/ApexCityCanvas';
-import { GameMap } from '@/components/apex-city/GameMap';
-import { ISLAND_DISTRICTS } from '@/game/data/islandMapData';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 
 export const GameWorldHome: React.FC = () => {
   const { user, isLoading, isAdmin, openAuthModal } = useAuth();
 
-  // Active game view: null (home), 'runner' (Game 1), 'space' (Game 2), 'apex' (Game 3)
+  // Active game view: null (home), 'runner' (Game 1), 'space' (Game 2)
   // Preserves active game state on browser refresh via URL parameter & localStorage
-  const [activeGame, setActiveGame] = useState<'runner' | 'space' | 'apex' | null>(() => {
+  const [activeGame, setActiveGame] = useState<'runner' | 'space' | null>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const gameParam = params.get('game');
-      if (gameParam === 'runner' || gameParam === 'space' || gameParam === 'apex') {
+      if (gameParam === 'runner' || gameParam === 'space') {
         return gameParam;
       }
       const saved = localStorage.getItem('xian_active_game');
-      if (saved === 'runner' || saved === 'space' || saved === 'apex') {
+      if (saved === 'runner' || saved === 'space') {
         return saved;
       }
     }
     return null;
   });
-  const [showMapPreview, setShowMapPreview] = useState(false);
-  const [previewDistrictId, setPreviewDistrictId] = useState<string | null>(null);
   const [leaderboard, setLeaderboard] = useState<{ topSpace: any[]; topRunner: any[] }>({
     topSpace: [],
     topRunner: [],
@@ -88,7 +80,7 @@ export const GameWorldHome: React.FC = () => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const gameParam = params.get('game');
-      if (gameParam === 'runner' || gameParam === 'space' || gameParam === 'apex') {
+      if (gameParam === 'runner' || gameParam === 'space') {
         setActiveGame(gameParam);
       } else {
         setActiveGame(null);
@@ -99,7 +91,7 @@ export const GameWorldHome: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const handlePlayGame = (gameKey: 'runner' | 'space' | 'apex') => {
+  const handlePlayGame = (gameKey: 'runner' | 'space') => {
     if (!user) {
       openAuthModal('login');
       return;
@@ -153,15 +145,6 @@ export const GameWorldHome: React.FC = () => {
     return (
       <div className="fixed inset-0 z-50 w-full h-full bg-slate-950 overflow-hidden touch-none">
         <SpaceGameCanvas onGoHome={() => setActiveGame(null)} />
-      </div>
-    );
-  }
-
-  // If Game 3 (Apex City 3D) is running
-  if (activeGame === 'apex') {
-    return (
-      <div className="fixed inset-0 z-50 w-full h-full bg-slate-950 overflow-hidden touch-none">
-        <ApexCityCanvas onExit={() => setActiveGame(null)} />
       </div>
     );
   }
@@ -226,7 +209,7 @@ export const GameWorldHome: React.FC = () => {
         <div className="flex items-center justify-between px-1">
           <h2 className="text-xs font-black tracking-widest text-slate-400 uppercase">CHOOSE GAME</h2>
           <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-            3 TITLES READY
+            2 TITLES READY
           </span>
         </div>
 
@@ -267,51 +250,33 @@ export const GameWorldHome: React.FC = () => {
                 Cyber Runner Royale
               </h3>
               <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-cyan-300">
-                <span>Speedrun Solo</span>
+                <span>Multiplayer Battle Royale</span>
                 <span className="text-slate-600">•</span>
-                <span>4-Player Rooms</span>
+                <span>Physics Platformer</span>
                 <span className="text-slate-600">•</span>
-                <span>Star Challenges</span>
+                <span>Star Speedrun</span>
               </div>
             </div>
           </div>
 
           {/* Card Body & Actions */}
           <div className="p-4 sm:p-5 space-y-3 bg-slate-900/95">
-            {/* User Stats Snapshot if logged in */}
-            {user && (
-              <div className="flex items-center justify-between text-xs bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-800">
-                <span className="text-slate-400 font-medium">Your Progress:</span>
-                <div className="flex items-center gap-3 font-bold">
-                  <span className="text-amber-400 flex items-center gap-1">
-                    <Star className="w-3 h-3 fill-amber-400" />
-                    <span>{user.stats?.runnerStars ?? 0} / 9</span>
-                  </span>
-                  <span className="text-emerald-400">
-                    {user.stats?.runnerBestTime ? `${user.stats.runnerBestTime}s Best` : 'No run yet'}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Tap To Play Actions */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <button
-                onClick={() => handlePlayGame('runner')}
-                className="w-full py-3.5 px-4 bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white font-black text-sm rounded-2xl shadow-lg shadow-indigo-600/30 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Play className="w-4 h-4 fill-white" />
-                <span>PLAY SOLO RACE</span>
-              </button>
-
-              <button
-                onClick={() => handlePlayGame('runner')}
-                className="w-full py-3.5 px-4 bg-slate-800 hover:bg-slate-750 border border-slate-700/80 text-cyan-300 hover:text-white font-bold text-sm rounded-2xl transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Users className="w-4 h-4" />
-                <span>JOIN / CREATE ROOM</span>
-              </button>
+            {/* Tag Badges */}
+            <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300">REALTIME WS</span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-indigo-300">UP TO 8 PLAYERS</span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-emerald-300">SPEEDRUN TIMER</span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-amber-300">CUSTOM ROOMS</span>
             </div>
+
+            {/* Tap To Play Button */}
+            <button
+              onClick={() => handlePlayGame('runner')}
+              className="w-full py-3.5 px-4 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-sm rounded-2xl shadow-lg shadow-indigo-600/30 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Play className="w-4 h-4 fill-white" />
+              <span>PLAY RUNNER ROYALE</span>
+            </button>
           </div>
         </div>
 
@@ -320,21 +285,19 @@ export const GameWorldHome: React.FC = () => {
         {/* ============================================================ */}
         <div className="group relative rounded-3xl bg-slate-900/90 border border-slate-800/90 hover:border-cyan-500/60 overflow-hidden shadow-2xl transition-all duration-200">
           {/* Visual Poster Banner */}
-          <div className="h-44 sm:h-52 w-full relative overflow-hidden bg-gradient-to-br from-slate-950 via-cyan-950 to-indigo-950 flex flex-col justify-end p-4 sm:p-5">
-            {/* Cosmic Starfield Effect */}
+          <div className="h-44 sm:h-52 w-full relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950 flex flex-col justify-end p-4 sm:p-5">
+            {/* Ambient Starfield Glow */}
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,#0e7490_0%,transparent_60%)] opacity-30" />
-            <div className="absolute top-6 left-8 w-1.5 h-1.5 bg-white rounded-full opacity-80" />
-            <div className="absolute top-16 right-16 w-1 h-1 bg-cyan-300 rounded-full opacity-60" />
-            <div className="absolute bottom-20 left-24 w-1 h-1 bg-purple-300 rounded-full opacity-70" />
+            <div className="absolute -top-12 -left-12 w-48 h-48 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-slate-900 via-slate-900/80 to-transparent" />
 
             {/* Poster Badges */}
             <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between z-10">
-              <span className="px-2.5 py-1 rounded-full bg-cyan-600/90 text-white font-black text-[10px] tracking-wider uppercase shadow-md flex items-center gap-1.5">
-                <Rocket className="w-3 h-3" />
+              <span className="px-2.5 py-1 rounded-full bg-cyan-500/90 text-slate-950 font-black text-[10px] tracking-wider uppercase shadow-md flex items-center gap-1.5">
+                <Rocket className="w-3 h-3 fill-slate-950" />
                 <span>ARCADE SHOOTER</span>
               </span>
-              <span className="px-2.5 py-1 rounded-full bg-slate-950/80 border border-slate-700/80 text-cyan-300 font-black text-[10px] tracking-wider uppercase">
+              <span className="px-2.5 py-1 rounded-full bg-slate-950/80 border border-slate-700/80 text-cyan-400 font-black text-[10px] tracking-wider uppercase">
                 BOSS RAIDS
               </span>
             </div>
@@ -342,9 +305,7 @@ export const GameWorldHome: React.FC = () => {
             {/* Poster Center Graphic Art */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center opacity-80 group-hover:scale-105 transition-transform duration-300">
               <div className="w-20 h-20 rounded-2xl bg-cyan-500/10 border border-cyan-400/30 flex items-center justify-center shadow-inner">
-                <svg className="w-12 h-12 text-cyan-400" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2.5s-5 4-5 11.5c0 3 2 5.5 5 5.5s5-2.5 5-5.5C17 6.5 12 2.5 12 2.5zM7.5 18l-3.5 2 1-3.5L7.5 18zm9 0l3.5 2-1-3.5L16.5 18z" />
-                </svg>
+                <Flame className="w-12 h-12 text-cyan-400" />
               </div>
             </div>
 
@@ -353,27 +314,25 @@ export const GameWorldHome: React.FC = () => {
               <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none">
                 Neon Space Survivor
               </h3>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-purple-300">
-                <span>Laser Upgrades</span>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-cyan-300">
+                <span>Retro Arcade Space Shooter</span>
                 <span className="text-slate-600">•</span>
                 <span>Alien Swarms</span>
                 <span className="text-slate-600">•</span>
-                <span>Smart Bombs</span>
+                <span>Epic Boss Fights</span>
               </div>
             </div>
           </div>
 
           {/* Card Body & Actions */}
           <div className="p-4 sm:p-5 space-y-3 bg-slate-900/95">
-            {/* User Stats Snapshot if logged in */}
-            {user && (
-              <div className="flex items-center justify-between text-xs bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-800">
-                <span className="text-slate-400 font-medium">Your High Score:</span>
-                <span className="text-cyan-400 font-mono font-bold">
-                  {(user.stats?.spaceHighScore ?? 0).toLocaleString()} Pts
-                </span>
-              </div>
-            )}
+            {/* Tag Badges */}
+            <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300">ENDLESS WAVES</span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-cyan-300">SMART BOMBS</span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-purple-300">TRIPLE LASERS</span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-amber-300">GLOBAL LEADERBOARD</span>
+            </div>
 
             {/* Tap To Play Button */}
             <button
@@ -383,88 +342,6 @@ export const GameWorldHome: React.FC = () => {
               <Rocket className="w-4 h-4" />
               <span>LAUNCH MISSION</span>
             </button>
-          </div>
-        </div>
-
-        {/* ============================================================ */}
-        {/* GAME CARD 3: APEX CITY 3D: UNDERGROUND                       */}
-        {/* ============================================================ */}
-        <div className="group relative rounded-3xl bg-slate-900/90 border border-slate-800/90 hover:border-amber-500/60 overflow-hidden shadow-2xl transition-all duration-200">
-          {/* Visual Poster Banner */}
-          <div className="h-44 sm:h-52 w-full relative overflow-hidden bg-gradient-to-br from-slate-950 via-purple-950 to-indigo-950 flex flex-col justify-end p-4 sm:p-5">
-            {/* Ambient City Neon Grid */}
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,#7c3aed_0%,transparent_60%)] opacity-35" />
-            <div className="absolute -top-12 -left-12 w-48 h-48 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-slate-900 via-slate-900/80 to-transparent" />
-
-            {/* Poster Badges */}
-            <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between z-10">
-              <span className="px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-[10px] tracking-wider uppercase shadow-md flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3 fill-slate-950" />
-                <span>3D OPEN WORLD</span>
-              </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowMapPreview(true);
-                }}
-                className="px-2.5 py-1 rounded-full bg-slate-950/85 hover:bg-slate-900 border border-amber-500/60 text-amber-300 hover:text-white font-black text-[10px] tracking-wider uppercase transition flex items-center gap-1.5 cursor-pointer shadow-md"
-              >
-                <MapIcon className="w-3 h-3 text-amber-400" />
-                <span>MAP PREVIEW</span>
-              </button>
-            </div>
-
-            {/* Poster Center Graphic Art */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center opacity-80 group-hover:scale-105 transition-transform duration-300">
-              <div className="w-20 h-20 rounded-2xl bg-amber-500/10 border border-amber-400/30 flex items-center justify-center shadow-inner text-4xl">
-                🏙️
-              </div>
-            </div>
-
-            {/* Game Title & Tags on Poster */}
-            <div className="relative z-10 space-y-1">
-              <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none">
-                Apex City 3D
-              </h3>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-amber-300">
-                <span>Arcade Sports Cars</span>
-                <span className="text-slate-600">•</span>
-                <span>5-Star Police Chases</span>
-                <span className="text-slate-600">•</span>
-                <span>Missions & Cash</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card Body & Actions */}
-          <div className="p-4 sm:p-5 space-y-3 bg-slate-900/95">
-            {/* Tag Badges */}
-            <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
-              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300">GTA-INSPIRED</span>
-              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-cyan-300">3RD PERSON CAMERA</span>
-              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-purple-300">SYNDICATE SHOOTOUTS</span>
-              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-amber-300">RADAR MINIMAP</span>
-            </div>
-
-            {/* Action Buttons: Play + Map Preview */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <button
-                onClick={() => handlePlayGame('apex')}
-                className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-slate-950 font-black text-sm rounded-2xl shadow-lg shadow-amber-500/30 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Play className="w-4 h-4 fill-slate-950" />
-                <span>PLAY APEX CITY</span>
-              </button>
-
-              <button
-                onClick={() => setShowMapPreview(true)}
-                className="w-full py-3.5 px-4 bg-slate-800 hover:bg-slate-750 border border-slate-700/80 text-amber-300 hover:text-white font-bold text-sm rounded-2xl transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer shadow-md"
-              >
-                <MapIcon className="w-4 h-4 text-amber-400" />
-                <span>MAP PREVIEW</span>
-              </button>
-            </div>
           </div>
         </div>
 
@@ -578,95 +455,6 @@ export const GameWorldHome: React.FC = () => {
 
       {/* Auth Modal */}
       <AuthModal />
-
-      {/* ============================================================ */}
-      {/* FULL-SCREEN MAP PREVIEW MODAL                                */}
-      {/* ============================================================ */}
-      {showMapPreview && (
-        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col p-3 sm:p-5 select-none animate-in fade-in duration-200">
-          {/* Header Bar */}
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                <MapIcon className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-base font-black text-white tracking-wider uppercase flex items-center gap-2">
-                  <span>Apex City Archipelago Map</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-950 text-amber-400 border border-amber-800/80 font-bold">
-                    PREVIEW
-                  </span>
-                </h2>
-                <p className="text-xs text-slate-400">
-                  20 Explorable Island Districts • 18 Highway Arterials • 6 Arched Bridges
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  setShowMapPreview(false);
-                  handlePlayGame('apex');
-                }}
-                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs rounded-xl transition shadow-lg flex items-center gap-1.5 cursor-pointer"
-              >
-                <Play className="w-3.5 h-3.5 fill-slate-950" />
-                <span>LAUNCH GAME</span>
-              </button>
-              <button
-                onClick={() => setShowMapPreview(false)}
-                className="p-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-slate-300 hover:text-white transition shadow-lg cursor-pointer"
-                title="Close Map Preview"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Map Content */}
-          <div className="relative flex-1 my-3 rounded-2xl overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl flex items-center justify-center">
-            <GameMap
-              src="/maps/game-map.svg"
-              className="w-full h-full"
-              highlightId={previewDistrictId}
-              onSelectDistrict={(id) => setPreviewDistrictId(id)}
-            />
-          </div>
-
-          {/* Footer Bar: District Details & Legend */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs border-t border-slate-800/80">
-            {/* Quick District Inspector */}
-            {previewDistrictId ? (
-              <div className="flex items-center gap-2 bg-slate-900/90 px-3 py-1.5 rounded-xl border border-amber-500/40 text-amber-300">
-                <Navigation className="w-3.5 h-3.5 text-amber-400" />
-                <span>
-                  <strong>
-                    {ISLAND_DISTRICTS.find((d) => d.id === previewDistrictId)?.name ?? previewDistrictId}
-                  </strong>{' '}
-                  ({ISLAND_DISTRICTS.find((d) => d.id === previewDistrictId)?.category ?? 'DISTRICT'})
-                  {' • '}
-                  {ISLAND_DISTRICTS.find((d) => d.id === previewDistrictId)?.buildingCount ?? 8} Buildings
-                </span>
-                <button
-                  onClick={() => setPreviewDistrictId(null)}
-                  className="ml-2 text-slate-400 hover:text-white"
-                >
-                  ✕
-                </button>
-              </div>
-            ) : (
-              <div className="text-slate-400 text-xs">
-                💡 <em>Click any district badge on the map to inspect its sector and buildings</em>
-              </div>
-            )}
-
-            <div className="text-slate-500 text-[11px] font-semibold">
-              High-Resolution Text-Free Vector Terrain & Road Network
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
