@@ -258,7 +258,7 @@ export class PlayerController {
       let diff = (yaw - this.player.group.rotation.y) % (Math.PI * 2);
       if (diff < -Math.PI) diff += Math.PI * 2;
       if (diff > Math.PI) diff -= Math.PI * 2;
-      this.player.group.rotation.y += diff * Math.min(1, delta * 12);
+      this.player.group.rotation.y += diff * Math.min(1, delta * 22);
     }
 
     // Flashlight target follows forward camera ray

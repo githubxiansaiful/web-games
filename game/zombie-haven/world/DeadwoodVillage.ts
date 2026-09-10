@@ -40,7 +40,6 @@ export class DeadwoodVillage {
 
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
     this.rootGroup.add(ground);
   }
 

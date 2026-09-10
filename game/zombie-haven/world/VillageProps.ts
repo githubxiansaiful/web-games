@@ -55,7 +55,7 @@ export class VillageProps {
     const floorGeo = new THREE.BoxGeometry(width, 0.02, depth);
     const floor = new THREE.Mesh(floorGeo, this.matWood);
     floor.position.y = 0.01;
-    floor.receiveShadow = true;
+    floor.receiveShadow = false;
     group.add(floor);
 
     // Wall thickness
@@ -66,21 +66,21 @@ export class VillageProps {
     const backGeo = new THREE.BoxGeometry(width, wallH, t);
     const backWall = new THREE.Mesh(backGeo, this.matHouseWall);
     backWall.position.set(0, wallH / 2, -depth / 2 + t / 2);
-    backWall.castShadow = true;
-    backWall.receiveShadow = true;
+    backWall.castShadow = false;
+    backWall.receiveShadow = false;
     group.add(backWall);
 
     // Left Wall
     const sideGeo = new THREE.BoxGeometry(t, wallH, depth);
     const leftWall = new THREE.Mesh(sideGeo, this.matHouseWall);
     leftWall.position.set(-width / 2 + t / 2, wallH / 2, 0);
-    leftWall.castShadow = true;
+    leftWall.castShadow = false;
     group.add(leftWall);
 
     // Right Wall
     const rightWall = new THREE.Mesh(sideGeo, this.matHouseWall);
     rightWall.position.set(width / 2 - t / 2, wallH / 2, 0);
-    rightWall.castShadow = true;
+    rightWall.castShadow = false;
     group.add(rightWall);
 
     // Front Wall with Doorway (two wall pieces leaving 2.2m door in center)
@@ -90,12 +90,12 @@ export class VillageProps {
 
     const frontL = new THREE.Mesh(frontPartGeo, this.matHouseWall);
     frontL.position.set(-width / 2 + frontPartW / 2, wallH / 2, depth / 2 - t / 2);
-    frontL.castShadow = true;
+    frontL.castShadow = false;
     group.add(frontL);
 
     const frontR = new THREE.Mesh(frontPartGeo, this.matHouseWall);
     frontR.position.set(width / 2 - frontPartW / 2, wallH / 2, depth / 2 - t / 2);
-    frontR.castShadow = true;
+    frontR.castShadow = false;
     group.add(frontR);
 
     // Doorway Lintel beam
@@ -111,7 +111,7 @@ export class VillageProps {
     const roof = new THREE.Mesh(roofGeo, this.matHouseRoof);
     roof.position.set(0, wallH + roofH / 2, 0);
     roof.rotation.y = Math.PI / 4;
-    roof.castShadow = true;
+    roof.castShadow = false;
     group.add(roof);
 
     return { group, colliders };
@@ -128,8 +128,8 @@ export class VillageProps {
     const bodyGeo = new THREE.BoxGeometry(width, height, depth);
     const body = new THREE.Mesh(bodyGeo, this.matBarnWall);
     body.position.y = height / 2;
-    body.castShadow = true;
-    body.receiveShadow = true;
+    body.castShadow = false;
+    body.receiveShadow = false;
     group.add(body);
 
     // Gambrel roof
@@ -139,7 +139,7 @@ export class VillageProps {
     roof.position.set(0, height + roofH * 0.4, 0);
     roof.rotation.x = Math.PI / 2;
     roof.rotation.z = Math.PI / 4;
-    roof.castShadow = true;
+    roof.castShadow = false;
     group.add(roof);
 
     // Barn Door Arch (Open double doors)
@@ -162,14 +162,14 @@ export class VillageProps {
     const bodyGeo = new THREE.BoxGeometry(2.1, 0.9, 4.4);
     const body = new THREE.Mesh(bodyGeo, this.matMetalRust);
     body.position.y = 0.8;
-    body.castShadow = true;
+    body.castShadow = false;
     group.add(body);
 
     // Cabin
     const cabinGeo = new THREE.BoxGeometry(1.8, 0.7, 2.2);
     const cabin = new THREE.Mesh(cabinGeo, this.matGlass);
     cabin.position.set(0, 1.45, -0.2);
-    cabin.castShadow = true;
+    cabin.castShadow = false;
     group.add(cabin);
 
     // Wheels
@@ -185,7 +185,7 @@ export class VillageProps {
       const wheel = new THREE.Mesh(wheelGeo, wheelMat);
       wheel.rotation.z = Math.PI / 2;
       wheel.position.set(wx, wy, wz);
-      wheel.castShadow = true;
+      wheel.castShadow = false;
       group.add(wheel);
     });
 
@@ -203,7 +203,7 @@ export class VillageProps {
     const baseGeo = new THREE.CylinderGeometry(1.4, 1.5, 1.1, 12, 1, true);
     const base = new THREE.Mesh(baseGeo, this.matStone);
     base.position.y = 0.55;
-    base.castShadow = true;
+    base.castShadow = false;
     group.add(base);
 
     // Water surface inside
@@ -227,7 +227,7 @@ export class VillageProps {
     const roof = new THREE.Mesh(roofGeo, this.matDarkWood);
     roof.position.y = 2.8;
     roof.rotation.y = Math.PI / 4;
-    roof.castShadow = true;
+    roof.castShadow = false;
     group.add(roof);
 
     return group;
@@ -244,7 +244,7 @@ export class VillageProps {
     const postGeo = new THREE.CylinderGeometry(0.1, 0.14, 5.0, 8);
     const post = new THREE.Mesh(postGeo, this.matMetalRust);
     post.position.y = 2.5;
-    post.castShadow = true;
+    post.castShadow = false;
     group.add(post);
 
     // Lantern arm
@@ -280,7 +280,7 @@ export class VillageProps {
     const barrelGeo = new THREE.CylinderGeometry(0.5, 0.5, 1.2, 10);
     const barrel = new THREE.Mesh(barrelGeo, this.matMetalRust);
     barrel.position.y = 0.6;
-    barrel.castShadow = true;
+    barrel.castShadow = false;
     group.add(barrel);
 
     // Fire core
@@ -309,7 +309,7 @@ export class VillageProps {
     const trunkGeo = new THREE.CylinderGeometry(0.25 * scale, 0.4 * scale, 3 * scale, 6);
     const trunk = new THREE.Mesh(trunkGeo, this.matDarkWood);
     trunk.position.y = 1.5 * scale;
-    trunk.castShadow = true;
+    trunk.castShadow = false;
     group.add(trunk);
 
     // Foliage cones (3 stacked)
@@ -322,7 +322,7 @@ export class VillageProps {
       const coneGeo = new THREE.ConeGeometry(lvl.r, lvl.h, 7);
       const cone = new THREE.Mesh(coneGeo, this.matLeaves);
       cone.position.y = lvl.y;
-      cone.castShadow = true;
+      cone.castShadow = false;
       group.add(cone);
     });
 
@@ -340,7 +340,7 @@ export class VillageProps {
     const trunk = new THREE.Mesh(trunkGeo, this.matDeadWood);
     trunk.position.y = 2.5 * scale;
     trunk.rotation.z = (Math.random() - 0.5) * 0.15;
-    trunk.castShadow = true;
+    trunk.castShadow = false;
     group.add(trunk);
 
     // Branches
@@ -350,7 +350,7 @@ export class VillageProps {
       branch.position.set(0, (3.2 + b * 0.6) * scale, 0);
       branch.rotation.z = (b % 2 === 0 ? 0.7 : -0.7) + (Math.random() - 0.5) * 0.2;
       branch.rotation.y = (b * Math.PI) / 2;
-      branch.castShadow = true;
+      branch.castShadow = false;
       group.add(branch);
     }
 
@@ -367,11 +367,11 @@ export class VillageProps {
     const postGeo = new THREE.BoxGeometry(0.2, 1.3, 0.2);
     const p1 = new THREE.Mesh(postGeo, this.matWood);
     p1.position.set(-length / 2, 0.65, 0);
-    p1.castShadow = true;
+    p1.castShadow = false;
 
     const p2 = new THREE.Mesh(postGeo, this.matWood);
     p2.position.set(length / 2, 0.65, 0);
-    p2.castShadow = true;
+    p2.castShadow = false;
     group.add(p1, p2);
 
     const railGeo = new THREE.BoxGeometry(length, 0.12, 0.08);

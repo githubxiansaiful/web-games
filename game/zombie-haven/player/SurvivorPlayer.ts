@@ -187,7 +187,7 @@ export class SurvivorPlayer {
       const thighGeo = new THREE.BoxGeometry(0.19, 0.40, 0.19);
       const thigh = new THREE.Mesh(thighGeo, pantsMat);
       thigh.position.set(0, -0.20, 0);
-      thigh.castShadow = true;
+      thigh.castShadow = false;
       pivot.add(thigh);
 
       // Outer thigh cargo pocket
@@ -206,21 +206,21 @@ export class SurvivorPlayer {
       const calfGeo = new THREE.BoxGeometry(0.16, 0.38, 0.16);
       const calf = new THREE.Mesh(calfGeo, pantsMat);
       calf.position.set(0, -0.61, 0);
-      calf.castShadow = true;
+      calf.castShadow = false;
       pivot.add(calf);
 
       // Combat Boot upper
       const bootGeo = new THREE.BoxGeometry(0.18, 0.12, 0.24);
       const boot = new THREE.Mesh(bootGeo, bootsMat);
       boot.position.set(0, -0.88, 0.03);
-      boot.castShadow = true;
+      boot.castShadow = false;
       pivot.add(boot);
 
       // Rugged black rubber boot sole (hangs from -0.94 to -0.98 -> exact floor y = 0.00)
       const soleGeo = new THREE.BoxGeometry(0.20, 0.05, 0.27);
       const sole = new THREE.Mesh(soleGeo, soleMat);
       sole.position.set(0, -0.955, 0.035);
-      sole.castShadow = true;
+      sole.castShadow = false;
       pivot.add(sole);
     });
 
@@ -233,14 +233,14 @@ export class SurvivorPlayer {
     const waistGeo = new THREE.BoxGeometry(0.38, 0.20, 0.25);
     const waist = new THREE.Mesh(waistGeo, jacketMat);
     waist.position.set(0, 0.10, 0);
-    waist.castShadow = true;
+    waist.castShadow = false;
     this.torso.add(waist);
 
     // Chest / Upper Jacket (broader shoulders)
     const chestGeo = new THREE.BoxGeometry(0.48, 0.28, 0.28);
     const chest = new THREE.Mesh(chestGeo, jacketMat);
     chest.position.set(0, 0.32, 0);
-    chest.castShadow = true;
+    chest.castShadow = false;
     this.torso.add(chest);
 
     // Shoulder trims
@@ -263,7 +263,7 @@ export class SurvivorPlayer {
     const packGeo = new THREE.BoxGeometry(0.34, 0.36, 0.15);
     const backpack = new THREE.Mesh(packGeo, backpackMat);
     backpack.position.set(0, 0.28, -0.19);
-    backpack.castShadow = true;
+    backpack.castShadow = false;
     this.torso.add(backpack);
 
     // Bedroll / sleeping mat on top of pack
@@ -296,7 +296,7 @@ export class SurvivorPlayer {
     // Head base block
     const headGeo = new THREE.BoxGeometry(0.26, 0.23, 0.26);
     const headMesh = new THREE.Mesh(headGeo, skinMat);
-    headMesh.castShadow = true;
+    headMesh.castShadow = false;
     this.head.add(headMesh);
 
     // Defined chin / jawline
@@ -404,7 +404,7 @@ export class SurvivorPlayer {
     const upperArmGeo = new THREE.BoxGeometry(0.15, 0.28, 0.15);
     const leftUpperArm = new THREE.Mesh(upperArmGeo, jacketMat);
     leftUpperArm.position.set(0, -0.14, 0);
-    leftUpperArm.castShadow = true;
+    leftUpperArm.castShadow = false;
     this.leftArmPivot.add(leftUpperArm);
 
     this.leftElbowPivot = new THREE.Group();
@@ -414,7 +414,7 @@ export class SurvivorPlayer {
     const forearmGeo = new THREE.BoxGeometry(0.13, 0.26, 0.13);
     const leftForearm = new THREE.Mesh(forearmGeo, jacketMat);
     leftForearm.position.set(0, -0.13, 0);
-    leftForearm.castShadow = true;
+    leftForearm.castShadow = false;
     this.leftElbowPivot.add(leftForearm);
 
     this.leftHand = new THREE.Group();
@@ -429,7 +429,7 @@ export class SurvivorPlayer {
     // Right Arm Hierarchy: Shoulder -> Upper Arm -> Elbow -> Forearm -> Hand -> WeaponSocket
     const rightUpperArm = new THREE.Mesh(upperArmGeo, jacketMat);
     rightUpperArm.position.set(0, -0.14, 0);
-    rightUpperArm.castShadow = true;
+    rightUpperArm.castShadow = false;
     this.rightArmPivot.add(rightUpperArm);
 
     this.rightElbowPivot = new THREE.Group();
@@ -438,7 +438,7 @@ export class SurvivorPlayer {
 
     const rightForearm = new THREE.Mesh(forearmGeo, jacketMat);
     rightForearm.position.set(0, -0.13, 0);
-    rightForearm.castShadow = true;
+    rightForearm.castShadow = false;
     this.rightElbowPivot.add(rightForearm);
 
     this.rightHand = new THREE.Group();
@@ -481,7 +481,7 @@ export class SurvivorPlayer {
     this.flashlight = new THREE.SpotLight(0xfef9c3, 0, 42, Math.PI / 5.5, 0.4, 1.2);
     this.flashlight.position.set(0.22, 1.4, -0.15);
     this.flashlight.target = this.flashlightTarget;
-    this.flashlight.castShadow = isLocal;
+    this.flashlight.castShadow = false;
     this.group.add(this.flashlight);
 
     // Asynchronously load low-poly 3D firearms pack
@@ -718,7 +718,7 @@ export class SurvivorPlayer {
       // Rotate 180 degrees around Y so model faces -Z forward with back to camera (+Z)
       this.ualModel.rotation.y = Math.PI;
 
-      // Enable shadows and styling
+      // Disable shadows and configure styling
       const skinConfig = UAL_SKIN_PRESETS[this.activeSkin] || {
         mainColor: customColor,
         jointColor: 0x1e293b,
@@ -726,8 +726,8 @@ export class SurvivorPlayer {
       };
       this.ualModel.traverse((child: any) => {
         if (child.isSkinnedMesh || child.isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
+          child.castShadow = false;
+          child.receiveShadow = false;
           if (child.name === 'Mannequin_1') {
             child.material = new THREE.MeshStandardMaterial({
               color: skinConfig.mainColor,
@@ -801,10 +801,11 @@ export class SurvivorPlayer {
         this.animActions.death.clampWhenFinished = true;
       }
 
-      // Start in idle
-      if (this.animActions.idle) {
-        this.animActions.idle.play();
-        this.currentAnimAction = this.animActions.idle;
+      // Start in combat-ready idle stance
+      const startAction = this.animActions.pistolIdle || this.animActions.idle;
+      if (startAction) {
+        startAction.play();
+        this.currentAnimAction = startAction;
       }
 
       this.ualModelContainer.add(this.ualModel);
@@ -993,7 +994,7 @@ export class SurvivorPlayer {
     if (this.animMixer && this.ualModelContainer.visible) {
       this.animMixer.update(delta);
 
-      let targetAction: THREE.AnimationAction | undefined = this.animActions.idle;
+      let targetAction: THREE.AnimationAction | undefined = this.animActions.pistolIdle || this.animActions.idle;
 
       if (this.stats.isDowned) {
         targetAction = this.animActions.death;
@@ -1011,11 +1012,7 @@ export class SurvivorPlayer {
           if (targetAction) targetAction.timeScale = Math.max(0.85, Math.min(1.35, speed / 2.5));
         }
       } else {
-        if (isAiming) {
-          targetAction = this.animActions.pistolIdle || this.animActions.idle;
-        } else {
-          targetAction = this.animActions.idle;
-        }
+        targetAction = this.animActions.pistolIdle || this.animActions.idle;
       }
 
       // Landing transition trigger (only when landing stationary to avoid freezing movement)
@@ -1029,9 +1026,9 @@ export class SurvivorPlayer {
       // Smooth crossfade between locomotion actions
       if (targetAction && this.currentAnimAction !== targetAction) {
         if (this.currentAnimAction) {
-          this.currentAnimAction.fadeOut(0.18);
+          this.currentAnimAction.fadeOut(0.24);
         }
-        targetAction.reset().fadeIn(0.18).play();
+        targetAction.reset().fadeIn(0.24).play();
         this.currentAnimAction = targetAction;
       }
       return;

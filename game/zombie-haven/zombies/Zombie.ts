@@ -105,14 +105,14 @@ export class Zombie {
     const torsoGeo = new THREE.BoxGeometry(0.6, torsoH, 0.35);
     this.torso = new THREE.Mesh(torsoGeo, clothesMat);
     this.torso.position.y = 1.15;
-    this.torso.castShadow = true;
+    this.torso.castShadow = false;
     this.group.add(this.torso);
 
     // Head
     const headGeo = new THREE.BoxGeometry(0.36, 0.38, 0.36);
     this.head = new THREE.Mesh(headGeo, this.skinMat);
     this.head.position.set(0, 0.58, 0.05);
-    this.head.castShadow = true;
+    this.head.castShadow = false;
     this.torso.add(this.head);
 
     // Glowing Eyes
@@ -128,25 +128,25 @@ export class Zombie {
     this.leftArm = new THREE.Mesh(armGeo, this.skinMat);
     this.leftArm.position.set(-0.42, 0.05, 0.15);
     this.leftArm.rotation.x = -Math.PI / 2.3; // outstretched claw
-    this.leftArm.castShadow = true;
+    this.leftArm.castShadow = false;
     this.torso.add(this.leftArm);
 
     this.rightArm = new THREE.Mesh(armGeo, this.skinMat);
     this.rightArm.position.set(0.42, 0.05, 0.15);
     this.rightArm.rotation.x = -Math.PI / 2.2;
-    this.rightArm.castShadow = true;
+    this.rightArm.castShadow = false;
     this.torso.add(this.rightArm);
 
     // Legs
     const legGeo = new THREE.BoxGeometry(0.2, 0.75, 0.2);
     this.leftLeg = new THREE.Mesh(legGeo, pantsMat);
     this.leftLeg.position.set(-0.16, 0.42, 0);
-    this.leftLeg.castShadow = true;
+    this.leftLeg.castShadow = false;
     this.group.add(this.leftLeg);
 
     this.rightLeg = new THREE.Mesh(legGeo, pantsMat);
     this.rightLeg.position.set(0.16, 0.42, 0);
-    this.rightLeg.castShadow = true;
+    this.rightLeg.castShadow = false;
     this.group.add(this.rightLeg);
   }
 

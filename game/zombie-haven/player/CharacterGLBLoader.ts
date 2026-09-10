@@ -105,7 +105,7 @@ export class CharacterGLBLoader {
 
       const m = child.material ? child.material.clone() : new THREE.MeshLambertMaterial({ color: 0xcccccc });
       const mesh = new THREE.Mesh(g, m);
-      mesh.castShadow = true;
+      mesh.castShadow = false;
       mesh.receiveShadow = true;
       charGroup.add(mesh);
     });

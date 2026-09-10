@@ -66,7 +66,7 @@ export class LootSystem {
       emissiveIntensity: 0.25,
     });
     const box = new THREE.Mesh(boxGeo, boxMat);
-    box.castShadow = true;
+    box.castShadow = false;
     group.add(box);
 
     // Cross or icon emblem
