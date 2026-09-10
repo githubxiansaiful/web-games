@@ -51,9 +51,9 @@ export const ZombieHavenCanvas: React.FC<ZombieHavenCanvasProps> = ({ onExit }) 
     };
   }, []);
 
-  // Initialize engine when screen transitions to 'playing'
+  // Initialize engine immediately so bright sunny 3D village renders behind menu on load
   useEffect(() => {
-    if (screen === 'playing' && canvasRef.current && containerRef.current && !engineRef.current) {
+    if (canvasRef.current && containerRef.current && !engineRef.current) {
       const playerName = currentRoom?.players.find((p) => p.id === zombieSocket.myId)?.name || 'Survivor';
       const engine = new ZombieGameEngine(canvasRef.current, containerRef.current, playerName);
       engineRef.current = engine;
@@ -67,7 +67,7 @@ export const ZombieHavenCanvas: React.FC<ZombieHavenCanvasProps> = ({ onExit }) 
         setScreen('game_over');
       };
     }
-  }, [screen, currentRoom]);
+  }, [currentRoom]);
 
   // Handlers
   const handleStartSolo = (name: string) => {
@@ -111,7 +111,7 @@ export const ZombieHavenCanvas: React.FC<ZombieHavenCanvasProps> = ({ onExit }) 
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full bg-[#050811] overflow-hidden select-none touch-none"
+      className="relative w-full h-full bg-sky-400 overflow-hidden select-none touch-none"
     >
       {/* 3D WebGL Canvas */}
       <canvas ref={canvasRef} className="w-full h-full block cursor-crosshair" />

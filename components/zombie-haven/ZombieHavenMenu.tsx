@@ -57,7 +57,7 @@ export const ZombieHavenMenu: React.FC<ZombieHavenMenuProps> = ({
   };
 
   return (
-    <div className="absolute inset-0 z-40 bg-gradient-to-b from-[#060a14]/95 via-[#0b1020]/90 to-[#030712]/98 backdrop-blur-sm flex flex-col justify-between p-4 sm:p-8 select-none">
+    <div className="absolute inset-0 z-40 bg-sky-950/20 backdrop-blur-[2px] flex flex-col justify-between p-4 sm:p-8 select-none">
       {/* 1. TOP BAR */}
       <div className="w-full max-w-4xl mx-auto flex items-center justify-between">
         <button

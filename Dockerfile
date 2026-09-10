@@ -43,6 +43,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/socket-server.js ./socket-server.
 COPY --from=builder --chown=nextjs:nodejs /app/data ./data
 COPY --from=builder --chown=nextjs:nodejs /app/lib ./lib
 COPY --from=builder --chown=nextjs:nodejs /app/app ./app
+COPY --from=builder --chown=nextjs:nodejs /app/components ./components
+COPY --from=builder --chown=nextjs:nodejs /app/game ./game
 
 USER nextjs
 

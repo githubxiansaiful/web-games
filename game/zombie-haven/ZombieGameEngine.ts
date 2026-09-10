@@ -81,22 +81,23 @@ export class ZombieGameEngine {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = 1.35;
+    this.renderer.setClearColor(0x60a5fa, 1.0);
 
-    // 2. Scene & Bright Day Sky & Fog (Day Mode by Default)
+    // 2. Pure Radiant Daytime Sky (No Fog)
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x7bc8f6); // bright daylight sky
-    this.scene.fog = new THREE.FogExp2(0x8ecdf8, 0.003); // light daytime atmospheric haze
+    this.scene.background = new THREE.Color(0x60a5fa); // crystal clear bright sky blue
+    this.scene.fog = null; // zero fog for 100% sharp daylight visibility
 
-    // 3. Daylight Lighting: Hemisphere sky/earth bounce + Ambient + Direct Sunlight
-    const hemiLight = new THREE.HemisphereLight(0xbae6fd, 0x50753b, 1.35);
+    // 3. High-Intensity Daytime Sunlight & Natural Fill
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x86efac, 1.4);
     this.scene.add(hemiLight);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
     this.scene.add(ambientLight);
 
-    const sunLight = new THREE.DirectionalLight(0xfff6e6, 2.5);
-    sunLight.position.set(80, 150, 60);
+    const sunLight = new THREE.DirectionalLight(0xfffaed, 3.0);
+    sunLight.position.set(90, 160, 70);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
@@ -106,7 +107,8 @@ export class ZombieGameEngine {
     sunLight.shadow.camera.right = 90;
     sunLight.shadow.camera.top = 90;
     sunLight.shadow.camera.bottom = -90;
-    sunLight.shadow.bias = -0.0004;
+    sunLight.shadow.bias = 0.0002;
+    sunLight.shadow.normalBias = 0.02;
     this.scene.add(sunLight);
 
     // 4. Initialize Core World & Systems

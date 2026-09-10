@@ -44,8 +44,8 @@ export class DeadwoodVillage {
     groundGeo.computeVertexNormals();
 
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x3c682c, // natural vibrant woodland grass
-      roughness: 0.85,
+      color: 0x5ea836, // bright, lush sunny lawn green
+      roughness: 0.8,
       metalness: 0.05,
     });
 
@@ -58,12 +58,12 @@ export class DeadwoodVillage {
   // --- 2. ROAD NETWORK ---
   private buildRoadNetwork() {
     const roadMat = new THREE.MeshStandardMaterial({
-      color: 0x3f4854, // clear asphalt gray
-      roughness: 0.78,
+      color: 0x52525b, // bright clean asphalt gray
+      roughness: 0.72,
     });
     const gravelMat = new THREE.MeshStandardMaterial({
-      color: 0x78644e, // warm dirt and gravel farm path
-      roughness: 0.9,
+      color: 0xc49a6c, // warm sunlit dirt and gravel path
+      roughness: 0.85,
     });
 
     // Main East-West Highway (10m wide, 400m long)
@@ -130,8 +130,8 @@ export class DeadwoodVillage {
     lampCoords.forEach(([lx, lz]) => {
       const { group: lamp, light } = VillageProps.createStreetLamp();
       lamp.position.set(lx, 0, lz);
+      light.intensity = 0; // off in pure daytime
       this.rootGroup.add(lamp);
-      this.pointLights.push(light);
       this.addCollider(lx - 0.3, lx + 0.3, lz - 0.3, lz + 0.3);
     });
 

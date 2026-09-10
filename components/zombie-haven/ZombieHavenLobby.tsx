@@ -42,7 +42,7 @@ export const ZombieHavenLobby: React.FC<ZombieHavenLobbyProps> = ({
   const canLaunch = isHost && (room.players.length === 1 || room.players.every((p) => p.isReady));
 
   return (
-    <div className="absolute inset-0 z-40 bg-[#060913]/95 backdrop-blur-md flex items-center justify-center p-4 select-none animate-in fade-in duration-200">
+    <div className="absolute inset-0 z-40 bg-sky-950/25 backdrop-blur-[2px] flex items-center justify-center p-4 select-none animate-in fade-in duration-200">
       <div className="w-full max-w-lg bg-slate-950 border-2 border-red-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-red-950/70 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">

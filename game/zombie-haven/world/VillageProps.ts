@@ -30,17 +30,17 @@ export class VillageProps {
   public static initMaterials() {
     if (this.matWood) return;
 
-    this.matWood = new THREE.MeshLambertMaterial({ color: 0x85583b }); // warm timber plank
-    this.matDarkWood = new THREE.MeshLambertMaterial({ color: 0x543926 });
-    this.matHouseWall = new THREE.MeshLambertMaterial({ color: 0x8a7a6b }); // weathered clapboard siding
-    this.matHouseRoof = new THREE.MeshLambertMaterial({ color: 0x475569 }); // slate gray shingles
-    this.matBarnWall = new THREE.MeshLambertMaterial({ color: 0xa82727 }); // classic vibrant barn red
-    this.matMetalRust = new THREE.MeshLambertMaterial({ color: 0x715949 });
-    this.matCarPaint = new THREE.MeshLambertMaterial({ color: 0x2563eb }); // sedan enamel blue
-    this.matGlass = new THREE.MeshLambertMaterial({ color: 0xa5f3fc, transparent: true, opacity: 0.6 });
-    this.matStone = new THREE.MeshLambertMaterial({ color: 0x64748b });
-    this.matLeaves = new THREE.MeshLambertMaterial({ color: 0x2e7d32 }); // lush pine green
-    this.matDeadWood = new THREE.MeshLambertMaterial({ color: 0x52525b });
+    this.matWood = new THREE.MeshLambertMaterial({ color: 0xb45309 }); // warm golden timber plank
+    this.matDarkWood = new THREE.MeshLambertMaterial({ color: 0x78350f });
+    this.matHouseWall = new THREE.MeshLambertMaterial({ color: 0xc4b5a0 }); // light sunlit clapboard siding
+    this.matHouseRoof = new THREE.MeshLambertMaterial({ color: 0x64748b }); // light slate shingles
+    this.matBarnWall = new THREE.MeshLambertMaterial({ color: 0xdc2626 }); // vibrant country barn red
+    this.matMetalRust = new THREE.MeshLambertMaterial({ color: 0x854d0e });
+    this.matCarPaint = new THREE.MeshLambertMaterial({ color: 0x3b82f6 }); // sedan bright enamel blue
+    this.matGlass = new THREE.MeshLambertMaterial({ color: 0xbae6fd, transparent: true, opacity: 0.65 });
+    this.matStone = new THREE.MeshLambertMaterial({ color: 0x94a3b8 });
+    this.matLeaves = new THREE.MeshLambertMaterial({ color: 0x22c55e }); // vibrant lush pine & oak green
+    this.matDeadWood = new THREE.MeshLambertMaterial({ color: 0x71717a });
   }
 
   /**

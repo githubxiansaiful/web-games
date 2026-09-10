@@ -154,7 +154,7 @@ export const GameWorldHome: React.FC = () => {
   // If Game 3 (Zombie Haven) is running
   if (activeGame === 'zombie') {
     return (
-      <div className="fixed inset-0 z-50 w-full h-full bg-slate-950 overflow-hidden touch-none">
+      <div className="fixed inset-0 z-50 w-full h-full bg-sky-400 overflow-hidden touch-none">
         <ZombieHavenCanvas onExit={() => setActiveGame(null)} />
       </div>
     );
