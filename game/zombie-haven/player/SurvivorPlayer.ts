@@ -19,6 +19,14 @@ import { characterGLBLoader, SurvivorSkin } from './CharacterGLBLoader';
 import { gunGLBLoader } from '../weapons/GunGLBLoader';
 import { ualAnimationLoader } from '../animation/UALAnimationLoader';
 
+export const UAL_SKIN_PRESETS: Record<string, { mainColor: number; jointColor: number; name: string }> = {
+  xian: { mainColor: 0x2563eb, jointColor: 0x1e293b, name: 'Xian (Tactical Blue)' },
+  crimson: { mainColor: 0xdc2626, jointColor: 0x18181b, name: 'Crimson (Spec-Ops Red)' },
+  marcus: { mainColor: 0x15803d, jointColor: 0x1c1917, name: 'Marcus (Camo Green)' },
+  elena: { mainColor: 0xd97706, jointColor: 0x0f172a, name: 'Elena (Desert Gold)' },
+  stealth: { mainColor: 0x18181b, jointColor: 0x3f3f46, name: 'Ghost (Stealth Black)' },
+};
+
 export class SurvivorPlayer {
   public group: THREE.Group;
   public stats: PlayerStats;
@@ -476,11 +484,6 @@ export class SurvivorPlayer {
     this.flashlight.castShadow = isLocal;
     this.group.add(this.flashlight);
 
-    // Asynchronously load low-poly 3D character pack model
-    if (this.activeSkin !== 'procedural') {
-      this.loadGLBCharacter(this.activeSkin);
-    }
-
     // Asynchronously load low-poly 3D firearms pack
     this.loadGLBGuns();
 
@@ -703,7 +706,8 @@ export class SurvivorPlayer {
   public async loadUALCharacter(customColor: number = 0x1d4ed8) {
     try {
       await ualAnimationLoader.load();
-      const model = ualAnimationLoader.getMannequinModel();
+      const isFemale = this.activeSkin === 'elena' || this.activeSkin === 'crimson';
+      const model = ualAnimationLoader.getCharacterModel(isFemale ? 'female' : 'male') || ualAnimationLoader.getMannequinModel();
       if (!model) return;
 
       while (this.ualModelContainer.children.length > 0) {
@@ -714,20 +718,25 @@ export class SurvivorPlayer {
       // Rotate 180 degrees around Y so model faces -Z forward with back to camera (+Z)
       this.ualModel.rotation.y = Math.PI;
 
-      // Custom survivor styling for mannequin skinned meshes
+      // Enable shadows and styling
+      const skinConfig = UAL_SKIN_PRESETS[this.activeSkin] || {
+        mainColor: customColor,
+        jointColor: 0x1e293b,
+        name: 'Custom',
+      };
       this.ualModel.traverse((child: any) => {
-        if (child.isSkinnedMesh) {
+        if (child.isSkinnedMesh || child.isMesh) {
           child.castShadow = true;
           child.receiveShadow = true;
           if (child.name === 'Mannequin_1') {
             child.material = new THREE.MeshStandardMaterial({
-              color: customColor,
+              color: skinConfig.mainColor,
               roughness: 0.45,
               metalness: 0.15,
             });
           } else if (child.name === 'Mannequin_2') {
             child.material = new THREE.MeshStandardMaterial({
-              color: 0x1e293b,
+              color: skinConfig.jointColor,
               roughness: 0.65,
               metalness: 0.25,
             });
@@ -745,6 +754,11 @@ export class SurvivorPlayer {
 
       // Setup Animation Mixer & Actions
       this.animMixer = new THREE.AnimationMixer(this.ualModel);
+      this.animMixer.addEventListener('finished', (e: any) => {
+        if (e.action && e.action !== this.animActions.death) {
+          e.action.stop();
+        }
+      });
 
       const getAction = (clipName: string) => {
         const clip = ualAnimationLoader.getClip(clipName);
@@ -776,6 +790,11 @@ export class SurvivorPlayer {
       }
       if (this.animActions.hit) {
         this.animActions.hit.setLoop(THREE.LoopOnce, 1);
+        this.animActions.hit.clampWhenFinished = false;
+      }
+      if (this.animActions.jumpLand) {
+        this.animActions.jumpLand.setLoop(THREE.LoopOnce, 1);
+        this.animActions.jumpLand.clampWhenFinished = false;
       }
       if (this.animActions.death) {
         this.animActions.death.setLoop(THREE.LoopOnce, 1);
@@ -805,55 +824,42 @@ export class SurvivorPlayer {
 
   public playShoot() {
     if (this.animActions.shoot) {
-      this.animActions.shoot.reset().play();
+      this.animActions.shoot.reset().setEffectiveWeight(1.0).play();
     }
   }
 
   public playReload() {
     if (this.animActions.reload) {
-      this.animActions.reload.reset().play();
+      this.animActions.reload.reset().setEffectiveWeight(1.0).play();
     }
   }
 
   public playHit() {
     if (this.animActions.hit) {
-      this.animActions.hit.reset().play();
+      this.animActions.hit.reset().setEffectiveWeight(1.0).play();
     }
   }
 
   /**
-   * Switches active character skin between Xian, Crimson, Marcus, Elena, or procedural
+   * Switches active character skin between Xian, Crimson, Marcus, Elena, or Ghost (Stealth)
    */
-  public setSkin(skin: SurvivorSkin | 'procedural') {
-    this.activeSkin = skin;
-    if (skin === 'procedural') {
-      this.glbModelContainer.visible = false;
-      this.proceduralModel.visible = true;
-      this.rightHand.add(this.weaponSocket);
-      this.weaponSocket.position.set(0, -0.05, 0.06);
-      this.weaponSocket.rotation.set(0, 0, 0);
-      return;
-    }
-
-    const model = characterGLBLoader.getCharacterModel(skin);
-    if (model) {
-      while (this.glbModelContainer.children.length > 0) {
-        const child = this.glbModelContainer.children[0];
-        if (child === this.weaponSocket) {
-          this.group.add(this.weaponSocket);
-        } else {
-          this.glbModelContainer.remove(child);
-        }
-      }
-
-      this.glbModelContainer.add(model);
-      this.glbModelContainer.add(this.weaponSocket);
-      this.glbModelContainer.visible = true;
-      this.proceduralModel.visible = false;
-      this.weaponSocket.position.set(0.28, 0.95, -0.25);
-      this.weaponSocket.rotation.set(0.15, Math.PI, 0);
+  public setSkin(skin: string) {
+    const prevFemale = this.activeSkin === 'elena' || this.activeSkin === 'crimson';
+    this.activeSkin = skin as any;
+    const newFemale = skin === 'elena' || skin === 'crimson';
+    if (prevFemale !== newFemale || !this.ualModel) {
+      this.loadUALCharacter();
     } else {
-      this.loadGLBCharacter(skin);
+      const skinConfig = UAL_SKIN_PRESETS[skin] || UAL_SKIN_PRESETS['xian'];
+      this.ualModel.traverse((child: any) => {
+        if (child.isSkinnedMesh) {
+          if (child.name === 'Mannequin_1') {
+            (child.material as THREE.MeshStandardMaterial).color.setHex(skinConfig.mainColor);
+          } else if (child.name === 'Mannequin_2') {
+            (child.material as THREE.MeshStandardMaterial).color.setHex(skinConfig.jointColor);
+          }
+        }
+      });
     }
   }
 
@@ -861,7 +867,7 @@ export class SurvivorPlayer {
    * Cycles to the next available survivor skin
    */
   public cycleNextSkin(): string {
-    const skinOrder: (SurvivorSkin | 'procedural')[] = ['xian', 'marcus', 'crimson', 'elena', 'procedural'];
+    const skinOrder = ['xian', 'crimson', 'marcus', 'elena', 'stealth'];
     const currentIdx = skinOrder.indexOf(this.activeSkin);
     const nextIdx = (currentIdx + 1) % skinOrder.length;
     const nextSkin = skinOrder[nextIdx];
@@ -999,10 +1005,10 @@ export class SurvivorPlayer {
           if (targetAction) targetAction.timeScale = 1.15;
         } else if (speed > 3.0) {
           targetAction = this.animActions.jog;
-          if (targetAction) targetAction.timeScale = speed / 4.0;
+          if (targetAction) targetAction.timeScale = Math.max(0.85, Math.min(1.35, speed / 4.0));
         } else {
           targetAction = this.animActions.walk;
-          if (targetAction) targetAction.timeScale = speed / 2.5;
+          if (targetAction) targetAction.timeScale = Math.max(0.85, Math.min(1.35, speed / 2.5));
         }
       } else {
         if (isAiming) {
@@ -1012,9 +1018,9 @@ export class SurvivorPlayer {
         }
       }
 
-      // Landing transition trigger
+      // Landing transition trigger (only when landing stationary to avoid freezing movement)
       if (isGrounded && !this.wasGrounded) {
-        if (this.animActions.jumpLand) {
+        if (!isMoving && this.animActions.jumpLand) {
           this.animActions.jumpLand.reset().play();
         }
       }

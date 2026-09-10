@@ -435,10 +435,15 @@ export class ZombieGameEngine {
         } else if (!rp.isDowned && this.remotePlayerModel.stats.isDowned) {
           this.remotePlayerModel.revive();
         }
-        const isRemoteMoving = rp.animState === 'run' || rp.animState === 'walk';
-        const remoteVel = isRemoteMoving ? new THREE.Vector3(0, 0, rp.animState === 'run' ? -6 : -3) : new THREE.Vector3();
-        this.remotePlayerModel.update(delta, remoteVel, rp.isAiming, rp.isSprinting, true);
       }
+    }
+
+    // 8b. Update Remote Player Animation every frame
+    if (this.remotePlayerModel && zombieSocket.remotePlayer) {
+      const rp = zombieSocket.remotePlayer;
+      const isRemoteMoving = rp.animState === 'run' || rp.animState === 'walk';
+      const remoteVel = isRemoteMoving ? new THREE.Vector3(0, 0, rp.animState === 'run' ? -6 : -3) : new THREE.Vector3();
+      this.remotePlayerModel.update(delta, remoteVel, rp.isAiming, rp.isSprinting, true);
     }
 
     // 9. Update Bullet Tracers
