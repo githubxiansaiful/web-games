@@ -1,7 +1,30 @@
 /**
  * Zombie Haven - Core Type Definitions
- * Based on Zombie Haven Game Design Document
+ * Based on Zombie Haven Game Design Document & Character/Camera/Shooting Spec
  */
+
+export const PLAYER_MOVEMENT_CONFIG = {
+  walkSpeed: 3.0,
+  runSpeed: 4.5,
+  sprintSpeed: 6.0,
+  aimSpeed: 2.8,
+  maxStamina: 100,
+  sprintDrainRate: 20, // points/sec
+  staminaRecoveryRate: 15, // points/sec
+  colliderHeight: 1.8,
+  colliderRadius: 0.35,
+};
+
+export const CAMERA_CONFIG = {
+  defaultDistance: 5.0,
+  defaultHeight: 2.8,
+  targetHeight: 1.4,
+  defaultFOV: 60,
+  aimDistance: 3.5,
+  aimHeight: 2.2,
+  aimFOV: 55,
+  shoulderOffset: 0.75,
+};
 
 export type WeaponType = 'pistol' | 'shotgun' | 'rifle';
 

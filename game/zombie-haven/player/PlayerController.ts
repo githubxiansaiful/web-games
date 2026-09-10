@@ -8,6 +8,7 @@ import { SurvivorPlayer } from './SurvivorPlayer';
 import { CameraController } from './CameraController';
 import { WeaponSystem } from '../weapons/WeaponSystem';
 import { DeadwoodVillage } from '../world/DeadwoodVillage';
+import { PLAYER_MOVEMENT_CONFIG } from '../types';
 
 export class PlayerController {
   private player: SurvivorPlayer;
@@ -170,11 +171,15 @@ export class PlayerController {
     const isSprintKey = this.keys['ShiftLeft'] || this.keys['ShiftRight'];
     const canSprint = isSprintKey && forward > 0 && this.player.stats.stamina > 5 && !this.isRightMouseDown;
 
-    // Movement speed
-    let baseSpeed = 4.5;
-    if (canSprint) baseSpeed = 7.5;
-    else if (this.isRightMouseDown) baseSpeed = 2.6; // slower when aiming down sights
-    else if (forward < 0) baseSpeed = 3.0; // backing up
+    // Movement speed from shared config (Spec Section 11)
+    let baseSpeed = PLAYER_MOVEMENT_CONFIG.runSpeed; // 4.5 m/s
+    if (canSprint) {
+      baseSpeed = PLAYER_MOVEMENT_CONFIG.sprintSpeed; // 6.0 m/s
+    } else if (this.isRightMouseDown) {
+      baseSpeed = PLAYER_MOVEMENT_CONFIG.aimSpeed; // 2.8 m/s
+    } else if (forward < 0) {
+      baseSpeed = PLAYER_MOVEMENT_CONFIG.walkSpeed; // 3.0 m/s
+    }
 
     // Calculate move vector in world space
     const yaw = this.cameraCtrl.yaw;
@@ -216,20 +221,30 @@ export class PlayerController {
       this.player.group.position.y = 0;
     }
 
-    // Collision detection & smooth sliding resolution
+    // Collision detection & smooth sliding resolution (Spec Section 35 & 36)
     const currentPos = this.player.group.position;
     const targetX = currentPos.x + this.velocity.x * delta;
     const targetZ = currentPos.z + this.velocity.z * delta;
 
-    const resolved = this.village.resolveCollision(targetX, targetZ, 0.45);
+    const resolved = this.village.resolveCollision(targetX, targetZ, PLAYER_MOVEMENT_CONFIG.colliderRadius);
     currentPos.x = resolved.x;
     currentPos.z = resolved.z;
     if (this.isGrounded) {
       currentPos.y = 0;
     }
 
-    // Player faces camera look direction
-    this.player.group.rotation.y = yaw;
+    // Player facing direction (Spec Section 10 & 34):
+    // When Aiming: character faces camera aim direction
+    // When Moving: character faces velocity movement direction
+    if (this.isRightMouseDown) {
+      this.player.group.rotation.y = THREE.MathUtils.lerp(this.player.group.rotation.y, yaw, delta * 20);
+    } else if (isMoving && this.velocity.lengthSq() > 0.05) {
+      const moveAngle = Math.atan2(this.velocity.x, this.velocity.z);
+      let diff = (moveAngle - this.player.group.rotation.y) % (Math.PI * 2);
+      if (diff < -Math.PI) diff += Math.PI * 2;
+      if (diff > Math.PI) diff -= Math.PI * 2;
+      this.player.group.rotation.y += diff * Math.min(1, delta * 15);
+    }
 
     // Flashlight target follows forward camera ray
     const camFwd = this.cameraCtrl.getForwardVector();

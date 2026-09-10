@@ -36,8 +36,9 @@ export class ZombieGameEngine {
   public loot: LootSystem;
   public revive: ReviveSystem;
 
-  // Visual Effects: Bullet Tracer lines
+  // Visual Effects: Bullet Tracer lines & Muzzle Smoke
   private tracers: { line: THREE.Line; life: number }[] = [];
+  private smokeParticles: { mesh: THREE.Mesh; life: number; maxLife: number; velocity: THREE.Vector3 }[] = [];
 
   // Match statistics & state
   public isRunning: boolean = true;
@@ -123,7 +124,7 @@ export class ZombieGameEngine {
     // Camera & Player Controls
     this.cameraCtrl = new CameraController(container.clientWidth / container.clientHeight);
     this.weapons = new WeaponSystem();
-    this.weapons.initMuzzleFlash(this.localPlayer.group);
+    this.weapons.initMuzzleFlash(this.scene);
 
     this.playerCtrl = new PlayerController(
       this.localPlayer,
@@ -175,7 +176,8 @@ export class ZombieGameEngine {
       if (this.localPlayer.stats.isDowned || this.isGameOver) return;
 
       const isAiming = this.playerCtrl.isRightMouseDown;
-      const { success, spreadDirs } = this.weapons.shoot(isAiming);
+      const muzzlePos = this.localPlayer.getMuzzleWorldPosition();
+      const { success, spreadDirs } = this.weapons.shoot(isAiming, muzzlePos);
       if (!success) return;
 
       const camOrigin = this.cameraCtrl.camera.position.clone();
@@ -189,13 +191,10 @@ export class ZombieGameEngine {
         // Raycast against zombies
         const hitResult = this.horde.testBulletHit(camOrigin, shotDir, config.range);
 
-        // Spawn visual tracer line
-        const muzzlePos = this.localPlayer.group.position
-          .clone()
-          .add(new THREE.Vector3(0.2, 1.25, 0.65).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.localPlayer.group.rotation.y));
-
+        // Spawn visual tracer line and smoke from physical muzzle barrel tip
         const endPoint = hitResult ? hitResult.hitPoint : muzzlePos.clone().addScaledVector(shotDir, config.range);
         this.createTracer(muzzlePos, endPoint);
+        this.createMuzzleSmoke(muzzlePos, shotDir);
 
         // Send shoot over multiplayer network
         zombieSocket.sendShoot(
@@ -264,12 +263,13 @@ export class ZombieGameEngine {
       }
     }
 
-    // Remote shoot visual tracer
+    // Remote shoot visual tracer & smoke
     zombieSocket.onRemoteShoot = (data) => {
       const origin = new THREE.Vector3(...data.origin);
       const dir = new THREE.Vector3(...data.dir);
       const end = origin.clone().addScaledVector(dir, 45);
       this.createTracer(origin, end);
+      this.createMuzzleSmoke(origin, dir);
     };
 
     // Remote zombie damage
@@ -296,6 +296,40 @@ export class ZombieGameEngine {
     const line = new THREE.Line(geo, mat);
     this.scene.add(line);
     this.tracers.push({ line, life: 0.07 });
+  }
+
+  private createMuzzleSmoke(pos: THREE.Vector3, dir: THREE.Vector3) {
+    const count = 3;
+    for (let i = 0; i < count; i++) {
+      const geo = new THREE.SphereGeometry(0.04 + Math.random() * 0.03, 5, 5);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xcccccc,
+        transparent: true,
+        opacity: 0.5,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.copy(pos).add(
+        new THREE.Vector3(
+          (Math.random() - 0.5) * 0.06,
+          (Math.random() - 0.5) * 0.06,
+          (Math.random() - 0.5) * 0.06
+        )
+      );
+      const velocity = dir.clone().multiplyScalar(1.5 + Math.random() * 1.5).add(
+        new THREE.Vector3(
+          (Math.random() - 0.5) * 0.4,
+          Math.random() * 0.4,
+          (Math.random() - 0.5) * 0.4
+        )
+      );
+      this.scene.add(mesh);
+      this.smokeParticles.push({
+        mesh,
+        life: 0.22 + Math.random() * 0.12,
+        maxLife: 0.34,
+        velocity,
+      });
+    }
   }
 
   private tick = () => {
@@ -408,6 +442,23 @@ export class ZombieGameEngine {
       }
     }
 
+    // 9b. Update Muzzle Smoke Particles
+    for (let s = this.smokeParticles.length - 1; s >= 0; s--) {
+      const p = this.smokeParticles[s];
+      p.life -= delta;
+      p.mesh.position.addScaledVector(p.velocity, delta);
+      p.velocity.multiplyScalar(0.91);
+      const progress = Math.max(0, p.life / p.maxLife);
+      (p.mesh.material as THREE.MeshBasicMaterial).opacity = progress * 0.45;
+      p.mesh.scale.addScalar(delta * 1.3);
+      if (p.life <= 0) {
+        this.scene.remove(p.mesh);
+        p.mesh.geometry.dispose();
+        (p.mesh.material as THREE.Material).dispose();
+        this.smokeParticles.splice(s, 1);
+      }
+    }
+
     // 10. Hitmarker Fade
     if (this.hitmarkerTimer > 0) {
       this.hitmarkerTimer -= delta;
@@ -488,6 +539,21 @@ export class ZombieGameEngine {
     window.removeEventListener('resize', this.handleResize);
     this.playerCtrl.dispose();
     zombieAudio.updateHeartbeat(false);
+
+    for (const t of this.tracers) {
+      this.scene.remove(t.line);
+      t.line.geometry.dispose();
+      (t.line.material as THREE.Material).dispose();
+    }
+    this.tracers = [];
+
+    for (const p of this.smokeParticles) {
+      this.scene.remove(p.mesh);
+      p.mesh.geometry.dispose();
+      (p.mesh.material as THREE.Material).dispose();
+    }
+    this.smokeParticles = [];
+
     this.renderer.dispose();
   }
 }

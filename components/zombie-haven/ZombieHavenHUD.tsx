@@ -8,10 +8,8 @@
 
 import React from 'react';
 import {
-  Shield,
   Heart,
   Zap,
-  Crosshair,
   Volume2,
   VolumeX,
   Navigation,
@@ -183,24 +181,69 @@ export const ZombieHavenHUD: React.FC<ZombieHavenHUDProps> = ({ engine, onExit }
 
       {/* 3. CENTER SCREEN: Crosshair, Hitmarkers, Prompts */}
       <div className="relative flex-1 flex items-center justify-center pointer-events-none">
-        {/* Tactical Crosshair */}
-        <div className="relative flex items-center justify-center">
-          <Crosshair
-            className={`w-6 h-6 transition-all duration-100 ${
-              player.stats.isAiming ? 'scale-75 text-cyan-400' : 'text-slate-300/80'
-            }`}
-          />
-          {/* Hitmarker Flash */}
-          {engine.hitmarkerActive && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in fade-in duration-75">
-              {engine.isHeadshotKill ? (
-                <Skull className="w-7 h-7 text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,1)] animate-ping" />
-              ) : (
-                <span className="font-mono font-black text-red-500 text-lg select-none">✕</span>
-              )}
-            </div>
-          )}
-        </div>
+        {/* Dynamic Tactical Crosshair (Spec Section 18 & 23) */}
+        {!player.stats.isDowned && (
+          <div className="relative flex items-center justify-center pointer-events-none">
+            {/* Center pinpoint dot */}
+            <div
+              className={`w-1.5 h-1.5 rounded-full transition-all duration-100 ${
+                player.stats.isAiming
+                  ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.9)] scale-110'
+                  : 'bg-white/85 shadow-[0_0_2px_rgba(0,0,0,0.8)]'
+              }`}
+            />
+
+            {/* 4 Reticle Ticks with dynamic gap that contracts on ADS */}
+            {/* Top tick */}
+            <div
+              className={`absolute w-0.5 h-2 rounded-full transition-all duration-100 ${
+                player.stats.isAiming
+                  ? 'bg-cyan-400 -translate-y-2 opacity-95'
+                  : 'bg-white/70 -translate-y-3.5 opacity-75'
+              }`}
+            />
+            {/* Bottom tick */}
+            <div
+              className={`absolute w-0.5 h-2 rounded-full transition-all duration-100 ${
+                player.stats.isAiming
+                  ? 'bg-cyan-400 translate-y-2 opacity-95'
+                  : 'bg-white/70 translate-y-3.5 opacity-75'
+              }`}
+            />
+            {/* Left tick */}
+            <div
+              className={`absolute h-0.5 w-2 rounded-full transition-all duration-100 ${
+                player.stats.isAiming
+                  ? 'bg-cyan-400 -translate-x-2 opacity-95'
+                  : 'bg-white/70 -translate-x-3.5 opacity-75'
+              }`}
+            />
+            {/* Right tick */}
+            <div
+              className={`absolute h-0.5 w-2 rounded-full transition-all duration-100 ${
+                player.stats.isAiming
+                  ? 'bg-cyan-400 translate-x-2 opacity-95'
+                  : 'bg-white/70 translate-x-3.5 opacity-75'
+              }`}
+            />
+
+            {/* Tactical 4-corner Hitmarker on Damage */}
+            {engine.hitmarkerActive && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in fade-in duration-75">
+                {engine.isHeadshotKill ? (
+                  <Skull className="w-8 h-8 text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,1)] animate-ping" />
+                ) : (
+                  <div className="relative w-7 h-7 flex items-center justify-center">
+                    <div className="absolute w-3 h-0.5 bg-red-500 rotate-45 -translate-x-2 -translate-y-2 shadow-[0_0_4px_rgba(239,68,68,0.8)]" />
+                    <div className="absolute w-3 h-0.5 bg-red-500 -rotate-45 translate-x-2 -translate-y-2 shadow-[0_0_4px_rgba(239,68,68,0.8)]" />
+                    <div className="absolute w-3 h-0.5 bg-red-500 -rotate-45 -translate-x-2 translate-y-2 shadow-[0_0_4px_rgba(239,68,68,0.8)]" />
+                    <div className="absolute w-3 h-0.5 bg-red-500 rotate-45 translate-x-2 translate-y-2 shadow-[0_0_4px_rgba(239,68,68,0.8)]" />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Scavenge Loot Prompt */}
         {engine.activeLootTarget && !player.stats.isDowned && (

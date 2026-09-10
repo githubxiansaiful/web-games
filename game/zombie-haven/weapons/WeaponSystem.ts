@@ -174,7 +174,7 @@ export class WeaponSystem {
   /**
    * Fires the active weapon. Returns array of ray directions with spread applied
    */
-  public shoot(isAiming = false): { success: boolean; spreadDirs: THREE.Vector3[] } {
+  public shoot(isAiming = false, muzzlePos?: THREE.Vector3): { success: boolean; spreadDirs: THREE.Vector3[] } {
     const state = this.getActiveState();
     const config = this.getActiveConfig();
     const now = performance.now() / 1000;
@@ -206,8 +206,8 @@ export class WeaponSystem {
     else if (this.activeWeapon === 'shotgun') zombieAudio.playShotgun();
     else if (this.activeWeapon === 'rifle') zombieAudio.playRifle();
 
-    // Trigger Muzzle Flash
-    this.triggerMuzzleFlash();
+    // Trigger Muzzle Flash at physical barrel tip
+    this.triggerMuzzleFlash(muzzlePos);
 
     // Calculate spread directions
     const spreadMod = isAiming ? 0.45 : 1.0;
@@ -227,13 +227,17 @@ export class WeaponSystem {
     return { success: true, spreadDirs };
   }
 
-  private triggerMuzzleFlash() {
+  public triggerMuzzleFlash(pos?: THREE.Vector3) {
     this.flashTimer = 0.06;
+    if (pos) {
+      if (this.muzzleFlashMesh) this.muzzleFlashMesh.position.copy(pos);
+      if (this.muzzleFlashLight) this.muzzleFlashLight.position.copy(pos);
+    }
     if (this.muzzleFlashMesh) {
-      (this.muzzleFlashMesh.material as THREE.MeshBasicMaterial).opacity = 0.9;
+      (this.muzzleFlashMesh.material as THREE.MeshBasicMaterial).opacity = 0.95;
     }
     if (this.muzzleFlashLight) {
-      this.muzzleFlashLight.intensity = 3.0;
+      this.muzzleFlashLight.intensity = 3.5;
     }
   }
 }

@@ -6,27 +6,28 @@
 
 import * as THREE from 'three';
 import { DeadwoodVillage } from '../world/DeadwoodVillage';
+import { CAMERA_CONFIG } from '../types';
 
 export class CameraController {
   public camera: THREE.PerspectiveCamera;
   public yaw: number = 0;
-  public pitch: number = 0.15; // slight downward look
+  public pitch: number = 0.12; // slight natural downward angle
   public mouseSensitivity: number = 0.0022;
 
-  private currentDistance: number = 4.0;
-  private currentHeight: number = 2.4;
-  private currentShoulderOffset: number = 0.65;
-  private targetFOV: number = 65;
+  private currentDistance: number = CAMERA_CONFIG.defaultDistance; // 5.0m
+  private currentHeight: number = CAMERA_CONFIG.defaultHeight;     // 2.8m
+  private currentShoulderOffset: number = 0.55;
+  private targetFOV: number = CAMERA_CONFIG.defaultFOV;            // 60 deg
 
   private boomDistanceFactor: number = 1.0;
-  private smoothedCamPos: THREE.Vector3 = new THREE.Vector3(0, 2.5, 18);
-  private smoothedLookTarget: THREE.Vector3 = new THREE.Vector3(0, 1.5, 0);
+  private smoothedCamPos: THREE.Vector3 = new THREE.Vector3(0, 2.8, 19);
+  private smoothedLookTarget: THREE.Vector3 = new THREE.Vector3(0, 1.4, 0);
 
   private trauma: number = 0; // for camera screen shake
 
   constructor(aspect: number) {
-    this.camera = new THREE.PerspectiveCamera(65, aspect, 0.1, 800);
-    this.camera.position.set(0, 2.5, 18);
+    this.camera = new THREE.PerspectiveCamera(CAMERA_CONFIG.defaultFOV, aspect, 0.1, 800);
+    this.camera.position.set(0, 2.8, 19);
     this.smoothedCamPos.copy(this.camera.position);
   }
 
@@ -42,7 +43,7 @@ export class CameraController {
     this.pitch = Math.max(-1.0, Math.min(1.2, this.pitch));
   }
 
-  public addShake(amount = 0.25) {
+  public addShake(amount = 0.22) {
     this.trauma = Math.min(1.0, this.trauma + amount);
   }
 
@@ -53,11 +54,11 @@ export class CameraController {
     village: DeadwoodVillage,
     recoilKick = 0
   ) {
-    // 1. ADS Zoom lerping
-    const targetDist = isAiming ? 2.2 : 3.8;
-    const targetH = isAiming ? 1.9 : 2.3;
-    const targetOffset = isAiming ? 0.75 : 0.65;
-    this.targetFOV = isAiming ? 50 : 65;
+    // 1. Third Person & Right-Shoulder ADS Zoom lerping (Spec Section 20 & 23)
+    const targetDist = isAiming ? CAMERA_CONFIG.aimDistance : CAMERA_CONFIG.defaultDistance; // 3.5m vs 5.0m
+    const targetH = isAiming ? CAMERA_CONFIG.aimHeight : CAMERA_CONFIG.defaultHeight;         // 2.2m vs 2.8m
+    const targetOffset = isAiming ? CAMERA_CONFIG.shoulderOffset : 0.55;                      // 0.75m vs 0.55m
+    this.targetFOV = isAiming ? CAMERA_CONFIG.aimFOV : CAMERA_CONFIG.defaultFOV;              // 55 deg vs 60 deg
 
     this.currentDistance = THREE.MathUtils.lerp(this.currentDistance, targetDist, delta * 10);
     this.currentHeight = THREE.MathUtils.lerp(this.currentHeight, targetH, delta * 10);
@@ -66,8 +67,8 @@ export class CameraController {
     this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, this.targetFOV, delta * 10);
     this.camera.updateProjectionMatrix();
 
-    // 2. Camera target pivot point (Survivor chest/shoulder level: y = 1.40)
-    const pivot = targetPos.clone().add(new THREE.Vector3(0, 1.40, 0));
+    // 2. Camera target pivot point (Survivor chest/eye level: y = 1.40m)
+    const pivot = targetPos.clone().add(new THREE.Vector3(0, CAMERA_CONFIG.targetHeight, 0));
 
     // Calculate rotation vectors from yaw and pitch (plus recoil kick)
     const effPitch = this.pitch + recoilKick;
