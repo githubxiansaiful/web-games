@@ -15,6 +15,7 @@
 
 import * as THREE from 'three';
 import { PlayerStats, WeaponType, PLAYER_MOVEMENT_CONFIG } from '../types';
+import { characterGLBLoader, SurvivorSkin } from './CharacterGLBLoader';
 
 export class SurvivorPlayer {
   public group: THREE.Group;
@@ -22,6 +23,11 @@ export class SurvivorPlayer {
   public flashlight: THREE.SpotLight;
   public flashlightTarget: THREE.Object3D;
   public flashlightOn: boolean = false;
+
+  // Active Skin and Model Containers
+  public activeSkin: SurvivorSkin | 'procedural' = 'xian';
+  public proceduralModel: THREE.Group;
+  public glbModelContainer: THREE.Group;
 
   // Character body joints and segments
   private pelvis: THREE.Group;
@@ -55,8 +61,20 @@ export class SurvivorPlayer {
   // Animation state
   private animTimer: number = 0;
 
-  constructor(isLocal = true, customColor = 0x2563eb) {
+  constructor(
+    isLocal = true,
+    customColor = 0x2563eb,
+    skin: SurvivorSkin | 'procedural' = isLocal ? 'xian' : 'crimson'
+  ) {
     this.group = new THREE.Group();
+    this.activeSkin = skin;
+
+    this.proceduralModel = new THREE.Group();
+    this.group.add(this.proceduralModel);
+
+    this.glbModelContainer = new THREE.Group();
+    this.group.add(this.glbModelContainer);
+    this.glbModelContainer.visible = false;
 
     this.stats = {
       health: 100,
@@ -96,7 +114,7 @@ export class SurvivorPlayer {
     // --- 2. Pelvis & Utility Belt (y = 0.98m) ---
     this.pelvis = new THREE.Group();
     this.pelvis.position.set(0, 0.98, 0);
-    this.group.add(this.pelvis);
+    this.proceduralModel.add(this.pelvis);
 
     const beltGeo = new THREE.BoxGeometry(0.38, 0.08, 0.26);
     const beltMesh = new THREE.Mesh(beltGeo, beltMat);
@@ -119,11 +137,11 @@ export class SurvivorPlayer {
     // Bottom of boot sole rests exactly at y = 0.00 at rest!
     this.leftLegPivot = new THREE.Group();
     this.leftLegPivot.position.set(-0.16, 0.98, 0);
-    this.group.add(this.leftLegPivot);
+    this.proceduralModel.add(this.leftLegPivot);
 
     this.rightLegPivot = new THREE.Group();
     this.rightLegPivot.position.set(0.16, 0.98, 0);
-    this.group.add(this.rightLegPivot);
+    this.proceduralModel.add(this.rightLegPivot);
 
     // Build leg limbs inside pivots
     [
@@ -174,7 +192,7 @@ export class SurvivorPlayer {
     // --- 4. Torso, Jacket & Survival Backpack ---
     this.torso = new THREE.Group();
     this.torso.position.set(0, 1.04, 0);
-    this.group.add(this.torso);
+    this.proceduralModel.add(this.torso);
 
     // Waist / Lower Jacket
     const waistGeo = new THREE.BoxGeometry(0.38, 0.20, 0.25);
@@ -430,6 +448,11 @@ export class SurvivorPlayer {
     this.flashlight.target = this.flashlightTarget;
     this.flashlight.castShadow = isLocal;
     this.group.add(this.flashlight);
+
+    // Asynchronously load low-poly 3D character pack model
+    if (this.activeSkin !== 'procedural') {
+      this.loadGLBCharacter(this.activeSkin);
+    }
   }
 
   /**
@@ -571,6 +594,88 @@ export class SurvivorPlayer {
     return this.flashlightOn;
   }
 
+  /**
+   * Asynchronously loads and attaches the 3D low-poly survivor character model from GLB pack
+   */
+  public async loadGLBCharacter(skin: SurvivorSkin) {
+    try {
+      await characterGLBLoader.load();
+      if (this.activeSkin === 'procedural') return;
+
+      const model = characterGLBLoader.getCharacterModel(this.activeSkin as SurvivorSkin);
+      if (model) {
+        while (this.glbModelContainer.children.length > 0) {
+          const child = this.glbModelContainer.children[0];
+          if (child === this.weaponSocket) {
+            this.group.add(this.weaponSocket);
+          } else {
+            this.glbModelContainer.remove(child);
+          }
+        }
+
+        this.glbModelContainer.add(model);
+        this.glbModelContainer.add(this.weaponSocket);
+        this.glbModelContainer.visible = true;
+        this.proceduralModel.visible = false;
+
+        this.weaponSocket.position.set(0.30, 0.90, 0.20);
+        this.weaponSocket.rotation.set(0.25, 0, 0);
+      }
+    } catch (err) {
+      console.warn('[SurvivorPlayer] Fallback to procedural model:', err);
+      this.proceduralModel.visible = true;
+      this.glbModelContainer.visible = false;
+    }
+  }
+
+  /**
+   * Switches active character skin between Xian, Crimson, Marcus, Elena, or procedural
+   */
+  public setSkin(skin: SurvivorSkin | 'procedural') {
+    this.activeSkin = skin;
+    if (skin === 'procedural') {
+      this.glbModelContainer.visible = false;
+      this.proceduralModel.visible = true;
+      this.rightHand.add(this.weaponSocket);
+      this.weaponSocket.position.set(0, -0.05, 0.06);
+      this.weaponSocket.rotation.set(0, 0, 0);
+      return;
+    }
+
+    const model = characterGLBLoader.getCharacterModel(skin);
+    if (model) {
+      while (this.glbModelContainer.children.length > 0) {
+        const child = this.glbModelContainer.children[0];
+        if (child === this.weaponSocket) {
+          this.group.add(this.weaponSocket);
+        } else {
+          this.glbModelContainer.remove(child);
+        }
+      }
+
+      this.glbModelContainer.add(model);
+      this.glbModelContainer.add(this.weaponSocket);
+      this.glbModelContainer.visible = true;
+      this.proceduralModel.visible = false;
+      this.weaponSocket.position.set(0.30, 0.90, 0.20);
+      this.weaponSocket.rotation.set(0.25, 0, 0);
+    } else {
+      this.loadGLBCharacter(skin);
+    }
+  }
+
+  /**
+   * Cycles to the next available survivor skin
+   */
+  public cycleNextSkin(): string {
+    const skinOrder: (SurvivorSkin | 'procedural')[] = ['xian', 'marcus', 'crimson', 'elena', 'procedural'];
+    const currentIdx = skinOrder.indexOf(this.activeSkin);
+    const nextIdx = (currentIdx + 1) % skinOrder.length;
+    const nextSkin = skinOrder[nextIdx];
+    this.setSkin(nextSkin);
+    return nextSkin;
+  }
+
   public applyDamage(dmg: number) {
     if (this.stats.isDowned || this.stats.health <= 0) return;
 
@@ -588,19 +693,27 @@ export class SurvivorPlayer {
     this.stats.bleedoutTimer = 35;
     this.stats.reviveProgress = 0;
 
-    // Realistic crawling / downed posture on the ground (safely above floor: all y >= 0.12m)
-    this.torso.position.set(0, 0.35, -0.12);
-    this.torso.rotation.set(Math.PI / 2.2, 0, 0);
+    if (this.glbModelContainer.visible) {
+      // GLB model crawling posture safely above floor (y >= 0.15m)
+      this.glbModelContainer.position.set(0, 0.18, -0.4);
+      this.glbModelContainer.rotation.set(Math.PI / 2.2, 0, 0);
+      this.weaponSocket.position.set(0.18, 0.22, 0.1);
+      this.weaponSocket.rotation.set(Math.PI / 2.2, 0, 0);
+    } else {
+      // Realistic procedural crawling / downed posture on the ground (safely above floor: all y >= 0.12m)
+      this.torso.position.set(0, 0.35, -0.12);
+      this.torso.rotation.set(Math.PI / 2.2, 0, 0);
 
-    this.leftLegPivot.position.set(-0.16, 0.26, -0.52);
-    this.rightLegPivot.position.set(0.16, 0.26, -0.52);
-    this.leftLegPivot.rotation.set(Math.PI / 2.1, 0, -0.15);
-    this.rightLegPivot.rotation.set(Math.PI / 2.1, 0, 0.15);
+      this.leftLegPivot.position.set(-0.16, 0.26, -0.52);
+      this.rightLegPivot.position.set(0.16, 0.26, -0.52);
+      this.leftLegPivot.rotation.set(Math.PI / 2.1, 0, -0.15);
+      this.rightLegPivot.rotation.set(Math.PI / 2.1, 0, 0.15);
 
-    this.leftArmPivot.rotation.set(-0.3, 0, 0.35);
-    this.rightArmPivot.rotation.set(-0.3, 0, -0.35);
-    this.leftElbowPivot.rotation.set(0, 0, 0);
-    this.rightElbowPivot.rotation.set(0, 0, 0);
+      this.leftArmPivot.rotation.set(-0.3, 0, 0.35);
+      this.rightArmPivot.rotation.set(-0.3, 0, -0.35);
+      this.leftElbowPivot.rotation.set(0, 0, 0);
+      this.rightElbowPivot.rotation.set(0, 0, 0);
+    }
   }
 
   public revive() {
@@ -608,19 +721,26 @@ export class SurvivorPlayer {
     this.stats.health = 50; // revive with 50% HP
     this.stats.reviveProgress = 0;
 
-    // Stand back up to upright position
-    this.torso.position.set(0, 1.04, 0);
-    this.torso.rotation.set(0, 0, 0);
+    if (this.glbModelContainer.visible) {
+      this.glbModelContainer.position.set(0, 0, 0);
+      this.glbModelContainer.rotation.set(0, 0, 0);
+      this.weaponSocket.position.set(0.30, 0.90, 0.20);
+      this.weaponSocket.rotation.set(0.25, 0, 0);
+    } else {
+      // Stand back up to upright position
+      this.torso.position.set(0, 1.04, 0);
+      this.torso.rotation.set(0, 0, 0);
 
-    this.leftLegPivot.position.set(-0.16, 0.98, 0);
-    this.rightLegPivot.position.set(0.16, 0.98, 0);
-    this.leftLegPivot.rotation.set(0, 0, 0);
-    this.rightLegPivot.rotation.set(0, 0, 0);
+      this.leftLegPivot.position.set(-0.16, 0.98, 0);
+      this.rightLegPivot.position.set(0.16, 0.98, 0);
+      this.leftLegPivot.rotation.set(0, 0, 0);
+      this.rightLegPivot.rotation.set(0, 0, 0);
 
-    this.leftArmPivot.rotation.set(0, 0, 0);
-    this.rightArmPivot.rotation.set(0, 0, 0);
-    this.leftElbowPivot.rotation.set(0, 0, 0);
-    this.rightElbowPivot.rotation.set(0, 0, 0);
+      this.leftArmPivot.rotation.set(0, 0, 0);
+      this.rightArmPivot.rotation.set(0, 0, 0);
+      this.leftElbowPivot.rotation.set(0, 0, 0);
+      this.rightElbowPivot.rotation.set(0, 0, 0);
+    }
   }
 
   public update(delta: number, velocity: THREE.Vector3, isAiming: boolean, isSprinting: boolean) {
@@ -648,10 +768,40 @@ export class SurvivorPlayer {
       return;
     }
 
-    // Procedural walk / run animation
     const speed = velocity.length();
     const isMoving = speed > 0.15;
 
+    // --- A. GLB Model Animation ---
+    if (this.glbModelContainer.visible) {
+      if (isMoving) {
+        const animSpeed = isSprinting ? 12.5 : 8.0;
+        this.animTimer += delta * animSpeed;
+
+        // Rhythmic walking/running step bobbing and turn lean
+        this.glbModelContainer.position.y = Math.abs(Math.sin(this.animTimer * 2)) * (isSprinting ? 0.045 : 0.025);
+        this.glbModelContainer.rotation.y = Math.sin(this.animTimer) * 0.035;
+        this.glbModelContainer.rotation.x = isSprinting ? 0.10 : 0.03;
+      } else {
+        // Subtle idle breathing
+        this.animTimer += delta * 2.2;
+        this.glbModelContainer.position.y = Math.sin(this.animTimer) * 0.008;
+        this.glbModelContainer.rotation.set(0, 0, 0);
+      }
+
+      // Weapon Socket Positioning for GLB Character
+      if (isAiming) {
+        // Aiming stance: weapon raised to shoulder/eye line pointing directly at crosshair
+        this.weaponSocket.position.lerp(new THREE.Vector3(0.18, 1.25, 0.38), delta * 18);
+        this.weaponSocket.rotation.x = THREE.MathUtils.lerp(this.weaponSocket.rotation.x, -0.05, delta * 18);
+      } else {
+        // Low-ready resting pose near right hip
+        this.weaponSocket.position.lerp(new THREE.Vector3(0.30, 0.90, 0.20), delta * 18);
+        this.weaponSocket.rotation.x = THREE.MathUtils.lerp(this.weaponSocket.rotation.x, 0.25, delta * 18);
+      }
+      return;
+    }
+
+    // --- B. Procedural Model Articulated Limb IK Animation ---
     if (isMoving) {
       const animSpeed = isSprinting ? 12.5 : 8.0;
       this.animTimer += delta * animSpeed;

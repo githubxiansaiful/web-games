@@ -355,8 +355,10 @@ export const ZombieHavenHUD: React.FC<ZombieHavenHUDProps> = ({ engine, onExit }
               </div>
             </div>
           ) : (
-            <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1.5">
-              <span>KEYS [1] [2] [3] OR SCROLL</span>
+            <div className="text-[10px] font-bold text-slate-500 flex items-center gap-2">
+              <span>[1][2][3] WEAPONS</span>
+              <span>•</span>
+              <span className="text-cyan-400 uppercase font-mono">[K] {player.activeSkin}</span>
             </div>
           )}
         </div>

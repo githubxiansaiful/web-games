@@ -100,6 +100,11 @@ export class PlayerController {
         this.onInteractRequest();
       }
     }
+
+    // Cycle Survivor Skin: K
+    if (e.code === 'KeyK') {
+      this.player.cycleNextSkin();
+    }
   };
 
   private handleKeyUp = (e: KeyboardEvent) => {
