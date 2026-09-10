@@ -44,8 +44,8 @@ export class DeadwoodVillage {
     groundGeo.computeVertexNormals();
 
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x1c2419, // dark damp forest grass
-      roughness: 0.9,
+      color: 0x3c682c, // natural vibrant woodland grass
+      roughness: 0.85,
       metalness: 0.05,
     });
 
@@ -58,12 +58,12 @@ export class DeadwoodVillage {
   // --- 2. ROAD NETWORK ---
   private buildRoadNetwork() {
     const roadMat = new THREE.MeshStandardMaterial({
-      color: 0x22262b, // weathered cracked asphalt
-      roughness: 0.85,
+      color: 0x3f4854, // clear asphalt gray
+      roughness: 0.78,
     });
     const gravelMat = new THREE.MeshStandardMaterial({
-      color: 0x3d3935, // dirty brown farm path
-      roughness: 0.95,
+      color: 0x78644e, // warm dirt and gravel farm path
+      roughness: 0.9,
     });
 
     // Main East-West Highway (10m wide, 400m long)
@@ -81,6 +81,26 @@ export class DeadwoodVillage {
     crossRoad.position.y = 0.025;
     crossRoad.receiveShadow = true;
     this.rootGroup.add(crossRoad);
+
+    // Road Markings: Dashed Yellow Center Lines
+    const stripeMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+    for (let i = -190; i <= 190; i += 18) {
+      // Skip right at intersection center
+      if (Math.abs(i) < 6) continue;
+      const stripeGeo = new THREE.PlaneGeometry(8, 0.3);
+      const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+      stripe.rotation.x = -Math.PI / 2;
+      stripe.position.set(i, 0.03, 0);
+      this.rootGroup.add(stripe);
+    }
+    for (let i = -160; i <= 160; i += 18) {
+      if (Math.abs(i) < 6) continue;
+      const stripeGeo = new THREE.PlaneGeometry(0.3, 8);
+      const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+      stripe.rotation.x = -Math.PI / 2;
+      stripe.position.set(0, 0.035, i);
+      this.rootGroup.add(stripe);
+    }
 
     // Farm dirt track curving South-West
     const farmPathGeo = new THREE.PlaneGeometry(6, 120);

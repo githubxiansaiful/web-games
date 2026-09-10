@@ -36,6 +36,12 @@ export class ZombieGameEngine {
   public loot: LootSystem;
   public revive: ReviveSystem;
 
+  // Day / Night Environment
+  public isDayMode: boolean = true;
+  private ambientLight: THREE.AmbientLight;
+  private hemiLight: THREE.HemisphereLight;
+  private dirLight: THREE.DirectionalLight;
+
   // Visual Effects: Bullet Tracer lines
   private tracers: { line: THREE.Line; life: number }[] = [];
 
@@ -81,29 +87,33 @@ export class ZombieGameEngine {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 1.15;
 
-    // 2. Scene & Deep Atmospheric Night Fog
+    // 2. Scene & Bright Day Sky & Fog (Day Mode by Default)
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x060a14); // midnight deep blue
-    this.scene.fog = new THREE.FogExp2(0x060a14, 0.015); // eerie horror fog
+    this.scene.background = new THREE.Color(0x7bc8f6); // bright daylight sky
+    this.scene.fog = new THREE.FogExp2(0x8ecdf8, 0.003); // light daytime atmospheric haze
 
-    // 3. Moonlit Directional & Ambient Lighting
-    const ambientLight = new THREE.AmbientLight(0x1e293b, 0.65);
-    this.scene.add(ambientLight);
+    // 3. Daylight Lighting: Hemisphere sky/earth bounce + Ambient + Direct Sunlight
+    this.hemiLight = new THREE.HemisphereLight(0xbae6fd, 0x50753b, 1.3);
+    this.scene.add(this.hemiLight);
 
-    const moonLight = new THREE.DirectionalLight(0x94a3b8, 1.2);
-    moonLight.position.set(60, 100, 40);
-    moonLight.castShadow = true;
-    moonLight.shadow.mapSize.width = 1024;
-    moonLight.shadow.mapSize.height = 1024;
-    moonLight.shadow.camera.near = 10;
-    moonLight.shadow.camera.far = 250;
-    moonLight.shadow.camera.left = -60;
-    moonLight.shadow.camera.right = 60;
-    moonLight.shadow.camera.top = 60;
-    moonLight.shadow.camera.bottom = -60;
-    this.scene.add(moonLight);
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+    this.scene.add(this.ambientLight);
+
+    this.dirLight = new THREE.DirectionalLight(0xfff6e6, 2.4);
+    this.dirLight.position.set(80, 150, 60);
+    this.dirLight.castShadow = true;
+    this.dirLight.shadow.mapSize.width = 2048;
+    this.dirLight.shadow.mapSize.height = 2048;
+    this.dirLight.shadow.camera.near = 10;
+    this.dirLight.shadow.camera.far = 300;
+    this.dirLight.shadow.camera.left = -90;
+    this.dirLight.shadow.camera.right = 90;
+    this.dirLight.shadow.camera.top = 90;
+    this.dirLight.shadow.camera.bottom = -90;
+    this.dirLight.shadow.bias = -0.0004;
+    this.scene.add(this.dirLight);
 
     // 4. Initialize Core World & Systems
     this.village = new DeadwoodVillage();
@@ -232,6 +242,11 @@ export class ZombieGameEngine {
         this.loot.collectLoot(this.activeLootTarget, this.localPlayer, this.weapons);
         this.activeLootTarget = null;
       }
+    };
+
+    // Toggle Day / Night on [N]
+    this.playerCtrl.onToggleDayNightRequest = () => {
+      this.toggleDayNight();
     };
   }
 
@@ -463,6 +478,41 @@ export class ZombieGameEngine {
     }
 
     this.waves.startFirstWave();
+  }
+
+  public setDayMode(isDay: boolean) {
+    this.isDayMode = isDay;
+    if (isDay) {
+      this.scene.background = new THREE.Color(0x7bc8f6);
+      this.scene.fog = new THREE.FogExp2(0x8ecdf8, 0.003);
+      this.hemiLight.color.setHex(0xbae6fd);
+      this.hemiLight.groundColor.setHex(0x50753b);
+      this.hemiLight.intensity = 1.3;
+      this.ambientLight.color.setHex(0xffffff);
+      this.ambientLight.intensity = 0.65;
+      this.dirLight.color.setHex(0xfff6e6);
+      this.dirLight.intensity = 2.4;
+      this.dirLight.position.set(80, 150, 60);
+      this.renderer.toneMappingExposure = 1.15;
+    } else {
+      this.scene.background = new THREE.Color(0x080d18);
+      this.scene.fog = new THREE.FogExp2(0x080d18, 0.012);
+      this.hemiLight.color.setHex(0x1e293b);
+      this.hemiLight.groundColor.setHex(0x0b1120);
+      this.hemiLight.intensity = 0.4;
+      this.ambientLight.color.setHex(0x1e293b);
+      this.ambientLight.intensity = 0.45;
+      this.dirLight.color.setHex(0x94a3b8);
+      this.dirLight.intensity = 1.1;
+      this.dirLight.position.set(60, 100, 40);
+      this.renderer.toneMappingExposure = 1.05;
+    }
+    if (this.onStateChange) this.onStateChange();
+  }
+
+  public toggleDayNight(): boolean {
+    this.setDayMode(!this.isDayMode);
+    return this.isDayMode;
   }
 
   private handleResize = () => {

@@ -19,7 +19,7 @@ export const ZOMBIE_CONFIGS: Record<ZombieType, ZombieConfig> = {
     detectRange: 45,
     scoreValue: 10,
     scale: 1.0,
-    color: 0x3f4f3f,
+    color: 0x4e6b4e, // sickly rotting undead green
   },
   runner: {
     type: 'runner',
@@ -31,7 +31,7 @@ export const ZOMBIE_CONFIGS: Record<ZombieType, ZombieConfig> = {
     detectRange: 60,
     scoreValue: 20,
     scale: 0.92,
-    color: 0x503a3a,
+    color: 0x993838, // furious crimson-tainted infected
   },
   tank: {
     type: 'tank',
@@ -43,7 +43,7 @@ export const ZOMBIE_CONFIGS: Record<ZombieType, ZombieConfig> = {
     detectRange: 40,
     scoreValue: 50,
     scale: 1.55,
-    color: 0x222222,
+    color: 0x475569, // massive slate-gray brute
   },
   screamer: {
     type: 'screamer',
@@ -55,7 +55,7 @@ export const ZOMBIE_CONFIGS: Record<ZombieType, ZombieConfig> = {
     detectRange: 55,
     scoreValue: 30,
     scale: 0.9,
-    color: 0x473b52,
+    color: 0x6b4984, // ghastly pale purple-black banshee
   },
 };
 

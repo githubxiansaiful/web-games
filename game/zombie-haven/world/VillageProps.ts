@@ -30,17 +30,17 @@ export class VillageProps {
   public static initMaterials() {
     if (this.matWood) return;
 
-    this.matWood = new THREE.MeshLambertMaterial({ color: 0x6b533a });
-    this.matDarkWood = new THREE.MeshLambertMaterial({ color: 0x3d2817 });
-    this.matHouseWall = new THREE.MeshLambertMaterial({ color: 0x24283b });
-    this.matHouseRoof = new THREE.MeshLambertMaterial({ color: 0x1f2335 });
-    this.matBarnWall = new THREE.MeshLambertMaterial({ color: 0x7f1d1d });
-    this.matMetalRust = new THREE.MeshLambertMaterial({ color: 0x4a3b32 });
-    this.matCarPaint = new THREE.MeshLambertMaterial({ color: 0x1e293b });
-    this.matGlass = new THREE.MeshLambertMaterial({ color: 0x0f172a, transparent: true, opacity: 0.8 });
-    this.matStone = new THREE.MeshLambertMaterial({ color: 0x475569 });
-    this.matLeaves = new THREE.MeshLambertMaterial({ color: 0x14532d });
-    this.matDeadWood = new THREE.MeshLambertMaterial({ color: 0x27272a });
+    this.matWood = new THREE.MeshLambertMaterial({ color: 0x85583b }); // warm timber plank
+    this.matDarkWood = new THREE.MeshLambertMaterial({ color: 0x543926 });
+    this.matHouseWall = new THREE.MeshLambertMaterial({ color: 0x8a7a6b }); // weathered clapboard siding
+    this.matHouseRoof = new THREE.MeshLambertMaterial({ color: 0x475569 }); // slate gray shingles
+    this.matBarnWall = new THREE.MeshLambertMaterial({ color: 0xa82727 }); // classic vibrant barn red
+    this.matMetalRust = new THREE.MeshLambertMaterial({ color: 0x715949 });
+    this.matCarPaint = new THREE.MeshLambertMaterial({ color: 0x2563eb }); // sedan enamel blue
+    this.matGlass = new THREE.MeshLambertMaterial({ color: 0xa5f3fc, transparent: true, opacity: 0.6 });
+    this.matStone = new THREE.MeshLambertMaterial({ color: 0x64748b });
+    this.matLeaves = new THREE.MeshLambertMaterial({ color: 0x2e7d32 }); // lush pine green
+    this.matDeadWood = new THREE.MeshLambertMaterial({ color: 0x52525b });
   }
 
   /**
