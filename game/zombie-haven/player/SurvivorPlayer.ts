@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import { PlayerStats, WeaponType, PLAYER_MOVEMENT_CONFIG } from '../types';
 import { characterGLBLoader, SurvivorSkin } from './CharacterGLBLoader';
 import { gunGLBLoader } from '../weapons/GunGLBLoader';
+import { ualAnimationLoader } from '../animation/UALAnimationLoader';
 
 export class SurvivorPlayer {
   public group: THREE.Group;
@@ -29,6 +30,27 @@ export class SurvivorPlayer {
   public activeSkin: SurvivorSkin | 'procedural' = 'xian';
   public proceduralModel: THREE.Group;
   public glbModelContainer: THREE.Group;
+  public ualModelContainer: THREE.Group;
+  public ualModel: THREE.Group | null = null;
+
+  // UAL 3D Skeletal Animation System
+  public animMixer: THREE.AnimationMixer | null = null;
+  private animActions: {
+    idle?: THREE.AnimationAction;
+    pistolIdle?: THREE.AnimationAction;
+    walk?: THREE.AnimationAction;
+    jog?: THREE.AnimationAction;
+    sprint?: THREE.AnimationAction;
+    jumpStart?: THREE.AnimationAction;
+    jumpLoop?: THREE.AnimationAction;
+    jumpLand?: THREE.AnimationAction;
+    shoot?: THREE.AnimationAction;
+    reload?: THREE.AnimationAction;
+    hit?: THREE.AnimationAction;
+    death?: THREE.AnimationAction;
+  } = {};
+  private currentAnimAction: THREE.AnimationAction | null = null;
+  private wasGrounded: boolean = true;
 
   // Character body joints and segments
   private pelvis: THREE.Group;
@@ -77,6 +99,9 @@ export class SurvivorPlayer {
     this.glbModelContainer = new THREE.Group();
     this.group.add(this.glbModelContainer);
     this.glbModelContainer.visible = false;
+
+    this.ualModelContainer = new THREE.Group();
+    this.group.add(this.ualModelContainer);
 
     this.stats = {
       health: 100,
@@ -458,6 +483,9 @@ export class SurvivorPlayer {
 
     // Asynchronously load low-poly 3D firearms pack
     this.loadGLBGuns();
+
+    // Asynchronously load UAL 3D rigged character with 43 animations
+    this.loadUALCharacter(customColor);
   }
 
   /**
@@ -670,6 +698,130 @@ export class SurvivorPlayer {
   }
 
   /**
+   * Asynchronously loads and initializes UAL 3D rigged character with 43 animations
+   */
+  public async loadUALCharacter(customColor: number = 0x1d4ed8) {
+    try {
+      await ualAnimationLoader.load();
+      const model = ualAnimationLoader.getMannequinModel();
+      if (!model) return;
+
+      while (this.ualModelContainer.children.length > 0) {
+        this.ualModelContainer.remove(this.ualModelContainer.children[0]);
+      }
+
+      this.ualModel = model;
+      // Rotate 180 degrees around Y so model faces -Z forward with back to camera (+Z)
+      this.ualModel.rotation.y = Math.PI;
+
+      // Custom survivor styling for mannequin skinned meshes
+      this.ualModel.traverse((child: any) => {
+        if (child.isSkinnedMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+          if (child.name === 'Mannequin_1') {
+            child.material = new THREE.MeshStandardMaterial({
+              color: customColor,
+              roughness: 0.45,
+              metalness: 0.15,
+            });
+          } else if (child.name === 'Mannequin_2') {
+            child.material = new THREE.MeshStandardMaterial({
+              color: 0x1e293b,
+              roughness: 0.65,
+              metalness: 0.25,
+            });
+          }
+        }
+      });
+
+      // Attach weaponSocket to right hand bone
+      const handR = this.ualModel.getObjectByName('hand_r');
+      if (handR) {
+        handR.add(this.weaponSocket);
+        this.weaponSocket.position.set(0, 0.07, 0.03);
+        this.weaponSocket.rotation.set(-Math.PI / 2, 0, 0);
+      }
+
+      // Setup Animation Mixer & Actions
+      this.animMixer = new THREE.AnimationMixer(this.ualModel);
+
+      const getAction = (clipName: string) => {
+        const clip = ualAnimationLoader.getClip(clipName);
+        return clip ? this.animMixer!.clipAction(clip) : undefined;
+      };
+
+      this.animActions = {
+        idle: getAction('Idle_Loop'),
+        pistolIdle: getAction('Pistol_Idle_Loop'),
+        walk: getAction('Walk_Loop'),
+        jog: getAction('Jog_Fwd_Loop'),
+        sprint: getAction('Sprint_Loop'),
+        jumpStart: getAction('Jump_Start'),
+        jumpLoop: getAction('Jump_Loop'),
+        jumpLand: getAction('Jump_Land'),
+        shoot: getAction('Pistol_Shoot'),
+        reload: getAction('Pistol_Reload'),
+        hit: getAction('Hit_Chest'),
+        death: getAction('Death01'),
+      };
+
+      if (this.animActions.shoot) {
+        this.animActions.shoot.setLoop(THREE.LoopOnce, 1);
+        this.animActions.shoot.clampWhenFinished = false;
+      }
+      if (this.animActions.reload) {
+        this.animActions.reload.setLoop(THREE.LoopOnce, 1);
+        this.animActions.reload.clampWhenFinished = false;
+      }
+      if (this.animActions.hit) {
+        this.animActions.hit.setLoop(THREE.LoopOnce, 1);
+      }
+      if (this.animActions.death) {
+        this.animActions.death.setLoop(THREE.LoopOnce, 1);
+        this.animActions.death.clampWhenFinished = true;
+      }
+
+      // Start in idle
+      if (this.animActions.idle) {
+        this.animActions.idle.play();
+        this.currentAnimAction = this.animActions.idle;
+      }
+
+      this.ualModelContainer.add(this.ualModel);
+      this.ualModelContainer.visible = true;
+      this.proceduralModel.visible = false;
+      this.glbModelContainer.visible = false;
+    } catch (err) {
+      console.warn('[SurvivorPlayer] Failed to load UAL animated character:', err);
+    }
+  }
+
+  public playJump() {
+    if (this.animActions.jumpStart) {
+      this.animActions.jumpStart.reset().play();
+    }
+  }
+
+  public playShoot() {
+    if (this.animActions.shoot) {
+      this.animActions.shoot.reset().play();
+    }
+  }
+
+  public playReload() {
+    if (this.animActions.reload) {
+      this.animActions.reload.reset().play();
+    }
+  }
+
+  public playHit() {
+    if (this.animActions.hit) {
+      this.animActions.hit.reset().play();
+    }
+  }
+
+  /**
    * Switches active character skin between Xian, Crimson, Marcus, Elena, or procedural
    */
   public setSkin(skin: SurvivorSkin | 'procedural') {
@@ -734,6 +886,12 @@ export class SurvivorPlayer {
     this.stats.bleedoutTimer = 35;
     this.stats.reviveProgress = 0;
 
+    if (this.animActions.death) {
+      if (this.currentAnimAction) this.currentAnimAction.fadeOut(0.2);
+      this.animActions.death.reset().fadeIn(0.2).play();
+      this.currentAnimAction = this.animActions.death;
+    }
+
     if (this.glbModelContainer.visible) {
       // GLB model crawling posture safely above floor (y >= 0.15m)
       this.glbModelContainer.position.set(0, 0.18, -0.4);
@@ -762,6 +920,12 @@ export class SurvivorPlayer {
     this.stats.health = 50; // revive with 50% HP
     this.stats.reviveProgress = 0;
 
+    if (this.animActions.death) this.animActions.death.fadeOut(0.3);
+    if (this.animActions.idle) {
+      this.animActions.idle.reset().fadeIn(0.3).play();
+      this.currentAnimAction = this.animActions.idle;
+    }
+
     if (this.glbModelContainer.visible) {
       this.glbModelContainer.position.set(0, 0, 0);
       this.glbModelContainer.rotation.set(0, 0, 0);
@@ -784,7 +948,13 @@ export class SurvivorPlayer {
     }
   }
 
-  public update(delta: number, velocity: THREE.Vector3, isAiming: boolean, isSprinting: boolean) {
+  public update(
+    delta: number,
+    velocity: THREE.Vector3,
+    isAiming: boolean,
+    isSprinting: boolean,
+    isGrounded: boolean = true
+  ) {
     // Stamina drain and regeneration (Spec Section 12)
     if (isSprinting && velocity.lengthSq() > 0.1 && !this.stats.isDowned) {
       this.stats.stamina = Math.max(0, this.stats.stamina - delta * PLAYER_MOVEMENT_CONFIG.sprintDrainRate);
@@ -806,11 +976,60 @@ export class SurvivorPlayer {
     // Downed Bleedout Timer
     if (this.stats.isDowned) {
       this.stats.bleedoutTimer -= delta;
+      if (this.animMixer) this.animMixer.update(delta);
       return;
     }
 
     const speed = velocity.length();
     const isMoving = speed > 0.15;
+
+    // --- 0. UAL 3D Skeletal Animation System (Universal Animation Library) ---
+    if (this.animMixer && this.ualModelContainer.visible) {
+      this.animMixer.update(delta);
+
+      let targetAction: THREE.AnimationAction | undefined = this.animActions.idle;
+
+      if (this.stats.isDowned) {
+        targetAction = this.animActions.death;
+      } else if (!isGrounded) {
+        targetAction = this.animActions.jumpLoop;
+      } else if (isMoving) {
+        if (isSprinting) {
+          targetAction = this.animActions.sprint;
+          if (targetAction) targetAction.timeScale = 1.15;
+        } else if (speed > 3.0) {
+          targetAction = this.animActions.jog;
+          if (targetAction) targetAction.timeScale = speed / 4.0;
+        } else {
+          targetAction = this.animActions.walk;
+          if (targetAction) targetAction.timeScale = speed / 2.5;
+        }
+      } else {
+        if (isAiming) {
+          targetAction = this.animActions.pistolIdle || this.animActions.idle;
+        } else {
+          targetAction = this.animActions.idle;
+        }
+      }
+
+      // Landing transition trigger
+      if (isGrounded && !this.wasGrounded) {
+        if (this.animActions.jumpLand) {
+          this.animActions.jumpLand.reset().play();
+        }
+      }
+      this.wasGrounded = isGrounded;
+
+      // Smooth crossfade between locomotion actions
+      if (targetAction && this.currentAnimAction !== targetAction) {
+        if (this.currentAnimAction) {
+          this.currentAnimAction.fadeOut(0.18);
+        }
+        targetAction.reset().fadeIn(0.18).play();
+        this.currentAnimAction = targetAction;
+      }
+      return;
+    }
 
     // --- A. GLB Model Animation ---
     if (this.glbModelContainer.visible) {

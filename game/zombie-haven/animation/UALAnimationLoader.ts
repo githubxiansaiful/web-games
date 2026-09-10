@@ -8,6 +8,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 export class UALAnimationLoader {
   private static instance: UALAnimationLoader;
@@ -62,7 +63,7 @@ export class UALAnimationLoader {
 
   public getMannequinModel(): THREE.Group | null {
     if (!this.gltfCache) return null;
-    return this.gltfCache.scene.clone(true);
+    return SkeletonUtils.clone(this.gltfCache.scene) as THREE.Group;
   }
 }
 

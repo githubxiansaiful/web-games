@@ -87,6 +87,7 @@ export class PlayerController {
     // Reload: R
     if (e.code === 'KeyR') {
       this.weapons.startReload();
+      this.player.playReload();
     }
 
     // Flashlight toggle: F
@@ -119,6 +120,7 @@ export class PlayerController {
 
     if (e.button === 0) {
       this.isMouseDown = true;
+      this.player.playShoot();
       if (this.onShootRequest) {
         this.onShootRequest();
       }
@@ -212,6 +214,7 @@ export class PlayerController {
       this.verticalVelocity = 5.8;
       this.isGrounded = false;
       this.player.stats.stamina -= 10;
+      this.player.playJump();
     }
 
     if (!this.isGrounded) {
@@ -262,8 +265,8 @@ export class PlayerController {
     const camFwd = this.cameraCtrl.getForwardVector();
     this.player.flashlightTarget.position.copy(camFwd).multiplyScalar(30);
 
-    // Update Player character procedural animation
-    this.player.update(delta, this.velocity, this.isMouseDown, canSprint);
+    // Update Player character animation
+    this.player.update(delta, this.velocity, this.isMouseDown, canSprint, this.isGrounded);
   }
 
   public dispose() {

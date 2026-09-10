@@ -361,6 +361,7 @@ export class ZombieGameEngine {
     const remotePos = this.remotePlayerModel ? this.remotePlayerModel.group.position : null;
     this.horde.update(delta, this.localPlayer, remotePos, (dmg) => {
       this.localPlayer.applyDamage(dmg);
+      this.localPlayer.playHit();
       this.cameraCtrl.addShake(0.35);
       zombieAudio.playPlayerHurt();
     });
@@ -434,6 +435,9 @@ export class ZombieGameEngine {
         } else if (!rp.isDowned && this.remotePlayerModel.stats.isDowned) {
           this.remotePlayerModel.revive();
         }
+        const isRemoteMoving = rp.animState === 'run' || rp.animState === 'walk';
+        const remoteVel = isRemoteMoving ? new THREE.Vector3(0, 0, rp.animState === 'run' ? -6 : -3) : new THREE.Vector3();
+        this.remotePlayerModel.update(delta, remoteVel, rp.isAiming, rp.isSprinting, true);
       }
     }
 
