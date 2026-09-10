@@ -62,6 +62,7 @@ export class ZombieGameEngine {
   private clock: THREE.Clock;
   private animationFrameId: number | null = null;
   private networkSyncTimer: number = 0;
+  private soloDeathTimer?: number;
 
   // Event callbacks to React HUD
   public onStateChange?: () => void;
@@ -162,7 +163,7 @@ export class ZombieGameEngine {
   private setupShootAndInteraction() {
     // Shooting
     this.playerCtrl.onShootRequest = () => {
-      if (this.localPlayer.stats.isDowned || this.isGameOver) return;
+      if (this.localPlayer.stats.isDowned || this.localPlayer.stats.health <= 0 || this.isGameOver) return;
 
       const isAiming = true;
       const muzzlePos = this.localPlayer.getMuzzleWorldPosition();
@@ -471,19 +472,28 @@ export class ZombieGameEngine {
       }
     }
 
-    // 11. Check Game Over (Local player dead/downed and remote partner dead/downed, or solo bleedout)
+    // 11. Check Game Over (Solo mode: immediate death without revive; Co-op mode: bleedout and teammate revive)
     if (!this.isGameOver) {
-      const localLost =
-        this.localPlayer.stats.isDowned && this.localPlayer.stats.bleedoutTimer <= 0;
-      const remoteLost = !this.remotePlayerModel || (this.remotePlayerModel.stats.isDowned && this.remotePlayerModel.stats.health <= 0);
+      const isSolo = !this.remotePlayerModel;
+      this.localPlayer.isSoloMode = isSolo;
 
-      // In solo: downed bleedout = game over. In co-op: both downed = game over.
-      const bothDowned = this.remotePlayerModel
-        ? this.localPlayer.stats.isDowned && this.remotePlayerModel.stats.isDowned
-        : this.localPlayer.stats.isDowned;
+      if (isSolo) {
+        if (this.localPlayer.stats.health <= 0) {
+          if (this.soloDeathTimer === undefined) this.soloDeathTimer = 1.4;
+          this.soloDeathTimer -= delta;
+          if (this.soloDeathTimer <= 0) {
+            this.triggerGameOver();
+          }
+        }
+      } else {
+        const localLost =
+          this.localPlayer.stats.isDowned && this.localPlayer.stats.bleedoutTimer <= 0;
+        const bothDowned =
+          this.localPlayer.stats.isDowned && (this.remotePlayerModel?.stats.isDowned ?? false);
 
-      if (localLost || (bothDowned && this.localPlayer.stats.bleedoutTimer <= 2)) {
-        this.triggerGameOver();
+        if (localLost || (bothDowned && this.localPlayer.stats.bleedoutTimer <= 2)) {
+          this.triggerGameOver();
+        }
       }
     }
 
@@ -511,6 +521,7 @@ export class ZombieGameEngine {
 
   public restartGame() {
     this.isGameOver = false;
+    this.soloDeathTimer = undefined;
     this.matchStartTime = Date.now();
     this.horde.clearAll();
     this.localPlayer.revive();

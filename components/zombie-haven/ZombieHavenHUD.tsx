@@ -63,8 +63,8 @@ export const ZombieHavenHUD: React.FC<ZombieHavenHUDProps> = ({ engine, onExit }
       {/* 1. Low Health Crimson Vignette Overlay */}
       {isLowHealth && <div className="absolute inset-0 blood-vignette animate-pulse pointer-events-none" />}
 
-      {/* Downed Blackout Overlay */}
-      {player.stats.isDowned && (
+      {/* Downed Blackout Overlay (only shown in co-op mode with teammate) */}
+      {player.stats.isDowned && remotePlayer && (
         <div className="absolute inset-0 bg-red-950/60 backdrop-blur-[2px] flex flex-col items-center justify-center pointer-events-none animate-in fade-in">
           <div className="p-4 rounded-2xl bg-black/80 border-2 border-red-600 shadow-2xl text-center space-y-2 max-w-sm">
             <AlertTriangle className="w-10 h-10 text-red-500 mx-auto animate-bounce" />
@@ -256,8 +256,8 @@ export const ZombieHavenHUD: React.FC<ZombieHavenHUDProps> = ({ engine, onExit }
           </div>
         )}
 
-        {/* Revive Downed Partner Circular Channel Overlay */}
-        {engine.canReviveTeammate && !player.stats.isDowned && (
+        {/* Revive Downed Partner Circular Channel Overlay (co-op mode only) */}
+        {remotePlayer && engine.canReviveTeammate && !player.stats.isDowned && (
           <div className="absolute top-2/3 bg-slate-950/95 border-2 border-amber-500 px-5 py-3 rounded-2xl shadow-2xl backdrop-blur-md flex flex-col items-center gap-2 pointer-events-none animate-pulse">
             <div className="flex items-center gap-2 text-xs font-black text-amber-400 uppercase tracking-wide">
               <AlertTriangle className="w-4 h-4" />

@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { ZombieType, ZombieState, ZombieConfig } from '../types';
 import { zombieAudio } from '@/components/zombie-haven/ZombieHavenAudio';
+import { zombieGLBLoader, ZombieInstance } from './ZombieGLBLoader';
 
 export const ZOMBIE_CONFIGS: Record<ZombieType, ZombieConfig> = {
   walker: {
@@ -70,7 +71,10 @@ export class Zombie {
   public deathTimer: number = 0;
   public isDead: boolean = false;
 
-  // Body parts for procedural animation
+  public glbInstance: ZombieInstance | null = null;
+  private currentGlbAction: THREE.AnimationAction | null = null;
+
+  // Body parts for procedural animation (fallback)
   private torso: THREE.Mesh;
   private head: THREE.Mesh;
   private leftArm: THREE.Mesh;
@@ -95,7 +99,7 @@ export class Zombie {
     this.group.position.copy(spawnPos);
     this.group.scale.setScalar(this.config.scale);
 
-    // Zombie Materials
+    // Zombie Materials (Procedural fallback)
     this.skinMat = new THREE.MeshLambertMaterial({ color: this.config.color });
     const clothesMat = new THREE.MeshLambertMaterial({ color: 0x1f2937 });
     const pantsMat = new THREE.MeshLambertMaterial({ color: 0x111827 });
@@ -148,6 +152,38 @@ export class Zombie {
     this.rightLeg.position.set(0.16, 0.42, 0);
     this.rightLeg.castShadow = false;
     this.group.add(this.rightLeg);
+
+    // Initialize 3D Modular Zombie from Quaternius pack
+    const inst = zombieGLBLoader.createZombieInstance(type);
+    if (inst) {
+      this.attachGLBInstance(inst);
+    } else {
+      zombieGLBLoader.load().then(() => {
+        if (!this.glbInstance && !this.isDead) {
+          const asyncInst = zombieGLBLoader.createZombieInstance(this.type);
+          if (asyncInst) {
+            this.attachGLBInstance(asyncInst);
+          }
+        }
+      });
+    }
+  }
+
+  private attachGLBInstance(inst: ZombieInstance) {
+    this.glbInstance = inst;
+    this.group.add(inst.model);
+
+    // Hide procedural fallback meshes
+    this.torso.visible = false;
+    this.leftLeg.visible = false;
+    this.rightLeg.visible = false;
+
+    // Start walk or run animation
+    const startAction = (this.type === 'runner' ? inst.actions.run : inst.actions.walk) || inst.actions.idle;
+    if (startAction) {
+      startAction.play();
+      this.currentGlbAction = startAction;
+    }
   }
 
   public takeDamage(damage: number, hitDir?: THREE.Vector3): boolean {
@@ -158,6 +194,12 @@ export class Zombie {
 
     // Flash white/red on hit
     this.skinMat.color.setHex(0xf87171);
+    if (this.glbInstance) {
+      this.glbInstance.skinMaterials.forEach((m) => m.color.setHex(0xf87171));
+      if (this.glbInstance.actions.hit) {
+        this.glbInstance.actions.hit.reset().play();
+      }
+    }
 
     if (this.health === 0) {
       this.die(hitDir);
@@ -172,19 +214,32 @@ export class Zombie {
     this.deathTimer = 0;
     zombieAudio.playZombieDeath();
 
-    // Turn off glowing eyes
+    // Turn off glowing eyes on procedural mesh
     this.eyeMesh.visible = false;
 
-    // Death collapse animation
-    this.group.position.y = 0.15;
-    this.torso.rotation.x = Math.PI / 2.2;
-    this.leftArm.rotation.x = 0;
-    this.rightArm.rotation.x = 0;
-    this.leftLeg.rotation.x = 0.2;
-    this.rightLeg.rotation.x = -0.2;
+    if (this.glbInstance) {
+      if (this.currentGlbAction && this.currentGlbAction !== this.glbInstance.actions.death) {
+        this.currentGlbAction.fadeOut(0.15);
+      }
+      if (this.glbInstance.actions.death) {
+        this.glbInstance.actions.death.reset().fadeIn(0.15).play();
+        this.currentGlbAction = this.glbInstance.actions.death;
+      }
+      if (hitDir) {
+        this.group.position.addScaledVector(hitDir, 0.4);
+      }
+    } else {
+      // Death collapse animation for procedural fallback
+      this.group.position.y = 0.15;
+      this.torso.rotation.x = Math.PI / 2.2;
+      this.leftArm.rotation.x = 0;
+      this.rightArm.rotation.x = 0;
+      this.leftLeg.rotation.x = 0.2;
+      this.rightLeg.rotation.x = -0.2;
 
-    if (hitDir) {
-      this.group.position.addScaledVector(hitDir, 0.6);
+      if (hitDir) {
+        this.group.position.addScaledVector(hitDir, 0.6);
+      }
     }
   }
 
@@ -192,9 +247,17 @@ export class Zombie {
     this.isAttacking = true;
     this.attackAnimTime = 0;
     zombieAudio.playZombieAttack();
+
+    if (this.glbInstance && this.glbInstance.actions.attack) {
+      this.glbInstance.actions.attack.reset().play();
+    }
   }
 
   public update(delta: number, targetPos: THREE.Vector3 | null, speedMultiplier = 1.0) {
+    if (this.glbInstance) {
+      this.glbInstance.mixer.update(delta);
+    }
+
     // If dead, fade and wait for removal
     if (this.isDead) {
       this.deathTimer += delta;
@@ -206,13 +269,18 @@ export class Zombie {
       this.staggerTimer -= delta;
       if (this.staggerTimer <= 0) {
         this.skinMat.color.setHex(this.config.color);
+        if (this.glbInstance) {
+          this.glbInstance.skinMaterials.forEach((m, idx) => {
+            m.color.setHex(this.glbInstance!.originalSkinColors[idx] || this.config.color);
+          });
+        }
       }
     }
 
     this.animTimer += delta * (this.config.speed * 2.8);
 
-    // Attack Claw Animation
-    if (this.isAttacking) {
+    // Attack Claw Animation (Procedural fallback)
+    if (!this.glbInstance && this.isAttacking) {
       this.attackAnimTime += delta * 4;
       const swipe = Math.sin(this.attackAnimTime * Math.PI);
       this.rightArm.rotation.x = -Math.PI / 2 - swipe * 0.8;
@@ -242,18 +310,40 @@ export class Zombie {
         this.group.position.x += (dx / dist) * moveDist;
         this.group.position.z += (dz / dist) * moveDist;
 
-        // Limping walk cycle
-        const legSwing = Math.sin(this.animTimer) * 0.55;
-        this.leftLeg.rotation.x = legSwing;
-        this.rightLeg.rotation.x = -legSwing;
+        if (this.glbInstance) {
+          const targetAction =
+            (this.type === 'runner' || this.config.speed > 3.0
+              ? this.glbInstance.actions.run
+              : this.glbInstance.actions.walk) || this.glbInstance.actions.idle;
 
-        // Body shambling sway
-        this.torso.rotation.z = Math.sin(this.animTimer * 0.6) * 0.12;
-        this.head.rotation.y = Math.sin(this.animTimer * 0.4) * 0.15;
+          if (targetAction) {
+            targetAction.timeScale = Math.max(0.85, Math.min(1.8, this.config.speed / 1.8));
+            if (this.currentGlbAction !== targetAction) {
+              if (this.currentGlbAction) this.currentGlbAction.fadeOut(0.2);
+              targetAction.reset().fadeIn(0.2).play();
+              this.currentGlbAction = targetAction;
+            }
+          }
+        } else {
+          // Limping walk cycle (procedural)
+          const legSwing = Math.sin(this.animTimer) * 0.55;
+          this.leftLeg.rotation.x = legSwing;
+          this.rightLeg.rotation.x = -legSwing;
+
+          // Body shambling sway
+          this.torso.rotation.z = Math.sin(this.animTimer * 0.6) * 0.12;
+          this.head.rotation.y = Math.sin(this.animTimer * 0.4) * 0.15;
+        }
       } else {
         this.state = 'attack';
-        this.leftLeg.rotation.x = 0;
-        this.rightLeg.rotation.x = 0;
+        if (this.glbInstance) {
+          if (!this.isAttacking) {
+            this.startAttack();
+          }
+        } else {
+          this.leftLeg.rotation.x = 0;
+          this.rightLeg.rotation.x = 0;
+        }
       }
     }
   }

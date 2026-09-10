@@ -49,9 +49,7 @@ export class SurvivorPlayer {
     walk?: THREE.AnimationAction;
     jog?: THREE.AnimationAction;
     sprint?: THREE.AnimationAction;
-    jumpStart?: THREE.AnimationAction;
     jumpLoop?: THREE.AnimationAction;
-    jumpLand?: THREE.AnimationAction;
     shoot?: THREE.AnimationAction;
     reload?: THREE.AnimationAction;
     hit?: THREE.AnimationAction;
@@ -59,6 +57,7 @@ export class SurvivorPlayer {
   } = {};
   private currentAnimAction: THREE.AnimationAction | null = null;
   private wasGrounded: boolean = true;
+  private combatTimer: number = 0;
 
   // Character body joints and segments
   private pelvis: THREE.Group;
@@ -744,12 +743,12 @@ export class SurvivorPlayer {
         }
       });
 
-      // Attach weaponSocket to right hand bone
+      // Attach weaponSocket to right hand bone (right-side up, pointing forward down barrel)
       const handR = this.ualModel.getObjectByName('hand_r');
       if (handR) {
         handR.add(this.weaponSocket);
-        this.weaponSocket.position.set(0, 0.07, 0.03);
-        this.weaponSocket.rotation.set(-Math.PI / 2, 0, 0);
+        this.weaponSocket.position.set(0, 0.08, 0.01);
+        this.weaponSocket.rotation.set(-Math.PI / 2, 0, Math.PI);
       }
 
       // Setup Animation Mixer & Actions
@@ -771,9 +770,7 @@ export class SurvivorPlayer {
         walk: getAction('Walk_Loop'),
         jog: getAction('Jog_Fwd_Loop'),
         sprint: getAction('Sprint_Loop'),
-        jumpStart: getAction('Jump_Start'),
         jumpLoop: getAction('Jump_Loop'),
-        jumpLand: getAction('Jump_Land'),
         shoot: getAction('Pistol_Shoot'),
         reload: getAction('Pistol_Reload'),
         hit: getAction('Hit_Chest'),
@@ -791,10 +788,6 @@ export class SurvivorPlayer {
       if (this.animActions.hit) {
         this.animActions.hit.setLoop(THREE.LoopOnce, 1);
         this.animActions.hit.clampWhenFinished = false;
-      }
-      if (this.animActions.jumpLand) {
-        this.animActions.jumpLand.setLoop(THREE.LoopOnce, 1);
-        this.animActions.jumpLand.clampWhenFinished = false;
       }
       if (this.animActions.death) {
         this.animActions.death.setLoop(THREE.LoopOnce, 1);
@@ -818,12 +811,17 @@ export class SurvivorPlayer {
   }
 
   public playJump() {
-    if (this.animActions.jumpStart) {
-      this.animActions.jumpStart.reset().play();
+    if (this.animActions.jumpLoop) {
+      if (this.currentAnimAction && this.currentAnimAction !== this.animActions.jumpLoop) {
+        this.currentAnimAction.fadeOut(0.14);
+      }
+      this.animActions.jumpLoop.reset().fadeIn(0.14).play();
+      this.currentAnimAction = this.animActions.jumpLoop;
     }
   }
 
   public playShoot() {
+    this.combatTimer = 1.8;
     if (this.animActions.shoot) {
       this.animActions.shoot.reset().setEffectiveWeight(1.0).play();
     }
@@ -876,6 +874,8 @@ export class SurvivorPlayer {
     return nextSkin;
   }
 
+  public isSoloMode: boolean = true;
+
   public applyDamage(dmg: number) {
     if (this.stats.isDowned || this.stats.health <= 0) return;
 
@@ -883,7 +883,23 @@ export class SurvivorPlayer {
     this.stats.damageReceived += dmg;
 
     if (this.stats.health === 0) {
-      this.enterDownedState();
+      if (this.isSoloMode) {
+        this.enterDeathState();
+      } else {
+        this.enterDownedState();
+      }
+    }
+  }
+
+  public enterDeathState() {
+    this.stats.health = 0;
+    this.stats.isDowned = false;
+    this.stats.isSprinting = false;
+
+    if (this.animActions.death) {
+      if (this.currentAnimAction) this.currentAnimAction.fadeOut(0.2);
+      this.animActions.death.reset().fadeIn(0.2).play();
+      this.currentAnimAction = this.animActions.death;
     }
   }
 
@@ -980,11 +996,17 @@ export class SurvivorPlayer {
 
     this.stats.isAiming = isAiming;
 
-    // Downed Bleedout Timer
-    if (this.stats.isDowned) {
-      this.stats.bleedoutTimer -= delta;
+    // Downed / Dead State
+    if (this.stats.isDowned || this.stats.health <= 0) {
+      if (this.stats.isDowned) {
+        this.stats.bleedoutTimer -= delta;
+      }
       if (this.animMixer) this.animMixer.update(delta);
       return;
+    }
+
+    if (this.combatTimer > 0) {
+      this.combatTimer -= delta;
     }
 
     const speed = velocity.length();
@@ -994,9 +1016,11 @@ export class SurvivorPlayer {
     if (this.animMixer && this.ualModelContainer.visible) {
       this.animMixer.update(delta);
 
-      let targetAction: THREE.AnimationAction | undefined = this.animActions.pistolIdle || this.animActions.idle;
+      let targetAction: THREE.AnimationAction | undefined = this.combatTimer > 0
+        ? (this.animActions.pistolIdle || this.animActions.idle)
+        : (this.animActions.idle || this.animActions.pistolIdle);
 
-      if (this.stats.isDowned) {
+      if (this.stats.isDowned || this.stats.health <= 0) {
         targetAction = this.animActions.death;
       } else if (!isGrounded) {
         targetAction = this.animActions.jumpLoop;
@@ -1012,23 +1036,19 @@ export class SurvivorPlayer {
           if (targetAction) targetAction.timeScale = Math.max(0.85, Math.min(1.35, speed / 2.5));
         }
       } else {
-        targetAction = this.animActions.pistolIdle || this.animActions.idle;
+        targetAction = this.combatTimer > 0
+          ? (this.animActions.pistolIdle || this.animActions.idle)
+          : (this.animActions.idle || this.animActions.pistolIdle);
       }
 
-      // Landing transition trigger (only when landing stationary to avoid freezing movement)
-      if (isGrounded && !this.wasGrounded) {
-        if (!isMoving && this.animActions.jumpLand) {
-          this.animActions.jumpLand.reset().play();
-        }
-      }
       this.wasGrounded = isGrounded;
 
       // Smooth crossfade between locomotion actions
       if (targetAction && this.currentAnimAction !== targetAction) {
         if (this.currentAnimAction) {
-          this.currentAnimAction.fadeOut(0.24);
+          this.currentAnimAction.fadeOut(0.2);
         }
-        targetAction.reset().fadeIn(0.24).play();
+        targetAction.reset().fadeIn(0.2).play();
         this.currentAnimAction = targetAction;
       }
       return;

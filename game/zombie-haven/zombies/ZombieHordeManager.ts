@@ -10,6 +10,7 @@ import { ZombieType } from '../types';
 import { DeadwoodVillage } from '../world/DeadwoodVillage';
 import { SurvivorPlayer } from '../player/SurvivorPlayer';
 import { zombieAudio } from '@/components/zombie-haven/ZombieHavenAudio';
+import { zombieGLBLoader } from './ZombieGLBLoader';
 
 export class ZombieHordeManager {
   public zombies: Zombie[] = [];
@@ -21,6 +22,7 @@ export class ZombieHordeManager {
   constructor(scene: THREE.Scene, village: DeadwoodVillage) {
     this.scene = scene;
     this.village = village;
+    zombieGLBLoader.load();
   }
 
   public spawnZombie(type: ZombieType, spawnPos?: THREE.Vector3): Zombie {

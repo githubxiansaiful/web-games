@@ -70,6 +70,7 @@ export class PlayerController {
   };
 
   private handleKeyDown = (e: KeyboardEvent) => {
+    if (e.repeat && e.code === 'Space') return;
     this.keys[e.code] = true;
 
     // Weapon switching: 1, 2, 3
@@ -158,8 +159,10 @@ export class PlayerController {
   };
 
   public update(delta: number) {
-    if (this.player.stats.isDowned) {
+    if (this.player.stats.isDowned || this.player.stats.health <= 0) {
       this.velocity.set(0, 0, 0);
+      this.isMouseDown = false;
+      this.isRightMouseDown = false;
       return;
     }
 
@@ -209,10 +212,11 @@ export class PlayerController {
     this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, targetVx, delta * accel);
     this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, targetVz, delta * accel);
 
-    // Jump / Gravity
+    // Jump / Gravity (single keypress consumption prevents continuous auto-jumping)
     if (this.keys['Space'] && this.isGrounded && this.player.stats.stamina >= 10) {
       this.verticalVelocity = 5.8;
       this.isGrounded = false;
+      this.keys['Space'] = false;
       this.player.stats.stamina -= 10;
       this.player.playJump();
     }
