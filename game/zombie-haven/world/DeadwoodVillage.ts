@@ -27,21 +27,8 @@ export class DeadwoodVillage {
 
   // --- 1. TERRAIN & GROUND ---
   private buildTerrain() {
-    // 600m x 600m active ground plane with dark mossy soil
-    const groundGeo = new THREE.PlaneGeometry(600, 600, 32, 32);
-    // Subtle undulation
-    const posAttr = groundGeo.attributes.position;
-    for (let i = 0; i < posAttr.count; i++) {
-      const vx = posAttr.getX(i);
-      const vy = posAttr.getY(i);
-      // Keep village center flat (within 140m), add gentle rolling hills outside
-      const dist = Math.hypot(vx, vy);
-      if (dist > 120) {
-        const h = Math.sin(vx * 0.02) * Math.cos(vy * 0.02) * 3.5;
-        posAttr.setZ(i, h);
-      }
-    }
-    groundGeo.computeVertexNormals();
+    // 600m x 600m active ground plane - flat at y=0 for zero floor clipping
+    const groundGeo = new THREE.PlaneGeometry(600, 600);
 
     const groundMat = new THREE.MeshStandardMaterial({
       color: 0x5ea836, // bright, lush sunny lawn green
@@ -118,7 +105,7 @@ export class DeadwoodVillage {
     const well = VillageProps.createWaterWell();
     well.position.set(0, 0, 0);
     this.rootGroup.add(well);
-    this.addCollider(-1.6, 1.6, -1.6, 1.6);
+    this.addCollider(-1.6, 1.6, -1.6, 1.6, 1.3);
 
     // 4 Plaza Street Lamps
     const lampCoords = [
@@ -132,7 +119,7 @@ export class DeadwoodVillage {
       lamp.position.set(lx, 0, lz);
       light.intensity = 0; // off in pure daytime
       this.rootGroup.add(lamp);
-      this.addCollider(lx - 0.3, lx + 0.3, lz - 0.3, lz + 0.3);
+      this.addCollider(lx - 0.25, lx + 0.25, lz - 0.25, lz + 0.25, 3.5);
     });
 
     // Flaming Barrels in Plaza
@@ -140,14 +127,14 @@ export class DeadwoodVillage {
     fire1.position.set(6, 0, -5);
     this.rootGroup.add(fire1);
     this.pointLights.push(fLight1);
-    this.addCollider(5.3, 6.7, -5.7, -4.3);
+    this.addCollider(5.3, 6.7, -5.7, -4.3, 1.1);
 
     // General Store Building (North-East of square)
     const { group: store } = VillageProps.createHouse(14, 12, 5.5);
     store.position.set(28, 0, 24);
     store.rotation.y = -Math.PI / 2;
     this.rootGroup.add(store);
-    this.addCollider(21, 35, 17, 31);
+    this.addCollider(21, 35, 17, 31, 6.0);
     this.houseSpawnPoints.push(new THREE.Vector3(28, 0.5, 24));
 
     // Abandoned Sedan parked in front of Store
@@ -155,7 +142,7 @@ export class DeadwoodVillage {
     car1.position.set(15, 0, 22);
     car1.rotation.y = 0.4;
     this.rootGroup.add(car1);
-    this.addCollider(13.8, 16.2, 19.8, 24.2);
+    this.addCollider(13.8, 16.2, 19.8, 24.2, 1.6);
   }
 
   // --- 4. ZONE B: RESIDENTIAL AREA (Houses & Garages) ---
@@ -211,14 +198,14 @@ export class DeadwoodVillage {
     barn.position.set(-80, 0, -85);
     barn.rotation.y = Math.PI / 4;
     this.rootGroup.add(barn);
-    this.addCollider(-92, -68, -98, -72);
+    this.addCollider(-92, -68, -98, -72, 8.0);
     this.houseSpawnPoints.push(new THREE.Vector3(-80, 0.5, -85));
 
     // Farmhouse
     const { group: farmHouse } = VillageProps.createHouse(14, 12, 5.5);
     farmHouse.position.set(-50, 0, -120);
     this.rootGroup.add(farmHouse);
-    this.addCollider(-58, -42, -127, -113);
+    this.addCollider(-58, -42, -127, -113, 6.0);
     this.houseSpawnPoints.push(new THREE.Vector3(-50, 0.5, -120));
 
     // Abandoned Truck near Barn
@@ -226,7 +213,7 @@ export class DeadwoodVillage {
     truck.position.set(-65, 0, -75);
     truck.rotation.y = -0.6;
     this.rootGroup.add(truck);
-    this.addCollider(-66.5, -63.5, -77, -73);
+    this.addCollider(-66.5, -63.5, -77, -73, 1.8);
 
     // Barrel fire at barn entrance
     const { group: barnFire, light: bLight } = VillageProps.createBarrelFire();
@@ -242,7 +229,7 @@ export class DeadwoodVillage {
     garage.position.set(85, 0, -25);
     garage.rotation.y = -Math.PI / 2;
     this.rootGroup.add(garage);
-    this.addCollider(76, 94, -33, -17);
+    this.addCollider(76, 94, -33, -17, 5.5);
     this.houseSpawnPoints.push(new THREE.Vector3(85, 0.5, -25));
 
     // Wrecked cars
@@ -250,13 +237,13 @@ export class DeadwoodVillage {
     wreck1.position.set(70, 0, -15);
     wreck1.rotation.y = 1.2;
     this.rootGroup.add(wreck1);
-    this.addCollider(68.5, 71.5, -17.5, -12.5);
+    this.addCollider(68.5, 71.5, -17.5, -12.5, 1.5);
 
     const wreck2 = VillageProps.createAbandonedCar();
     wreck2.position.set(72, 0, -35);
     wreck2.rotation.y = -0.8;
     this.rootGroup.add(wreck2);
-    this.addCollider(70.5, 73.5, -37.5, -32.5);
+    this.addCollider(70.5, 73.5, -37.5, -32.5, 1.5);
   }
 
   // --- 7. ZONE D: PERIMETER FOREST & VEGETATION ---
@@ -322,8 +309,8 @@ export class DeadwoodVillage {
     }
   }
 
-  private addCollider(minX: number, maxX: number, minZ: number, maxZ: number) {
-    this.colliders.push({ minX, maxX, minZ, maxZ });
+  private addCollider(minX: number, maxX: number, minZ: number, maxZ: number, height = 5.0) {
+    this.colliders.push({ minX, maxX, minZ, maxZ, height });
   }
 
   /**
@@ -348,5 +335,70 @@ export class DeadwoodVillage {
       }
     }
     return false;
+  }
+
+  /**
+   * Height-aware Camera Obstacle Check
+   * Low ground props (fences, barrels, wells, car hoods) below camera ray do NOT block the camera
+   */
+  public checkCameraObstacle(x: number, y: number, z: number, radius = 0.35): boolean {
+    if (Math.abs(x) > 255 || Math.abs(z) > 255) {
+      return true;
+    }
+
+    for (let i = 0; i < this.colliders.length; i++) {
+      const c = this.colliders[i];
+      const obstacleHeight = c.height ?? 5.0;
+      // If the camera ray is comfortably above this prop, it doesn't occlude the camera!
+      if (y > obstacleHeight) continue;
+
+      const closestX = Math.max(c.minX, Math.min(x, c.maxX));
+      const closestZ = Math.max(c.minZ, Math.min(z, c.maxZ));
+
+      const dx = x - closestX;
+      const dz = z - closestZ;
+      if (dx * dx + dz * dz < radius * radius) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Multi-pass continuous collision resolver for smooth wall sliding without vibration or jitter
+   */
+  public resolveCollision(x: number, z: number, radius = 0.5): { x: number; z: number; collided: boolean } {
+    let resX = Math.max(-258, Math.min(258, x));
+    let resZ = Math.max(-258, Math.min(258, z));
+    let anyCollided = resX !== x || resZ !== z;
+
+    // Up to 3 relaxation passes to resolve acute corners seamlessly
+    for (let pass = 0; pass < 3; pass++) {
+      let collidedThisPass = false;
+      for (let i = 0; i < this.colliders.length; i++) {
+        const c = this.colliders[i];
+        const closestX = Math.max(c.minX, Math.min(resX, c.maxX));
+        const closestZ = Math.max(c.minZ, Math.min(resZ, c.maxZ));
+
+        const dx = resX - closestX;
+        const dz = resZ - closestZ;
+        const distSq = dx * dx + dz * dz;
+
+        if (distSq < radius * radius) {
+          collidedThisPass = true;
+          anyCollided = true;
+          const dist = Math.sqrt(distSq);
+          if (dist > 0.0001) {
+            const push = radius - dist + 0.002;
+            resX += (dx / dist) * push;
+            resZ += (dz / dist) * push;
+          } else {
+            resX += radius;
+          }
+        }
+      }
+      if (!collidedThisPass) break;
+    }
+    return { x: resX, z: resZ, collided: anyCollided };
   }
 }

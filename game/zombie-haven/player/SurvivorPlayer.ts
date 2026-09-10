@@ -15,13 +15,17 @@ export class SurvivorPlayer {
   public flashlightTarget: THREE.Object3D;
   public flashlightOn: boolean = false;
 
-  // Character body parts for procedural animation
+  // Character body parts and joint pivots for natural, non-clipping animation
   private head: THREE.Mesh;
   private torso: THREE.Mesh;
-  private leftArm: THREE.Mesh;
-  private rightArm: THREE.Mesh;
-  private leftLeg: THREE.Mesh;
-  private rightLeg: THREE.Mesh;
+  private leftArmPivot: THREE.Group;
+  private rightArmPivot: THREE.Group;
+  private leftArmMesh: THREE.Mesh;
+  private rightArmMesh: THREE.Mesh;
+  private leftLegPivot: THREE.Group;
+  private rightLegPivot: THREE.Group;
+  private leftLegMesh: THREE.Mesh;
+  private rightLegMesh: THREE.Mesh;
   private weaponMeshGroup: THREE.Group;
 
   // Procedural weapon meshes
@@ -58,7 +62,7 @@ export class SurvivorPlayer {
     const pantsMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
     const bootsMat = new THREE.MeshLambertMaterial({ color: 0x0f172a });
 
-    // Torso (0.6w, 0.75h, 0.35d)
+    // Torso (0.65w, 0.75h, 0.38d)
     const torsoGeo = new THREE.BoxGeometry(0.65, 0.75, 0.38);
     this.torso = new THREE.Mesh(torsoGeo, jacketMat);
     this.torso.position.y = 1.15;
@@ -79,38 +83,69 @@ export class SurvivorPlayer {
     cap.position.set(0, 0.18, 0.02);
     this.head.add(cap);
 
-    // Arms
-    const armGeo = new THREE.BoxGeometry(0.18, 0.65, 0.18);
-    this.leftArm = new THREE.Mesh(armGeo, jacketMat);
-    this.leftArm.position.set(-0.45, 0.05, 0);
-    this.leftArm.castShadow = true;
-    this.torso.add(this.leftArm);
+    // Shoulders & Arms attached to Torso (shoulder joint at y = 0.26 in torso space)
+    this.leftArmPivot = new THREE.Group();
+    this.leftArmPivot.position.set(-0.44, 0.26, 0);
+    this.torso.add(this.leftArmPivot);
 
-    this.rightArm = new THREE.Mesh(armGeo, jacketMat);
-    this.rightArm.position.set(0.45, 0.05, 0);
-    this.rightArm.castShadow = true;
-    this.torso.add(this.rightArm);
+    this.rightArmPivot = new THREE.Group();
+    this.rightArmPivot.position.set(0.44, 0.26, 0);
+    this.torso.add(this.rightArmPivot);
 
-    // Legs
-    const legGeo = new THREE.BoxGeometry(0.22, 0.75, 0.22);
-    this.leftLeg = new THREE.Mesh(legGeo, pantsMat);
-    this.leftLeg.position.set(-0.18, 0.42, 0);
-    this.leftLeg.castShadow = true;
-    this.group.add(this.leftLeg);
+    const armGeo = new THREE.BoxGeometry(0.18, 0.56, 0.18);
+    this.leftArmMesh = new THREE.Mesh(armGeo, jacketMat);
+    this.leftArmMesh.position.set(0, -0.28, 0);
+    this.leftArmMesh.castShadow = true;
+    this.leftArmPivot.add(this.leftArmMesh);
 
-    this.rightLeg = new THREE.Mesh(legGeo, pantsMat);
-    this.rightLeg.position.set(0.18, 0.42, 0);
-    this.rightLeg.castShadow = true;
-    this.group.add(this.rightLeg);
+    this.rightArmMesh = new THREE.Mesh(armGeo, jacketMat);
+    this.rightArmMesh.position.set(0, -0.28, 0);
+    this.rightArmMesh.castShadow = true;
+    this.rightArmPivot.add(this.rightArmMesh);
 
-    // Boots
-    const bootGeo = new THREE.BoxGeometry(0.24, 0.18, 0.32);
+    // Hands
+    const handGeo = new THREE.BoxGeometry(0.14, 0.12, 0.14);
+    const leftHand = new THREE.Mesh(handGeo, skinMat);
+    leftHand.position.set(0, -0.58, 0);
+    this.leftArmPivot.add(leftHand);
+
+    const rightHand = new THREE.Mesh(handGeo, skinMat);
+    rightHand.position.set(0, -0.58, 0);
+    this.rightArmPivot.add(rightHand);
+
+    // Hip Pivots: located at hip joint level (y = 0.80)
+    // Any rotation around hip lifts the foot in an arc, mathematically preventing floor penetration
+    this.leftLegPivot = new THREE.Group();
+    this.leftLegPivot.position.set(-0.18, 0.80, 0);
+    this.group.add(this.leftLegPivot);
+
+    this.rightLegPivot = new THREE.Group();
+    this.rightLegPivot.position.set(0.18, 0.80, 0);
+    this.group.add(this.rightLegPivot);
+
+    // Leg Pants (hangs from hip joint y=0 down to y=-0.65)
+    const legGeo = new THREE.BoxGeometry(0.22, 0.65, 0.22);
+    this.leftLegMesh = new THREE.Mesh(legGeo, pantsMat);
+    this.leftLegMesh.position.set(0, -0.325, 0);
+    this.leftLegMesh.castShadow = true;
+    this.leftLegPivot.add(this.leftLegMesh);
+
+    this.rightLegMesh = new THREE.Mesh(legGeo, pantsMat);
+    this.rightLegMesh.position.set(0, -0.325, 0);
+    this.rightLegMesh.castShadow = true;
+    this.rightLegPivot.add(this.rightLegMesh);
+
+    // Boots (hangs from y=-0.65 down to y=-0.80, resting exactly on the floor at y=0.00)
+    const bootGeo = new THREE.BoxGeometry(0.24, 0.15, 0.30);
     const b1 = new THREE.Mesh(bootGeo, bootsMat);
-    b1.position.set(0, -0.32, 0.04);
-    this.leftLeg.add(b1);
+    b1.position.set(0, -0.725, 0.04);
+    b1.castShadow = true;
+    this.leftLegPivot.add(b1);
+
     const b2 = new THREE.Mesh(bootGeo, bootsMat);
-    b2.position.set(0, -0.32, 0.04);
-    this.rightLeg.add(b2);
+    b2.position.set(0, -0.725, 0.04);
+    b2.castShadow = true;
+    this.rightLegPivot.add(b2);
 
     // --- 2. Tactical Flashlight ---
     this.flashlightTarget = new THREE.Object3D();
@@ -125,7 +160,7 @@ export class SurvivorPlayer {
 
     // --- 3. Weapon Attachments ---
     this.weaponMeshGroup = new THREE.Group();
-    this.weaponMeshGroup.position.set(0.25, 0.1, 0.35);
+    this.weaponMeshGroup.position.set(0.22, 0.05, 0.35);
     this.torso.add(this.weaponMeshGroup);
 
     this.pistolMesh = this.buildPistolModel();
@@ -204,13 +239,17 @@ export class SurvivorPlayer {
     this.stats.bleedoutTimer = 35;
     this.stats.reviveProgress = 0;
 
-    // Downed crawling posture
-    this.torso.rotation.x = Math.PI / 3;
-    this.torso.position.y = 0.5;
-    this.leftLeg.position.y = 0.2;
-    this.rightLeg.position.y = 0.2;
-    this.leftLeg.rotation.x = Math.PI / 4;
-    this.rightLeg.rotation.x = Math.PI / 4;
+    // Realistic crawling / downed posture on the ground (safely above floor: all y >= 0.12)
+    this.torso.position.set(0, 0.35, -0.12);
+    this.torso.rotation.set(Math.PI / 2.2, 0, 0);
+
+    this.leftLegPivot.position.set(-0.18, 0.26, -0.52);
+    this.rightLegPivot.position.set(0.18, 0.26, -0.52);
+    this.leftLegPivot.rotation.set(Math.PI / 2.1, 0, -0.15);
+    this.rightLegPivot.rotation.set(Math.PI / 2.1, 0, 0.15);
+
+    this.leftArmPivot.rotation.set(-0.3, 0, 0.35);
+    this.rightArmPivot.rotation.set(-0.3, 0, -0.35);
   }
 
   public revive() {
@@ -219,12 +258,16 @@ export class SurvivorPlayer {
     this.stats.reviveProgress = 0;
 
     // Stand back up
-    this.torso.rotation.x = 0;
-    this.torso.position.y = 1.15;
-    this.leftLeg.position.set(-0.18, 0.42, 0);
-    this.rightLeg.position.set(0.18, 0.42, 0);
-    this.leftLeg.rotation.x = 0;
-    this.rightLeg.rotation.x = 0;
+    this.torso.position.set(0, 1.15, 0);
+    this.torso.rotation.set(0, 0, 0);
+
+    this.leftLegPivot.position.set(-0.18, 0.80, 0);
+    this.rightLegPivot.position.set(0.18, 0.80, 0);
+    this.leftLegPivot.rotation.set(0, 0, 0);
+    this.rightLegPivot.rotation.set(0, 0, 0);
+
+    this.leftArmPivot.rotation.set(0, 0, 0);
+    this.rightArmPivot.rotation.set(0, 0, 0);
   }
 
   public update(delta: number, velocity: THREE.Vector3, isAiming: boolean, isSprinting: boolean) {
@@ -251,31 +294,47 @@ export class SurvivorPlayer {
 
     // Procedural walk / run animation
     const speed = velocity.length();
-    if (speed > 0.2) {
-      const animSpeed = isSprinting ? 12 : 7;
+    if (speed > 0.15) {
+      const animSpeed = isSprinting ? 12 : 7.5;
       this.animTimer += delta * animSpeed;
 
-      const legSwing = Math.sin(this.animTimer) * (isSprinting ? 0.85 : 0.45);
-      this.leftLeg.rotation.x = legSwing;
-      this.rightLeg.rotation.x = -legSwing;
+      const legSwing = Math.sin(this.animTimer) * (isSprinting ? 0.75 : 0.45);
+      this.leftLegPivot.rotation.x = legSwing;
+      this.rightLegPivot.rotation.x = -legSwing;
+
+      // Natural torso sway while running
+      this.torso.rotation.y = Math.sin(this.animTimer) * 0.05;
+      this.torso.position.y = 1.15 + Math.abs(Math.sin(this.animTimer * 2)) * 0.025;
 
       if (!isAiming) {
-        this.leftArm.rotation.x = -legSwing * 0.6;
-        this.rightArm.rotation.x = legSwing * 0.6;
+        this.leftArmPivot.rotation.x = -legSwing * 0.75;
+        this.rightArmPivot.rotation.x = legSwing * 0.75;
       }
     } else {
       // Idle breathing
       this.animTimer += delta * 2;
-      this.leftLeg.rotation.x = 0;
-      this.rightLeg.rotation.x = 0;
-      this.torso.position.y = 1.15 + Math.sin(this.animTimer) * 0.015;
+      this.leftLegPivot.rotation.x = 0;
+      this.rightLegPivot.rotation.x = 0;
+      this.torso.rotation.y = 0;
+      this.torso.position.y = 1.15 + Math.sin(this.animTimer) * 0.012;
+
+      if (!isAiming) {
+        this.leftArmPivot.rotation.x = Math.sin(this.animTimer) * 0.05;
+        this.rightArmPivot.rotation.x = -Math.sin(this.animTimer) * 0.05;
+      }
     }
 
     // Aiming arm posture (point gun forward)
     if (isAiming) {
-      this.rightArm.rotation.x = -Math.PI / 2 + 0.1;
-      this.leftArm.rotation.x = -Math.PI / 2.2;
-      this.leftArm.rotation.y = 0.3;
+      this.rightArmPivot.rotation.x = -Math.PI / 2 + 0.08;
+      this.rightArmPivot.rotation.y = -0.15;
+      this.leftArmPivot.rotation.x = -Math.PI / 2.1;
+      this.leftArmPivot.rotation.y = 0.35;
+      this.weaponMeshGroup.position.set(0.18, 0.12, 0.45);
+    } else {
+      this.rightArmPivot.rotation.y = 0;
+      this.leftArmPivot.rotation.y = 0;
+      this.weaponMeshGroup.position.set(0.22, 0.05, 0.35);
     }
   }
 }

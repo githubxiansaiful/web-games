@@ -51,10 +51,10 @@ export class VillageProps {
     const group = new THREE.Group();
     const colliders: CollisionBox[] = [];
 
-    // Interior floor
-    const floorGeo = new THREE.BoxGeometry(width, 0.2, depth);
+    // Interior floor (flush with terrain)
+    const floorGeo = new THREE.BoxGeometry(width, 0.02, depth);
     const floor = new THREE.Mesh(floorGeo, this.matWood);
-    floor.position.y = 0.1;
+    floor.position.y = 0.01;
     floor.receiveShadow = true;
     group.add(floor);
 

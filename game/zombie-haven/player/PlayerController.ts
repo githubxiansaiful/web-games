@@ -212,27 +212,20 @@ export class PlayerController {
         this.verticalVelocity = 0;
         this.isGrounded = true;
       }
+    } else {
+      this.player.group.position.y = 0;
     }
 
-    // Collision detection & movement resolution
+    // Collision detection & smooth sliding resolution
     const currentPos = this.player.group.position;
-    const nextX = currentPos.x + this.velocity.x * delta;
-    const nextZ = currentPos.z + this.velocity.z * delta;
+    const targetX = currentPos.x + this.velocity.x * delta;
+    const targetZ = currentPos.z + this.velocity.z * delta;
 
-    const playerRadius = 0.5;
-
-    // Test X move
-    if (!this.village.checkCollision(nextX, currentPos.z, playerRadius)) {
-      currentPos.x = nextX;
-    } else {
-      this.velocity.x = 0;
-    }
-
-    // Test Z move
-    if (!this.village.checkCollision(currentPos.x, nextZ, playerRadius)) {
-      currentPos.z = nextZ;
-    } else {
-      this.velocity.z = 0;
+    const resolved = this.village.resolveCollision(targetX, targetZ, 0.45);
+    currentPos.x = resolved.x;
+    currentPos.z = resolved.z;
+    if (this.isGrounded) {
+      currentPos.y = 0;
     }
 
     // Player faces camera look direction
