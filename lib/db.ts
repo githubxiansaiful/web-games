@@ -95,6 +95,20 @@ const DEFAULT_GAMES: GameInfo[] = [
     multiplayer: false,
     icon: '🚀',
   },
+  {
+    id: 'zombie-haven',
+    title: 'Zombie Haven: Deadwood Village',
+    tagline: 'Two Friends. One Village. Endless Zombies.',
+    description: 'Enter the abandoned rural ruins of Deadwood Village in a 3D cooperative zombie survival game for 2 players. Scavenge weapons, ammunition, and medical supplies, hold off escalating undead hordes, and revive your downed partner to survive the night.',
+    genre: '3D Co-op Horror Survival',
+    tags: ['3D CO-OP', 'ZOMBIE SURVIVAL', '2 PLAYERS', 'THIRD PERSON', 'HORDE DEFENSE'],
+    badge: 'NEW CO-OP',
+    rating: 5.0,
+    playCount: 1250,
+    isActive: true,
+    multiplayer: true,
+    icon: '🧟‍♂️',
+  },
 ];
 
 function getInitialAdminUsers(): User[] {

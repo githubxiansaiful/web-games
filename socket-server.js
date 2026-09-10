@@ -12,6 +12,30 @@ const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // In-memory room store
 const rooms = new Map();
+const zombieRooms = new Map();
+
+function getOrCreateZombieRoom(code) {
+  if (!zombieRooms.has(code)) {
+    zombieRooms.set(code, {
+      code,
+      hostId: null,
+      status: 'lobby',
+      players: new Map(),
+      createdAt: Date.now(),
+    });
+  }
+  return zombieRooms.get(code);
+}
+
+function serializeZombieRoom(room) {
+  return {
+    code: room.code,
+    hostId: room.hostId,
+    status: room.status,
+    players: Array.from(room.players.values()),
+    createdAt: room.createdAt,
+  };
+}
 
 function getOrCreateRoom(code) {
   if (!rooms.has(code)) {
@@ -227,44 +251,169 @@ io.on('connection', (socket) => {
     });
   });
 
-  // 9. Return to Lobby
-  socket.on('return_to_lobby', ({ stageId }) => {
-    if (!currentRoomCode) return;
-    const room = rooms.get(currentRoomCode);
-    if (!room || room.hostId !== socket.id) return;
-
-    room.status = 'lobby';
-    room.finishCounter = 0;
-    if (stageId) room.stageId = stageId;
-    for (const p of room.players.values()) {
-      if (!p.isHost) p.isReady = false;
-    }
-
-    io.to(currentRoomCode).emit('returned_to_lobby', serializeRoom(room));
-  });
-
-  // 10. Disconnect
-  socket.on('disconnect', () => {
-    if (currentRoomCode) {
+    // 9. Return to Lobby
+    socket.on('return_to_lobby', ({ stageId }) => {
+      if (!currentRoomCode) return;
       const room = rooms.get(currentRoomCode);
-      if (room) {
-        room.players.delete(socket.id);
-        io.to(currentRoomCode).emit('player_left', { id: socket.id });
+      if (!room || room.hostId !== socket.id) return;
 
-        if (room.players.size === 0) {
-          rooms.delete(currentRoomCode);
-        } else {
-          if (room.hostId === socket.id) {
-            const firstRemaining = room.players.keys().next().value;
-            room.hostId = firstRemaining;
-            const newHost = room.players.get(firstRemaining);
-            if (newHost) newHost.isHost = true;
+      room.status = 'lobby';
+      room.finishCounter = 0;
+      if (stageId) room.stageId = stageId;
+      for (const p of room.players.values()) {
+        if (!p.isHost) p.isReady = false;
+      }
+
+      io.to(currentRoomCode).emit('returned_to_lobby', serializeRoom(room));
+    });
+
+    // ============================================================
+    // ZOMBIE HAVEN 2-PLAYER CO-OP EVENTS
+    // ============================================================
+    let currentZombieRoomCode = null;
+
+    socket.on('zombie:create_room', ({ playerName }, callback) => {
+      const code = 'ZH' + Math.floor(1000 + Math.random() * 9000);
+      const room = getOrCreateZombieRoom(code);
+      currentZombieRoomCode = code;
+      socket.join(code);
+
+      const playerData = {
+        id: socket.id,
+        name: playerName || 'Survivor 1',
+        isHost: true,
+        isReady: true,
+      };
+
+      room.hostId = socket.id;
+      room.players.set(socket.id, playerData);
+
+      if (callback) callback({ success: true, room: serializeZombieRoom(room) });
+      io.to(code).emit('zombie:room_updated', serializeZombieRoom(room));
+    });
+
+    socket.on('zombie:join_room', ({ code, playerName }, callback) => {
+      const roomCode = String(code).trim().toUpperCase();
+      const room = zombieRooms.get(roomCode);
+
+      if (!room) {
+        if (callback) callback({ success: false, error: 'Room not found! Check room code.' });
+        return;
+      }
+
+      if (room.players.size >= 2) {
+        if (callback) callback({ success: false, error: 'Room is full (maximum 2 survivors).' });
+        return;
+      }
+
+      currentZombieRoomCode = roomCode;
+      socket.join(roomCode);
+
+      const playerData = {
+        id: socket.id,
+        name: playerName || 'Survivor 2',
+        isHost: false,
+        isReady: false,
+      };
+
+      room.players.set(socket.id, playerData);
+
+      if (callback) callback({ success: true, room: serializeZombieRoom(room) });
+      io.to(roomCode).emit('zombie:room_updated', serializeZombieRoom(room));
+    });
+
+    socket.on('zombie:toggle_ready', ({ code, isReady }) => {
+      const roomCode = code || currentZombieRoomCode;
+      if (!roomCode) return;
+      const room = zombieRooms.get(roomCode);
+      if (!room) return;
+
+      const p = room.players.get(socket.id);
+      if (p) {
+        p.isReady = isReady;
+        io.to(roomCode).emit('zombie:room_updated', serializeZombieRoom(room));
+      }
+    });
+
+    socket.on('zombie:start_game', ({ code }) => {
+      const roomCode = code || currentZombieRoomCode;
+      if (!roomCode) return;
+      const room = zombieRooms.get(roomCode);
+      if (!room) return;
+
+      room.status = 'playing';
+      io.to(roomCode).emit('zombie:game_starting', serializeZombieRoom(room));
+    });
+
+    socket.on('zombie:player_state', ({ code, ...state }) => {
+      const roomCode = code || currentZombieRoomCode;
+      if (!roomCode) return;
+      socket.to(roomCode).emit('zombie:remote_player_state', {
+        id: socket.id,
+        ...state,
+      });
+    });
+
+    socket.on('zombie:shoot', ({ code, origin, dir, weapon }) => {
+      const roomCode = code || currentZombieRoomCode;
+      if (!roomCode) return;
+      socket.to(roomCode).emit('zombie:remote_shoot', {
+        id: socket.id,
+        origin,
+        dir,
+        weapon,
+      });
+    });
+
+    socket.on('zombie:zombie_damage', ({ code, zombieId, damage }) => {
+      const roomCode = code || currentZombieRoomCode;
+      if (!roomCode) return;
+      socket.to(roomCode).emit('zombie:remote_zombie_damage', {
+        zombieId,
+        damage,
+      });
+    });
+
+    socket.on('zombie:revive_done', ({ code }) => {
+      const roomCode = code || currentZombieRoomCode;
+      if (!roomCode) return;
+      socket.to(roomCode).emit('zombie:remote_revived');
+    });
+
+    // 10. Disconnect
+    socket.on('disconnect', () => {
+      if (currentRoomCode) {
+        const room = rooms.get(currentRoomCode);
+        if (room) {
+          room.players.delete(socket.id);
+          io.to(currentRoomCode).emit('player_left', { id: socket.id });
+
+          if (room.players.size === 0) {
+            rooms.delete(currentRoomCode);
+          } else {
+            if (room.hostId === socket.id) {
+              const firstRemaining = room.players.keys().next().value;
+              room.hostId = firstRemaining;
+              const newHost = room.players.get(firstRemaining);
+              if (newHost) newHost.isHost = true;
+            }
+            io.to(currentRoomCode).emit('room_updated', serializeRoom(room));
           }
-          io.to(currentRoomCode).emit('room_updated', serializeRoom(room));
         }
       }
-    }
-  });
+
+      if (currentZombieRoomCode) {
+        const zRoom = zombieRooms.get(currentZombieRoomCode);
+        if (zRoom) {
+          zRoom.players.delete(socket.id);
+          if (zRoom.players.size === 0) {
+            zombieRooms.delete(currentZombieRoomCode);
+          } else {
+            io.to(currentZombieRoomCode).emit('zombie:room_updated', serializeZombieRoom(zRoom));
+          }
+        }
+      }
+    });
 });
 
 httpServer.listen(PORT, () => {

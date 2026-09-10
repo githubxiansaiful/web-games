@@ -18,27 +18,29 @@ import {
   Gamepad2,
   Volume2,
   VolumeX,
+  Skull,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { GameCanvas } from '@/components/GameCanvas';
 import { SpaceGameCanvas } from '@/components/space-game/SpaceGameCanvas';
+import { ZombieHavenCanvas } from '@/components/zombie-haven/ZombieHavenCanvas';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 
 export const GameWorldHome: React.FC = () => {
   const { user, isLoading, isAdmin, openAuthModal } = useAuth();
 
-  // Active game view: null (home), 'runner' (Game 1), 'space' (Game 2)
+  // Active game view: null (home), 'runner' (Game 1), 'space' (Game 2), 'zombie' (Game 3)
   // Preserves active game state on browser refresh via URL parameter & localStorage
-  const [activeGame, setActiveGame] = useState<'runner' | 'space' | null>(() => {
+  const [activeGame, setActiveGame] = useState<'runner' | 'space' | 'zombie' | null>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const gameParam = params.get('game');
-      if (gameParam === 'runner' || gameParam === 'space') {
+      if (gameParam === 'runner' || gameParam === 'space' || gameParam === 'zombie') {
         return gameParam;
       }
       const saved = localStorage.getItem('xian_active_game');
-      if (saved === 'runner' || saved === 'space') {
+      if (saved === 'runner' || saved === 'space' || saved === 'zombie') {
         return saved;
       }
     }
@@ -80,7 +82,7 @@ export const GameWorldHome: React.FC = () => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const gameParam = params.get('game');
-      if (gameParam === 'runner' || gameParam === 'space') {
+      if (gameParam === 'runner' || gameParam === 'space' || gameParam === 'zombie') {
         setActiveGame(gameParam);
       } else {
         setActiveGame(null);
@@ -91,7 +93,7 @@ export const GameWorldHome: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const handlePlayGame = (gameKey: 'runner' | 'space') => {
+  const handlePlayGame = (gameKey: 'runner' | 'space' | 'zombie') => {
     if (!user) {
       openAuthModal('login');
       return;
@@ -145,6 +147,15 @@ export const GameWorldHome: React.FC = () => {
     return (
       <div className="fixed inset-0 z-50 w-full h-full bg-slate-950 overflow-hidden touch-none">
         <SpaceGameCanvas onGoHome={() => setActiveGame(null)} />
+      </div>
+    );
+  }
+
+  // If Game 3 (Zombie Haven) is running
+  if (activeGame === 'zombie') {
+    return (
+      <div className="fixed inset-0 z-50 w-full h-full bg-slate-950 overflow-hidden touch-none">
+        <ZombieHavenCanvas onExit={() => setActiveGame(null)} />
       </div>
     );
   }
@@ -209,7 +220,7 @@ export const GameWorldHome: React.FC = () => {
         <div className="flex items-center justify-between px-1">
           <h2 className="text-xs font-black tracking-widest text-slate-400 uppercase">CHOOSE GAME</h2>
           <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-            2 TITLES READY
+            3 TITLES READY
           </span>
         </div>
 
@@ -341,6 +352,73 @@ export const GameWorldHome: React.FC = () => {
             >
               <Rocket className="w-4 h-4" />
               <span>LAUNCH MISSION</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* GAME CARD 3: ZOMBIE HAVEN (3D CO-OP HORROR SURVIVAL)         */}
+        {/* ============================================================ */}
+        <div className="group relative rounded-3xl bg-slate-900/90 border border-slate-800/90 hover:border-red-600/60 overflow-hidden shadow-2xl transition-all duration-200">
+          {/* Visual Poster Banner */}
+          <div className="h-44 sm:h-52 w-full relative overflow-hidden bg-gradient-to-br from-[#050811] via-[#1a0505] to-[#2d0606] flex flex-col justify-end p-4 sm:p-5">
+            {/* Ambient Bloody Fog Grid */}
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,#7f1d1d_0%,transparent_65%)] opacity-35" />
+            <div className="absolute -top-12 -left-12 w-48 h-48 bg-red-600/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-slate-900 via-slate-900/80 to-transparent" />
+
+            {/* Poster Badges */}
+            <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between z-10">
+              <span className="px-2.5 py-1 rounded-full bg-red-600/90 text-white font-black text-[10px] tracking-wider uppercase shadow-md flex items-center gap-1.5">
+                <Skull className="w-3 h-3 text-white" />
+                <span>3D CO-OP HORROR</span>
+              </span>
+              <span className="px-2.5 py-1 rounded-full bg-slate-950/80 border border-slate-700/80 text-amber-400 font-black text-[10px] tracking-wider uppercase">
+                2 PLAYERS • 1 KM²
+              </span>
+            </div>
+
+            {/* Poster Center Graphic Art */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center opacity-85 group-hover:scale-105 transition-transform duration-300">
+              <div className="w-20 h-20 rounded-2xl bg-red-950/40 border border-red-500/40 flex items-center justify-center shadow-inner text-4xl">
+                🧟‍♂️
+              </div>
+            </div>
+
+            {/* Game Title & Tags on Poster */}
+            <div className="relative z-10 space-y-1">
+              <h3 className="font-zombie text-3xl sm:text-4xl text-red-500 zombie-glow-red tracking-wider leading-none">
+                Zombie Haven
+              </h3>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-amber-300">
+                <span>Deadwood Village</span>
+                <span className="text-slate-600">•</span>
+                <span>Endless Waves</span>
+                <span className="text-slate-600">•</span>
+                <span>8s Revive System</span>
+                <span className="text-slate-600">•</span>
+                <span>Arsenal Hitscan</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card Body & Actions */}
+          <div className="p-4 sm:p-5 space-y-3 bg-slate-900/95">
+            {/* Tag Badges */}
+            <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300">THIRD PERSON</span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-red-400">HORDE AI</span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-cyan-300">WEAPON LOADOUTS</span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-emerald-400">SUPPLY SCAVENGING</span>
+            </div>
+
+            {/* Tap To Play Button */}
+            <button
+              onClick={() => handlePlayGame('zombie')}
+              className="w-full py-3.5 px-4 bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-sm rounded-2xl shadow-lg shadow-red-600/30 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Skull className="w-4 h-4" />
+              <span>ENTER DEADWOOD VILLAGE</span>
             </button>
           </div>
         </div>

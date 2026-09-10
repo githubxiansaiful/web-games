@@ -1,8 +1,34 @@
+@import url('https://fonts.googleapis.com/css2?family=Creepster&family=Nosifer&family=Rubik+Glitch&display=swap');
 @import "tailwindcss";
 
 :root {
   --background: #020617;
   --foreground: #f8fafc;
+}
+
+/* Zombie Horror Typography & Effects */
+.font-zombie {
+  font-family: 'Creepster', 'Nosifer', cursive, fantasy;
+}
+
+.font-zombie-drip {
+  font-family: 'Nosifer', 'Creepster', cursive, fantasy;
+}
+
+.font-zombie-glitch {
+  font-family: 'Rubik Glitch', cursive, sans-serif;
+}
+
+.zombie-glow-red {
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.9), 0 0 18px rgba(185, 28, 28, 0.7), 0 0 30px rgba(127, 29, 29, 0.5);
+}
+
+.zombie-glow-green {
+  text-shadow: 0 0 8px rgba(34, 197, 94, 0.9), 0 0 18px rgba(22, 163, 74, 0.7), 0 0 30px rgba(20, 83, 45, 0.5);
+}
+
+.blood-vignette {
+  background: radial-gradient(circle at center, transparent 60%, rgba(185, 28, 28, 0.4) 90%, rgba(127, 29, 29, 0.8) 100%);
 }
 
 html {

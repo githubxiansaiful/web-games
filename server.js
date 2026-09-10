@@ -12,6 +12,30 @@ const handle = app.getRequestHandler();
 
 // In-memory room store for active multiplayer sessions
 const rooms = new Map();
+const zombieRooms = new Map();
+
+function getOrCreateZombieRoom(code) {
+  if (!zombieRooms.has(code)) {
+    zombieRooms.set(code, {
+      code,
+      hostId: null,
+      status: 'lobby',
+      players: new Map(),
+      createdAt: Date.now(),
+    });
+  }
+  return zombieRooms.get(code);
+}
+
+function serializeZombieRoom(room) {
+  return {
+    code: room.code,
+    hostId: room.hostId,
+    status: room.status,
+    players: Array.from(room.players.values()),
+    createdAt: room.createdAt,
+  };
+}
 
 function getOrCreateRoom(code, gameType = 'runner') {
   if (!rooms.has(code)) {
@@ -229,6 +253,119 @@ app.prepare().then(() => {
       io.to(currentRoomCode).emit('returned_to_lobby', serializeRoom(room));
     });
 
+    // ============================================================
+    // ZOMBIE HAVEN 2-PLAYER CO-OP EVENTS
+    // ============================================================
+    let currentZombieRoomCode = null;
+
+    socket.on('zombie:create_room', ({ playerName }, callback) => {
+      const code = 'ZH' + Math.floor(1000 + Math.random() * 9000);
+      const room = getOrCreateZombieRoom(code);
+      currentZombieRoomCode = code;
+      socket.join(code);
+
+      const playerData = {
+        id: socket.id,
+        name: playerName || 'Survivor 1',
+        isHost: true,
+        isReady: true,
+      };
+
+      room.hostId = socket.id;
+      room.players.set(socket.id, playerData);
+
+      if (callback) callback({ success: true, room: serializeZombieRoom(room) });
+      io.to(code).emit('zombie:room_updated', serializeZombieRoom(room));
+    });
+
+    socket.on('zombie:join_room', ({ code, playerName }, callback) => {
+      const roomCode = String(code).trim().toUpperCase();
+      const room = zombieRooms.get(roomCode);
+
+      if (!room) {
+        if (callback) callback({ success: false, error: 'Room not found! Check room code.' });
+        return;
+      }
+
+      if (room.players.size >= 2) {
+        if (callback) callback({ success: false, error: 'Room is full (maximum 2 survivors).' });
+        return;
+      }
+
+      currentZombieRoomCode = roomCode;
+      socket.join(roomCode);
+
+      const playerData = {
+        id: socket.id,
+        name: playerName || 'Survivor 2',
+        isHost: false,
+        isReady: false,
+      };
+
+      room.players.set(socket.id, playerData);
+
+      if (callback) callback({ success: true, room: serializeZombieRoom(room) });
+      io.to(roomCode).emit('zombie:room_updated', serializeZombieRoom(room));
+    });
+
+    socket.on('zombie:toggle_ready', ({ code, isReady }) => {
+      const roomCode = code || currentZombieRoomCode;
+      if (!roomCode) return;
+      const room = zombieRooms.get(roomCode);
+      if (!room) return;
+
+      const p = room.players.get(socket.id);
+      if (p) {
+        p.isReady = isReady;
+        io.to(roomCode).emit('zombie:room_updated', serializeZombieRoom(room));
+      }
+    });
+
+    socket.on('zombie:start_game', ({ code }) => {
+      const roomCode = code || currentZombieRoomCode;
+      if (!roomCode) return;
+      const room = zombieRooms.get(roomCode);
+      if (!room) return;
+
+      room.status = 'playing';
+      io.to(roomCode).emit('zombie:game_starting', serializeZombieRoom(room));
+    });
+
+    socket.on('zombie:player_state', ({ code, ...state }) => {
+      const roomCode = code || currentZombieRoomCode;
+      if (!roomCode) return;
+      socket.to(roomCode).emit('zombie:remote_player_state', {
+        id: socket.id,
+        ...state,
+      });
+    });
+
+    socket.on('zombie:shoot', ({ code, origin, dir, weapon }) => {
+      const roomCode = code || currentZombieRoomCode;
+      if (!roomCode) return;
+      socket.to(roomCode).emit('zombie:remote_shoot', {
+        id: socket.id,
+        origin,
+        dir,
+        weapon,
+      });
+    });
+
+    socket.on('zombie:zombie_damage', ({ code, zombieId, damage }) => {
+      const roomCode = code || currentZombieRoomCode;
+      if (!roomCode) return;
+      socket.to(roomCode).emit('zombie:remote_zombie_damage', {
+        zombieId,
+        damage,
+      });
+    });
+
+    socket.on('zombie:revive_done', ({ code }) => {
+      const roomCode = code || currentZombieRoomCode;
+      if (!roomCode) return;
+      socket.to(roomCode).emit('zombie:remote_revived');
+    });
+
     // 10. Handle Disconnect
     socket.on('disconnect', () => {
       if (currentRoomCode) {
@@ -248,6 +385,18 @@ app.prepare().then(() => {
               if (newHost) newHost.isHost = true;
             }
             io.to(currentRoomCode).emit('room_updated', serializeRoom(room));
+          }
+        }
+      }
+
+      if (currentZombieRoomCode) {
+        const zRoom = zombieRooms.get(currentZombieRoomCode);
+        if (zRoom) {
+          zRoom.players.delete(socket.id);
+          if (zRoom.players.size === 0) {
+            zombieRooms.delete(currentZombieRoomCode);
+          } else {
+            io.to(currentZombieRoomCode).emit('zombie:room_updated', serializeZombieRoom(zRoom));
           }
         }
       }
