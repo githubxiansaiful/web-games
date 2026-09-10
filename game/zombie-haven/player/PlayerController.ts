@@ -161,8 +161,8 @@ export class PlayerController {
       return;
     }
 
-    // Auto-fire check for Assault Rifle while holding left mouse
-    if (this.isMouseDown && this.weapons.activeWeapon === 'rifle' && this.onShootRequest) {
+    // Direct continuous shoot on left mouse down (respecting fire rate, like PUBG Mobile)
+    if (this.isMouseDown && this.onShootRequest) {
       this.onShootRequest();
     }
 
@@ -174,13 +174,13 @@ export class PlayerController {
 
     const isMoving = forward !== 0 || strafe !== 0;
     const isSprintKey = this.keys['ShiftLeft'] || this.keys['ShiftRight'];
-    const canSprint = isSprintKey && forward > 0 && this.player.stats.stamina > 5 && !this.isRightMouseDown;
+    const canSprint = isSprintKey && forward > 0 && this.player.stats.stamina > 5;
 
     // Movement speed from shared config (Spec Section 11)
     let baseSpeed = PLAYER_MOVEMENT_CONFIG.runSpeed; // 4.5 m/s
     if (canSprint) {
       baseSpeed = PLAYER_MOVEMENT_CONFIG.sprintSpeed; // 6.0 m/s
-    } else if (this.isRightMouseDown) {
+    } else if (this.isMouseDown) {
       baseSpeed = PLAYER_MOVEMENT_CONFIG.aimSpeed; // 2.8 m/s
     } else if (forward < 0) {
       baseSpeed = PLAYER_MOVEMENT_CONFIG.walkSpeed; // 3.0 m/s
@@ -238,17 +238,24 @@ export class PlayerController {
       currentPos.y = 0;
     }
 
-    // Player facing direction (Spec Section 10 & 34):
-    // When Aiming: character faces camera aim direction
-    // When Moving: character faces velocity movement direction
-    if (this.isRightMouseDown) {
-      this.player.group.rotation.y = THREE.MathUtils.lerp(this.player.group.rotation.y, yaw, delta * 20);
+    // Player facing direction (GTA 5 / PUBG Third Person):
+    // When firing: character snaps to camera yaw to shoot straight into crosshair
+    // When running: character smoothly turns toward movement direction (W = straight forward into distance)
+    // When idle: character smoothly aligns with camera yaw with back towards camera
+    if (this.isMouseDown) {
+      this.player.group.rotation.y = THREE.MathUtils.lerp(this.player.group.rotation.y, yaw, delta * 30);
     } else if (isMoving && this.velocity.lengthSq() > 0.05) {
-      const moveAngle = Math.atan2(this.velocity.x, this.velocity.z);
+      // Model naturally faces -Z, so target angle for velocity (vx, vz) is Math.atan2(-vx, -vz)
+      const moveAngle = Math.atan2(-this.velocity.x, -this.velocity.z);
       let diff = (moveAngle - this.player.group.rotation.y) % (Math.PI * 2);
       if (diff < -Math.PI) diff += Math.PI * 2;
       if (diff > Math.PI) diff -= Math.PI * 2;
-      this.player.group.rotation.y += diff * Math.min(1, delta * 15);
+      this.player.group.rotation.y += diff * Math.min(1, delta * 18);
+    } else {
+      let diff = (yaw - this.player.group.rotation.y) % (Math.PI * 2);
+      if (diff < -Math.PI) diff += Math.PI * 2;
+      if (diff > Math.PI) diff -= Math.PI * 2;
+      this.player.group.rotation.y += diff * Math.min(1, delta * 12);
     }
 
     // Flashlight target follows forward camera ray
@@ -256,7 +263,7 @@ export class PlayerController {
     this.player.flashlightTarget.position.copy(camFwd).multiplyScalar(30);
 
     // Update Player character procedural animation
-    this.player.update(delta, this.velocity, this.isRightMouseDown, canSprint);
+    this.player.update(delta, this.velocity, this.isMouseDown, canSprint);
   }
 
   public dispose() {

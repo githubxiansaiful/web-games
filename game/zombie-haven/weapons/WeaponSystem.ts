@@ -174,7 +174,7 @@ export class WeaponSystem {
   /**
    * Fires the active weapon. Returns array of ray directions with spread applied
    */
-  public shoot(isAiming = false, muzzlePos?: THREE.Vector3): { success: boolean; spreadDirs: THREE.Vector3[] } {
+  public shoot(isAiming = false, muzzlePos?: THREE.Vector3): { success: boolean; spreadDirs: THREE.Vector2[] } {
     const state = this.getActiveState();
     const config = this.getActiveConfig();
     const now = performance.now() / 1000;
@@ -209,14 +209,14 @@ export class WeaponSystem {
     // Trigger Muzzle Flash at physical barrel tip
     this.triggerMuzzleFlash(muzzlePos);
 
-    // Calculate spread directions
-    const spreadMod = isAiming ? 0.45 : 1.0;
-    const spreadDirs: THREE.Vector3[] = [];
+    // Calculate spread directions (angular deflection in crosshair plane)
+    const spreadMod = isAiming ? 0.35 : 0.75;
+    const spreadDirs: THREE.Vector2[] = [];
 
     for (let p = 0; p < config.pellets; p++) {
       const spreadX = (Math.random() - 0.5) * config.spread * spreadMod;
       const spreadY = (Math.random() - 0.5) * config.spread * spreadMod;
-      spreadDirs.push(new THREE.Vector3(spreadX, spreadY, 1).normalize());
+      spreadDirs.push(new THREE.Vector2(spreadX, spreadY));
     }
 
     // Auto reload when empty

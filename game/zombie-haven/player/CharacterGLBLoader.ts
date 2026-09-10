@@ -99,7 +99,7 @@ export class CharacterGLBLoader {
       g.applyMatrix4(child.matrixWorld);
       // Center X and Z, align feet to y = 0
       g.translate(-rawCenter.x, -minY, -rawCenter.z);
-      // Rotate 180 degrees around Y so model faces +Z forward
+      // Rotate 180 degrees around Y so model faces -Z forward with back to camera (+Z)
       g.rotateY(Math.PI);
       g.computeVertexNormals();
 

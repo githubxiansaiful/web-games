@@ -16,6 +16,7 @@
 import * as THREE from 'three';
 import { PlayerStats, WeaponType, PLAYER_MOVEMENT_CONFIG } from '../types';
 import { characterGLBLoader, SurvivorSkin } from './CharacterGLBLoader';
+import { gunGLBLoader } from '../weapons/GunGLBLoader';
 
 export class SurvivorPlayer {
   public group: THREE.Group;
@@ -70,6 +71,7 @@ export class SurvivorPlayer {
     this.activeSkin = skin;
 
     this.proceduralModel = new THREE.Group();
+    this.proceduralModel.rotation.y = Math.PI; // Face -Z forward with back towards camera
     this.group.add(this.proceduralModel);
 
     this.glbModelContainer = new THREE.Group();
@@ -440,11 +442,11 @@ export class SurvivorPlayer {
 
     // --- 7. Tactical Flashlight ---
     this.flashlightTarget = new THREE.Object3D();
-    this.flashlightTarget.position.set(0, 1.2, 20);
+    this.flashlightTarget.position.set(0, 1.2, -30);
     this.group.add(this.flashlightTarget);
 
     this.flashlight = new THREE.SpotLight(0xfef9c3, 0, 42, Math.PI / 5.5, 0.4, 1.2);
-    this.flashlight.position.set(0.22, 1.4, 0.15);
+    this.flashlight.position.set(0.22, 1.4, -0.15);
     this.flashlight.target = this.flashlightTarget;
     this.flashlight.castShadow = isLocal;
     this.group.add(this.flashlight);
@@ -453,6 +455,9 @@ export class SurvivorPlayer {
     if (this.activeSkin !== 'procedural') {
       this.loadGLBCharacter(this.activeSkin);
     }
+
+    // Asynchronously load low-poly 3D firearms pack
+    this.loadGLBGuns();
   }
 
   /**
@@ -618,13 +623,49 @@ export class SurvivorPlayer {
         this.glbModelContainer.visible = true;
         this.proceduralModel.visible = false;
 
-        this.weaponSocket.position.set(0.30, 0.90, 0.20);
-        this.weaponSocket.rotation.set(0.25, 0, 0);
+        this.weaponSocket.position.set(0.28, 0.95, -0.25);
+        this.weaponSocket.rotation.set(0.15, Math.PI, 0);
       }
     } catch (err) {
       console.warn('[SurvivorPlayer] Fallback to procedural model:', err);
       this.proceduralModel.visible = true;
       this.glbModelContainer.visible = false;
+    }
+  }
+
+  /**
+   * Asynchronously loads and upgrades weapons to authentic Quaternius 3D models
+   */
+  public async loadGLBGuns() {
+    try {
+      await gunGLBLoader.load();
+      const p = gunGLBLoader.getGunModel('pistol');
+      if (p) {
+        this.weaponSocket.remove(this.pistolMesh);
+        this.pistolMesh = p.group;
+        this.pistolMuzzle = p.muzzle;
+        this.weaponSocket.add(this.pistolMesh);
+      }
+
+      const s = gunGLBLoader.getGunModel('shotgun');
+      if (s) {
+        this.weaponSocket.remove(this.shotgunMesh);
+        this.shotgunMesh = s.group;
+        this.shotgunMuzzle = s.muzzle;
+        this.weaponSocket.add(this.shotgunMesh);
+      }
+
+      const r = gunGLBLoader.getGunModel('rifle');
+      if (r) {
+        this.weaponSocket.remove(this.rifleMesh);
+        this.rifleMesh = r.group;
+        this.rifleMuzzle = r.muzzle;
+        this.weaponSocket.add(this.rifleMesh);
+      }
+
+      this.setWeaponVisual(this.currentWeaponVisual);
+    } catch (err) {
+      console.warn('[SurvivorPlayer] Could not load 3D guns, keeping procedural models:', err);
     }
   }
 
@@ -657,8 +698,8 @@ export class SurvivorPlayer {
       this.glbModelContainer.add(this.weaponSocket);
       this.glbModelContainer.visible = true;
       this.proceduralModel.visible = false;
-      this.weaponSocket.position.set(0.30, 0.90, 0.20);
-      this.weaponSocket.rotation.set(0.25, 0, 0);
+      this.weaponSocket.position.set(0.28, 0.95, -0.25);
+      this.weaponSocket.rotation.set(0.15, Math.PI, 0);
     } else {
       this.loadGLBCharacter(skin);
     }
@@ -788,15 +829,17 @@ export class SurvivorPlayer {
         this.glbModelContainer.rotation.set(0, 0, 0);
       }
 
-      // Weapon Socket Positioning for GLB Character
+      // Weapon Socket Positioning for GLB Character (Points forward in -Z towards crosshair)
       if (isAiming) {
         // Aiming stance: weapon raised to shoulder/eye line pointing directly at crosshair
-        this.weaponSocket.position.lerp(new THREE.Vector3(0.18, 1.25, 0.38), delta * 18);
+        this.weaponSocket.position.lerp(new THREE.Vector3(0.20, 1.25, -0.38), delta * 18);
         this.weaponSocket.rotation.x = THREE.MathUtils.lerp(this.weaponSocket.rotation.x, -0.05, delta * 18);
+        this.weaponSocket.rotation.y = Math.PI;
       } else {
         // Low-ready resting pose near right hip
-        this.weaponSocket.position.lerp(new THREE.Vector3(0.30, 0.90, 0.20), delta * 18);
-        this.weaponSocket.rotation.x = THREE.MathUtils.lerp(this.weaponSocket.rotation.x, 0.25, delta * 18);
+        this.weaponSocket.position.lerp(new THREE.Vector3(0.28, 0.95, -0.25), delta * 18);
+        this.weaponSocket.rotation.x = THREE.MathUtils.lerp(this.weaponSocket.rotation.x, 0.15, delta * 18);
+        this.weaponSocket.rotation.y = Math.PI;
       }
       return;
     }

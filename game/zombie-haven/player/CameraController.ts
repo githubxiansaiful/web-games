@@ -39,8 +39,9 @@ export class CameraController {
     this.yaw -= clampedX * this.mouseSensitivity;
     this.pitch -= clampedY * this.mouseSensitivity;
 
-    // Clamp pitch between -1.0 (-57 deg) and 1.2 (+68 deg)
-    this.pitch = Math.max(-1.0, Math.min(1.2, this.pitch));
+    // Clamp pitch: max -0.95 (looking down from above) and min 0.35 (looking slightly up)
+    // Prevents camera from ever sinking beneath the terrain or under the feet
+    this.pitch = Math.max(-0.95, Math.min(0.35, this.pitch));
   }
 
   public addShake(amount = 0.22) {
@@ -54,21 +55,21 @@ export class CameraController {
     village: DeadwoodVillage,
     recoilKick = 0
   ) {
-    // 1. Third Person & Right-Shoulder ADS Zoom lerping (Spec Section 20 & 23)
-    const targetDist = isAiming ? CAMERA_CONFIG.aimDistance : CAMERA_CONFIG.defaultDistance; // 3.5m vs 5.0m
-    const targetH = isAiming ? CAMERA_CONFIG.aimHeight : CAMERA_CONFIG.defaultHeight;         // 2.2m vs 2.8m
-    const targetOffset = isAiming ? CAMERA_CONFIG.shoulderOffset : 0.55;                      // 0.75m vs 0.55m
-    this.targetFOV = isAiming ? CAMERA_CONFIG.aimFOV : CAMERA_CONFIG.defaultFOV;              // 55 deg vs 60 deg
+    // 1. Steady GTA 5 / PUBG Third-Person Camera (No jarring right-click zoom, rock-steady 65 deg FOV)
+    const targetDist = 4.0;
+    const targetH = 2.0;
+    const targetOffset = 0.48;
+    this.targetFOV = 65;
 
-    this.currentDistance = THREE.MathUtils.lerp(this.currentDistance, targetDist, delta * 10);
-    this.currentHeight = THREE.MathUtils.lerp(this.currentHeight, targetH, delta * 10);
-    this.currentShoulderOffset = THREE.MathUtils.lerp(this.currentShoulderOffset, targetOffset, delta * 10);
+    this.currentDistance = THREE.MathUtils.lerp(this.currentDistance, targetDist, delta * 12);
+    this.currentHeight = THREE.MathUtils.lerp(this.currentHeight, targetH, delta * 12);
+    this.currentShoulderOffset = THREE.MathUtils.lerp(this.currentShoulderOffset, targetOffset, delta * 12);
 
-    this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, this.targetFOV, delta * 10);
+    this.camera.fov = this.targetFOV;
     this.camera.updateProjectionMatrix();
 
-    // 2. Camera target pivot point (Survivor chest/eye level: y = 1.40m)
-    const pivot = targetPos.clone().add(new THREE.Vector3(0, CAMERA_CONFIG.targetHeight, 0));
+    // 2. Camera target pivot point (Survivor chest level: y = 1.30m)
+    const pivot = targetPos.clone().add(new THREE.Vector3(0, 1.30, 0));
 
     // Calculate rotation vectors from yaw and pitch (plus recoil kick)
     const effPitch = this.pitch + recoilKick;
@@ -114,6 +115,9 @@ export class CameraController {
 
     let finalCamPos = pivot.clone().addScaledVector(rayDir, rayDist * this.boomDistanceFactor);
 
+    // Strictly enforce ground clearance (camera never dips below floor or under feet)
+    finalCamPos.y = Math.max(0.40, finalCamPos.y);
+
     // 4. Subtle Trauma / Recoil Shake
     if (this.trauma > 0) {
       const shakeX = (Math.random() - 0.5) * this.trauma * 0.08;
@@ -125,6 +129,7 @@ export class CameraController {
 
     // 5. Smooth Camera Movement & Look Target to eliminate micro-jitter
     this.smoothedCamPos.lerp(finalCamPos, Math.min(1, delta * 24));
+    this.smoothedCamPos.y = Math.max(0.40, this.smoothedCamPos.y);
     this.camera.position.copy(this.smoothedCamPos);
 
     const targetLook = pivot.clone().addScaledVector(forward, 25);
@@ -141,5 +146,14 @@ export class CameraController {
     const sinYaw = Math.sin(this.yaw);
     const cosYaw = Math.cos(this.yaw);
     return new THREE.Vector3(-sinYaw * cosPitch, sinPitch, -cosYaw * cosPitch).normalize();
+  }
+
+  /**
+   * Returns right vector perpendicular to view in horizontal plane
+   */
+  public getRightVector(): THREE.Vector3 {
+    const sinYaw = Math.sin(this.yaw);
+    const cosYaw = Math.cos(this.yaw);
+    return new THREE.Vector3(cosYaw, 0, -sinYaw).normalize();
   }
 }

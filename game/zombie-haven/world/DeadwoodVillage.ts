@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import { VillageProps, CollisionBox } from './VillageProps';
+import { natureGLBLoader } from './NatureGLBLoader';
 
 export class DeadwoodVillage {
   public rootGroup: THREE.Group;
@@ -23,6 +24,7 @@ export class DeadwoodVillage {
     this.buildFarmArea();
     this.buildGarageArea();
     this.buildPerimeterForest();
+    this.loadNatureAssets();
   }
 
   // --- 1. TERRAIN & GROUND ---
@@ -400,5 +402,80 @@ export class DeadwoodVillage {
       if (!collidedThisPass) break;
     }
     return { x: resX, z: resZ, collided: anyCollided };
+  }
+
+  /**
+   * Loads Quaternius stylized low-poly nature pack models (trees, rocks, bushes, fallen logs)
+   * into the village world
+   */
+  public async loadNatureAssets() {
+    try {
+      await natureGLBLoader.load();
+      const natureGroup = new THREE.Group();
+      natureGroup.name = 'QuaterniusNature';
+
+      // 1. Scattered Rocks along roadsides and building corners
+      const rockLocations = [
+        { x: 12, z: 8, scale: 0.8 },
+        { x: -14, z: 12, scale: 1.1 },
+        { x: 22, z: -15, scale: 0.9 },
+        { x: -28, z: -8, scale: 1.2 },
+        { x: 35, z: 18, scale: 1.0 },
+        { x: -40, z: 28, scale: 1.3 },
+        { x: 5, z: -32, scale: 0.85 },
+        { x: -18, z: -45, scale: 1.0 },
+        { x: 50, z: -25, scale: 1.15 },
+        { x: -55, z: -20, scale: 0.95 },
+      ];
+
+      rockLocations.forEach((loc) => {
+        const rock = natureGLBLoader.getRandomRock();
+        if (rock) {
+          rock.position.set(loc.x, 0, loc.z);
+          rock.rotation.y = Math.random() * Math.PI * 2;
+          rock.scale.setScalar(loc.scale);
+          natureGroup.add(rock);
+          this.addCollider(loc.x - 0.7, loc.x + 0.7, loc.z - 0.7, loc.z + 0.7, 1.2);
+        }
+      });
+
+      // 2. Bushes and Foliage near fences and houses
+      const bushLocations = [
+        { x: 8, z: 14 }, { x: -8, z: 16 }, { x: 15, z: -10 },
+        { x: -20, z: 18 }, { x: 30, z: 12 }, { x: -32, z: 35 },
+        { x: 25, z: 38 }, { x: -15, z: -28 }, { x: 42, z: -30 },
+        { x: -48, z: -15 }, { x: 0, z: 42 }, { x: 0, z: -42 },
+      ];
+
+      bushLocations.forEach((loc) => {
+        const bush = natureGLBLoader.getRandomBush();
+        if (bush) {
+          bush.position.set(loc.x, 0, loc.z);
+          bush.rotation.y = Math.random() * Math.PI * 2;
+          natureGroup.add(bush);
+        }
+      });
+
+      // 3. Low-poly Quaternius Trees along outer village perimeter
+      for (let i = 0; i < 28; i++) {
+        const angle = (i / 28) * Math.PI * 2;
+        const dist = 58 + (i % 3) * 16;
+        const x = Math.cos(angle) * dist;
+        const z = Math.sin(angle) * dist;
+        const tree = natureGLBLoader.getRandomTree();
+        if (tree) {
+          tree.position.set(x, 0, z);
+          tree.rotation.y = Math.random() * Math.PI * 2;
+          const s = 0.85 + Math.random() * 0.35;
+          tree.scale.setScalar(s);
+          natureGroup.add(tree);
+          this.addCollider(x - 0.6, x + 0.6, z - 0.6, z + 0.6, 6.0);
+        }
+      }
+
+      this.rootGroup.add(natureGroup);
+    } catch (err) {
+      console.warn('[DeadwoodVillage] Could not load nature pack:', err);
+    }
   }
 }

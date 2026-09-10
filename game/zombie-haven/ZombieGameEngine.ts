@@ -175,18 +175,24 @@ export class ZombieGameEngine {
     this.playerCtrl.onShootRequest = () => {
       if (this.localPlayer.stats.isDowned || this.isGameOver) return;
 
-      const isAiming = this.playerCtrl.isRightMouseDown;
+      const isAiming = true;
       const muzzlePos = this.localPlayer.getMuzzleWorldPosition();
       const { success, spreadDirs } = this.weapons.shoot(isAiming, muzzlePos);
       if (!success) return;
 
       const camOrigin = this.cameraCtrl.camera.position.clone();
       const baseFwd = this.cameraCtrl.getForwardVector();
+      const right = this.cameraCtrl.getRightVector();
+      const up = new THREE.Vector3().crossVectors(right, baseFwd).normalize();
       const config = this.weapons.getActiveConfig();
 
-      spreadDirs.forEach((spreadDir) => {
-        // Offset base forward with spread
-        const shotDir = baseFwd.clone().add(spreadDir).normalize();
+      spreadDirs.forEach((spread) => {
+        // Offset base forward with spread in crosshair plane
+        const shotDir = baseFwd
+          .clone()
+          .addScaledVector(right, spread.x)
+          .addScaledVector(up, spread.y)
+          .normalize();
 
         // Raycast against zombies
         const hitResult = this.horde.testBulletHit(camOrigin, shotDir, config.range);
