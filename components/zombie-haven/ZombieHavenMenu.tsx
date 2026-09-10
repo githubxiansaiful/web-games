@@ -249,9 +249,6 @@ export const ZombieHavenMenu: React.FC<ZombieHavenMenuProps> = ({
                   <div className="bg-slate-900 p-2 rounded-xl border border-slate-800">
                     <span className="text-white font-bold">F</span>: Toggle Flashlight
                   </div>
-                  <div className="bg-slate-900 p-2 rounded-xl border border-slate-800">
-                    <span className="text-white font-bold">N</span>: Toggle Day / Night Mode
-                  </div>
                 </div>
               </div>
 

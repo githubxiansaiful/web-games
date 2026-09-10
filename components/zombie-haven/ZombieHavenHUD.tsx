@@ -19,8 +19,6 @@ import {
   Skull,
   Radio,
   Package,
-  Sun,
-  Moon,
 } from 'lucide-react';
 import { ZombieGameEngine } from '@/game/zombie-haven/ZombieGameEngine';
 import { zombieAudio } from './ZombieHavenAudio';
@@ -39,18 +37,6 @@ export const ZombieHavenHUD: React.FC<ZombieHavenHUDProps> = ({ engine, onExit }
   const remotePlayer = engine.remotePlayerModel;
 
   const [isMuted, setIsMuted] = React.useState(zombieAudio.getIsMuted());
-  const [isDayMode, setIsDayMode] = React.useState(engine.isDayMode);
-
-  React.useEffect(() => {
-    const handleCheck = () => {
-      setIsDayMode(engine.isDayMode);
-    };
-    const prevCb = engine.onStateChange;
-    engine.onStateChange = () => {
-      if (prevCb) prevCb();
-      handleCheck();
-    };
-  }, [engine]);
 
   const toggleMute = () => {
     const next = zombieAudio.toggleMute();
@@ -178,19 +164,6 @@ export const ZombieHavenHUD: React.FC<ZombieHavenHUDProps> = ({ engine, onExit }
 
         {/* Right: Quick Controls & Exit */}
         <div className="flex items-center gap-2 pointer-events-auto">
-          {/* Day / Night Mode Toggle */}
-          <button
-            onClick={() => {
-              const next = engine.toggleDayNight();
-              setIsDayMode(next);
-            }}
-            className="px-2.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-300 hover:text-white transition shadow-lg flex items-center gap-1.5 cursor-pointer"
-            title="Toggle Day / Night Mode (Shortcut: Key [N])"
-          >
-            {isDayMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
-            <span className="hidden sm:inline font-bold">{isDayMode ? 'Day Mode' : 'Night Mode'}</span>
-          </button>
-
           <button
             onClick={toggleMute}
             className="p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition shadow-lg cursor-pointer"

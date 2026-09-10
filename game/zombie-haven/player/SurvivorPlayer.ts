@@ -13,7 +13,7 @@ export class SurvivorPlayer {
   public stats: PlayerStats;
   public flashlight: THREE.SpotLight;
   public flashlightTarget: THREE.Object3D;
-  public flashlightOn: boolean = true;
+  public flashlightOn: boolean = false;
 
   // Character body parts for procedural animation
   private head: THREE.Mesh;
@@ -117,7 +117,7 @@ export class SurvivorPlayer {
     this.flashlightTarget.position.set(0, 1.2, 20);
     this.group.add(this.flashlightTarget);
 
-    this.flashlight = new THREE.SpotLight(0xfef9c3, 2.5, 38, Math.PI / 6, 0.45, 1.2);
+    this.flashlight = new THREE.SpotLight(0xfef9c3, 0, 38, Math.PI / 6, 0.45, 1.2);
     this.flashlight.position.set(0.25, 1.3, 0.25);
     this.flashlight.target = this.flashlightTarget;
     this.flashlight.castShadow = isLocal;

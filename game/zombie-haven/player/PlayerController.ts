@@ -30,7 +30,6 @@ export class PlayerController {
   // Callback listeners
   public onShootRequest?: () => void;
   public onInteractRequest?: () => void;
-  public onToggleDayNightRequest?: () => void;
 
   constructor(
     player: SurvivorPlayer,
@@ -98,13 +97,6 @@ export class PlayerController {
     if (e.code === 'KeyE') {
       if (this.onInteractRequest) {
         this.onInteractRequest();
-      }
-    }
-
-    // Day / Night Toggle: N
-    if (e.code === 'KeyN') {
-      if (this.onToggleDayNightRequest) {
-        this.onToggleDayNightRequest();
       }
     }
   };

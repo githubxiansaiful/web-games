@@ -36,12 +36,6 @@ export class ZombieGameEngine {
   public loot: LootSystem;
   public revive: ReviveSystem;
 
-  // Day / Night Environment
-  public isDayMode: boolean = true;
-  private ambientLight: THREE.AmbientLight;
-  private hemiLight: THREE.HemisphereLight;
-  private dirLight: THREE.DirectionalLight;
-
   // Visual Effects: Bullet Tracer lines
   private tracers: { line: THREE.Line; life: number }[] = [];
 
@@ -95,25 +89,25 @@ export class ZombieGameEngine {
     this.scene.fog = new THREE.FogExp2(0x8ecdf8, 0.003); // light daytime atmospheric haze
 
     // 3. Daylight Lighting: Hemisphere sky/earth bounce + Ambient + Direct Sunlight
-    this.hemiLight = new THREE.HemisphereLight(0xbae6fd, 0x50753b, 1.3);
-    this.scene.add(this.hemiLight);
+    const hemiLight = new THREE.HemisphereLight(0xbae6fd, 0x50753b, 1.35);
+    this.scene.add(hemiLight);
 
-    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
-    this.scene.add(this.ambientLight);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    this.scene.add(ambientLight);
 
-    this.dirLight = new THREE.DirectionalLight(0xfff6e6, 2.4);
-    this.dirLight.position.set(80, 150, 60);
-    this.dirLight.castShadow = true;
-    this.dirLight.shadow.mapSize.width = 2048;
-    this.dirLight.shadow.mapSize.height = 2048;
-    this.dirLight.shadow.camera.near = 10;
-    this.dirLight.shadow.camera.far = 300;
-    this.dirLight.shadow.camera.left = -90;
-    this.dirLight.shadow.camera.right = 90;
-    this.dirLight.shadow.camera.top = 90;
-    this.dirLight.shadow.camera.bottom = -90;
-    this.dirLight.shadow.bias = -0.0004;
-    this.scene.add(this.dirLight);
+    const sunLight = new THREE.DirectionalLight(0xfff6e6, 2.5);
+    sunLight.position.set(80, 150, 60);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 10;
+    sunLight.shadow.camera.far = 300;
+    sunLight.shadow.camera.left = -90;
+    sunLight.shadow.camera.right = 90;
+    sunLight.shadow.camera.top = 90;
+    sunLight.shadow.camera.bottom = -90;
+    sunLight.shadow.bias = -0.0004;
+    this.scene.add(sunLight);
 
     // 4. Initialize Core World & Systems
     this.village = new DeadwoodVillage();
@@ -242,11 +236,6 @@ export class ZombieGameEngine {
         this.loot.collectLoot(this.activeLootTarget, this.localPlayer, this.weapons);
         this.activeLootTarget = null;
       }
-    };
-
-    // Toggle Day / Night on [N]
-    this.playerCtrl.onToggleDayNightRequest = () => {
-      this.toggleDayNight();
     };
   }
 
@@ -478,41 +467,6 @@ export class ZombieGameEngine {
     }
 
     this.waves.startFirstWave();
-  }
-
-  public setDayMode(isDay: boolean) {
-    this.isDayMode = isDay;
-    if (isDay) {
-      this.scene.background = new THREE.Color(0x7bc8f6);
-      this.scene.fog = new THREE.FogExp2(0x8ecdf8, 0.003);
-      this.hemiLight.color.setHex(0xbae6fd);
-      this.hemiLight.groundColor.setHex(0x50753b);
-      this.hemiLight.intensity = 1.3;
-      this.ambientLight.color.setHex(0xffffff);
-      this.ambientLight.intensity = 0.65;
-      this.dirLight.color.setHex(0xfff6e6);
-      this.dirLight.intensity = 2.4;
-      this.dirLight.position.set(80, 150, 60);
-      this.renderer.toneMappingExposure = 1.15;
-    } else {
-      this.scene.background = new THREE.Color(0x080d18);
-      this.scene.fog = new THREE.FogExp2(0x080d18, 0.012);
-      this.hemiLight.color.setHex(0x1e293b);
-      this.hemiLight.groundColor.setHex(0x0b1120);
-      this.hemiLight.intensity = 0.4;
-      this.ambientLight.color.setHex(0x1e293b);
-      this.ambientLight.intensity = 0.45;
-      this.dirLight.color.setHex(0x94a3b8);
-      this.dirLight.intensity = 1.1;
-      this.dirLight.position.set(60, 100, 40);
-      this.renderer.toneMappingExposure = 1.05;
-    }
-    if (this.onStateChange) this.onStateChange();
-  }
-
-  public toggleDayNight(): boolean {
-    this.setDayMode(!this.isDayMode);
-    return this.isDayMode;
   }
 
   private handleResize = () => {
