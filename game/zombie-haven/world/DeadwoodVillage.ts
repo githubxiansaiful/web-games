@@ -90,11 +90,11 @@ export class DeadwoodVillage {
       this.rootGroup.add(stripe);
     }
 
-    // Farm dirt track curving South-West
+    // Farm dirt track curving South-West (rotated in 2D first to remain perfectly flat on the ground)
     const farmPathGeo = new THREE.PlaneGeometry(6, 120);
+    farmPathGeo.rotateZ(Math.PI / 6);
     const farmPath = new THREE.Mesh(farmPathGeo, gravelMat);
     farmPath.rotation.x = -Math.PI / 2;
-    farmPath.rotation.z = Math.PI / 6;
     farmPath.position.set(-50, 0.03, -70);
     farmPath.receiveShadow = true;
     this.rootGroup.add(farmPath);
@@ -102,11 +102,11 @@ export class DeadwoodVillage {
 
   // --- 3. ZONE A: VILLAGE CENTER ---
   private buildVillageCenter() {
-    // Stone Water Well right at center plaza (x: 0, z: 0)
+    // Stone Water Well moved to Plaza corner (-14, 0, 14) to keep road intersection completely open
     const well = VillageProps.createWaterWell();
-    well.position.set(0, 0, 0);
+    well.position.set(-14, 0, 14);
     this.rootGroup.add(well);
-    this.addCollider(-1.6, 1.6, -1.6, 1.6, 1.3);
+    this.addCollider(-15.6, -12.4, 12.4, 15.6, 1.3);
 
     // 4 Plaza Street Lamps
     const lampCoords = [
@@ -123,12 +123,12 @@ export class DeadwoodVillage {
       this.addCollider(lx - 0.25, lx + 0.25, lz - 0.25, lz + 0.25, 3.5);
     });
 
-    // Flaming Barrels in Plaza
+    // Flaming Barrels in Plaza (safely outside road at (10, 0, -10))
     const { group: fire1, light: fLight1 } = VillageProps.createBarrelFire();
-    fire1.position.set(6, 0, -5);
+    fire1.position.set(10, 0, -10);
     this.rootGroup.add(fire1);
     this.pointLights.push(fLight1);
-    this.addCollider(5.3, 6.7, -5.7, -4.3, 1.1);
+    this.addCollider(9.3, 10.7, -10.7, -9.3, 1.1);
 
     // General Store Building (North-East of square)
     const { group: store } = VillageProps.createHouse(14, 12, 5.5);
@@ -151,12 +151,12 @@ export class DeadwoodVillage {
     const houseConfigs = [
       // House 1 (North-West)
       { x: -35, z: 32, rot: Math.PI / 2, w: 12, d: 10 },
-      // House 2 (West)
-      { x: -45, z: -10, rot: 0, w: 11, d: 9 },
+      // House 2 (West) - shifted south to z=-18 to safely clear East-West highway (z=-5)
+      { x: -45, z: -18, rot: 0, w: 11, d: 9 },
       // House 3 (South-East)
       { x: 38, z: -35, rot: Math.PI, w: 13, d: 11 },
-      // House 4 (North)
-      { x: -5, z: 65, rot: 0, w: 12, d: 10 },
+      // House 4 (North) - shifted west to x=-22 to safely clear North-South crossroad (x=-4 to +4)
+      { x: -22, z: 65, rot: Math.PI / 2, w: 12, d: 10 },
     ];
 
     houseConfigs.forEach((cfg) => {
@@ -165,8 +165,11 @@ export class DeadwoodVillage {
       house.rotation.y = cfg.rot;
       this.rootGroup.add(house);
 
-      const hw = cfg.w / 2;
-      const hd = cfg.d / 2;
+      const isRotated = Math.abs(Math.sin(cfg.rot)) > 0.5;
+      const spanX = isRotated ? cfg.d : cfg.w;
+      const spanZ = isRotated ? cfg.w : cfg.d;
+      const hw = spanX / 2;
+      const hd = spanZ / 2;
       this.addCollider(cfg.x - hw, cfg.x + hw, cfg.z - hd, cfg.z + hd);
       this.houseSpawnPoints.push(new THREE.Vector3(cfg.x, 0.5, cfg.z));
 
@@ -177,18 +180,19 @@ export class DeadwoodVillage {
       this.rootGroup.add(fence);
     });
 
-    // Street lamps along residential lanes
+    // Street lamps along residential lanes (curb/sidewalk positions outside road borders)
     const lampLane = [
-      [-30, 10],
-      [30, -10],
-      [0, 45],
-      [0, -45],
+      [-30, 7.5],
+      [30, -7.5],
+      [6.5, 45],
+      [-6.5, -45],
     ];
     lampLane.forEach(([lx, lz]) => {
       const { group: lamp, light } = VillageProps.createStreetLamp();
       lamp.position.set(lx, 0, lz);
       this.rootGroup.add(lamp);
       this.pointLights.push(light);
+      this.addCollider(lx - 0.25, lx + 0.25, lz - 0.25, lz + 0.25, 3.5);
     });
   }
 
@@ -259,6 +263,12 @@ export class DeadwoodVillage {
       const dist = 110 + Math.random() * 140;
       const x = Math.cos(angle) * dist;
       const z = Math.sin(angle) * dist;
+
+      // Keep highways and roads completely clear of forest trees
+      if (this.isOnRoad(x, z, 3.5)) {
+        continue;
+      }
+
       const type = Math.random() > 0.4 ? 'pine' : 'dead';
       const scale = 0.8 + Math.random() * 0.6;
       treePositions.push({ x, z, type, scale });
@@ -308,6 +318,32 @@ export class DeadwoodVillage {
         this.zombieSpawnPoints.push(new THREE.Vector3(sx, 0, sz));
       });
     }
+  }
+
+  /**
+   * Checks if coordinate (x, z) falls within the roads (highway, crossroad, farm path)
+   * plus an optional safety margin.
+   */
+  public isOnRoad(x: number, z: number, margin = 2.5): boolean {
+    // 1. Main East-West Highway (length 400m from x = -200 to +200, width 10m: z in [-5, 5])
+    if (Math.abs(x) <= 205 && Math.abs(z) <= (5.0 + margin)) {
+      return true;
+    }
+    // 2. North-South Crossroads (length 350m from z = -175 to +175, width 8m: x in [-4, 4])
+    if (Math.abs(z) <= 180 && Math.abs(x) <= (4.0 + margin)) {
+      return true;
+    }
+    // 3. Farm dirt track (centered at (-50, -70), length 120m, width 6m, angled 30 deg)
+    const dx = x - (-50);
+    const dz = z - (-70);
+    const cosA = Math.cos(Math.PI / 6);
+    const sinA = Math.sin(Math.PI / 6);
+    const localWidth = Math.abs(dx * cosA - dz * sinA);
+    const localLength = Math.abs(-dx * sinA - dz * cosA);
+    if (localWidth <= (3.0 + margin) && localLength <= (60.0 + margin)) {
+      return true;
+    }
+    return false;
   }
 
   private addCollider(minX: number, maxX: number, minZ: number, maxZ: number, height = 5.0) {
@@ -413,7 +449,7 @@ export class DeadwoodVillage {
       const natureGroup = new THREE.Group();
       natureGroup.name = 'QuaterniusNature';
 
-      // 1. Scattered Rocks along roadsides and building corners
+      // 1. Scattered Rocks along roadsides and building corners (safely outside road bounds)
       const rockLocations = [
         { x: 12, z: 8, scale: 0.8 },
         { x: -14, z: 12, scale: 1.1 },
@@ -421,13 +457,14 @@ export class DeadwoodVillage {
         { x: -28, z: -8, scale: 1.2 },
         { x: 35, z: 18, scale: 1.0 },
         { x: -40, z: 28, scale: 1.3 },
-        { x: 5, z: -32, scale: 0.85 },
+        { x: 14, z: -32, scale: 0.85 },
         { x: -18, z: -45, scale: 1.0 },
         { x: 50, z: -25, scale: 1.15 },
         { x: -55, z: -20, scale: 0.95 },
       ];
 
       rockLocations.forEach((loc) => {
+        if (this.isOnRoad(loc.x, loc.z, 2.0)) return;
         const rock = natureGLBLoader.getRandomRock();
         if (rock) {
           rock.position.set(loc.x, 0, loc.z);
@@ -438,15 +475,16 @@ export class DeadwoodVillage {
         }
       });
 
-      // 2. Bushes and Foliage near fences and houses
+      // 2. Bushes and Foliage near fences and houses (no bushes on roads)
       const bushLocations = [
         { x: 8, z: 14 }, { x: -8, z: 16 }, { x: 15, z: -10 },
         { x: -20, z: 18 }, { x: 30, z: 12 }, { x: -32, z: 35 },
         { x: 25, z: 38 }, { x: -15, z: -28 }, { x: 42, z: -30 },
-        { x: -48, z: -15 }, { x: 0, z: 42 }, { x: 0, z: -42 },
+        { x: -48, z: -15 }, { x: -6.5, z: 42 }, { x: 6.5, z: -42 },
       ];
 
       bushLocations.forEach((loc) => {
+        if (this.isOnRoad(loc.x, loc.z, 1.5)) return;
         const bush = natureGLBLoader.getRandomBush();
         if (bush) {
           bush.position.set(loc.x, 0, loc.z);
@@ -455,12 +493,15 @@ export class DeadwoodVillage {
         }
       });
 
-      // 3. Low-poly Quaternius Trees along outer village perimeter
+      // 3. Low-poly Quaternius Trees along outer village perimeter (keep roads completely open)
       for (let i = 0; i < 28; i++) {
         const angle = (i / 28) * Math.PI * 2;
         const dist = 58 + (i % 3) * 16;
         const x = Math.cos(angle) * dist;
         const z = Math.sin(angle) * dist;
+
+        if (this.isOnRoad(x, z, 3.5)) continue;
+
         const tree = natureGLBLoader.getRandomTree();
         if (tree) {
           tree.position.set(x, 0, z);

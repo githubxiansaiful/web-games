@@ -218,15 +218,13 @@ export class Zombie {
     this.eyeMesh.visible = false;
 
     if (this.glbInstance) {
-      if (this.currentGlbAction && this.currentGlbAction !== this.glbInstance.actions.death) {
-        this.currentGlbAction.fadeOut(0.15);
-      }
+      this.glbInstance.mixer.stopAllAction();
       if (this.glbInstance.actions.death) {
-        this.glbInstance.actions.death.reset().fadeIn(0.15).play();
+        this.glbInstance.actions.death.reset().setEffectiveWeight(1.0).play();
         this.currentGlbAction = this.glbInstance.actions.death;
       }
       if (hitDir) {
-        this.group.position.addScaledVector(hitDir, 0.4);
+        this.group.position.addScaledVector(hitDir, 0.35);
       }
     } else {
       // Death collapse animation for procedural fallback
@@ -258,9 +256,12 @@ export class Zombie {
       this.glbInstance.mixer.update(delta);
     }
 
-    // If dead, fade and wait for removal
+    // If dead, advance deathTimer and sink slowly into ground after 3s
     if (this.isDead) {
       this.deathTimer += delta;
+      if (this.deathTimer > 3.0) {
+        this.group.position.y -= delta * 0.35;
+      }
       return;
     }
 

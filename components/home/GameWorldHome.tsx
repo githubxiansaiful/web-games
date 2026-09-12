@@ -24,23 +24,24 @@ import { useAuth } from '@/context/AuthContext';
 import { GameCanvas } from '@/components/GameCanvas';
 import { SpaceGameCanvas } from '@/components/space-game/SpaceGameCanvas';
 import { ZombieHavenCanvas } from '@/components/zombie-haven/ZombieHavenCanvas';
+import { DuoRampageGame } from '@/components/duo-rampage/DuoRampageGame';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 
 export const GameWorldHome: React.FC = () => {
   const { user, isLoading, isAdmin, openAuthModal } = useAuth();
 
-  // Active game view: null (home), 'runner' (Game 1), 'space' (Game 2), 'zombie' (Game 3)
+  // Active game view: null (home), 'runner' (Game 1), 'space' (Game 2), 'zombie' (Game 3), 'duo-rampage' (Game 4)
   // Preserves active game state on browser refresh via URL parameter & localStorage
-  const [activeGame, setActiveGame] = useState<'runner' | 'space' | 'zombie' | null>(() => {
+  const [activeGame, setActiveGame] = useState<'runner' | 'space' | 'zombie' | 'duo-rampage' | null>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const gameParam = params.get('game');
-      if (gameParam === 'runner' || gameParam === 'space' || gameParam === 'zombie') {
+      if (gameParam === 'runner' || gameParam === 'space' || gameParam === 'zombie' || gameParam === 'duo-rampage') {
         return gameParam;
       }
       const saved = localStorage.getItem('xian_active_game');
-      if (saved === 'runner' || saved === 'space' || saved === 'zombie') {
+      if (saved === 'runner' || saved === 'space' || saved === 'zombie' || saved === 'duo-rampage') {
         return saved;
       }
     }
@@ -82,7 +83,7 @@ export const GameWorldHome: React.FC = () => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const gameParam = params.get('game');
-      if (gameParam === 'runner' || gameParam === 'space' || gameParam === 'zombie') {
+      if (gameParam === 'runner' || gameParam === 'space' || gameParam === 'zombie' || gameParam === 'duo-rampage') {
         setActiveGame(gameParam);
       } else {
         setActiveGame(null);
@@ -93,7 +94,7 @@ export const GameWorldHome: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const handlePlayGame = (gameKey: 'runner' | 'space' | 'zombie') => {
+  const handlePlayGame = (gameKey: 'runner' | 'space' | 'zombie' | 'duo-rampage') => {
     if (!user) {
       openAuthModal('login');
       return;
@@ -160,6 +161,15 @@ export const GameWorldHome: React.FC = () => {
     );
   }
 
+  // If Game 4 (DUO RAMPAGE) is running
+  if (activeGame === 'duo-rampage') {
+    return (
+      <div className="fixed inset-0 z-50 w-full h-full bg-slate-950 overflow-hidden touch-none">
+        <DuoRampageGame onExit={() => setActiveGame(null)} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen w-full bg-[#060913] text-slate-100 flex flex-col antialiased selection:bg-indigo-500 selection:text-white pb-16">
       {/* 1. FLOATING MINIMAL TOP BAR (NO BULKY NAVBAR) */}
@@ -219,9 +229,78 @@ export const GameWorldHome: React.FC = () => {
         {/* Section Header */}
         <div className="flex items-center justify-between px-1">
           <h2 className="text-xs font-black tracking-widest text-slate-400 uppercase">CHOOSE GAME</h2>
-          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-            3 TITLES READY
+          <span className="text-[10px] font-bold text-amber-400 bg-amber-950/60 border border-amber-500/30 px-2 py-0.5 rounded-full">
+            4 TITLES READY
           </span>
+        </div>
+
+        {/* ============================================================ */}
+        {/* GAME CARD 0: DUO RAMPAGE (3D CARTOON CO-OP ACTION SHOOTER)   */}
+        {/* ============================================================ */}
+        <div className="group relative rounded-3xl bg-slate-900/90 border-2 border-orange-500/60 hover:border-amber-400 overflow-hidden shadow-2xl transition-all duration-200">
+          {/* Visual Poster Banner */}
+          <div className="h-52 sm:h-60 w-full relative overflow-hidden flex flex-col justify-end p-4 sm:p-5">
+            {/* Background Artwork */}
+            <div
+              className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+              style={{ backgroundImage: "url('/images/duo_rampage_poster.jpg')" }}
+            />
+            {/* Gradient Darkening Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/70 via-transparent to-slate-950/70" />
+
+            {/* Poster Badges */}
+            <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between z-10">
+              <span className="px-2.5 py-1 rounded-full bg-gradient-to-r from-red-600 to-amber-500 text-slate-950 font-black text-[10px] tracking-wider uppercase shadow-md flex items-center gap-1.5">
+                <Users className="w-3 h-3 text-slate-950" />
+                <span>CO-OP 2 PLAYERS • ROOM #</span>
+              </span>
+              <span className="px-2.5 py-1 rounded-full bg-slate-950/80 border border-slate-700/80 text-amber-400 font-black text-[10px] tracking-wider uppercase flex items-center gap-1">
+                <Flame className="w-3 h-3 text-amber-400 fill-current" />
+                <span>ABANDONED CITY</span>
+              </span>
+            </div>
+
+            {/* Game Title & Tags on Poster */}
+            <div className="relative z-10 space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-red-600 text-white font-black text-[9px] uppercase tracking-wider animate-pulse">
+                  NEW
+                </span>
+                <span className="text-[10px] font-bold text-cyan-300 tracking-wider">3D CARTOON ACTION</span>
+              </div>
+              <h3 className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-amber-200 to-orange-400 tracking-tight leading-none drop-shadow-md">
+                DUO RAMPAGE
+              </h3>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-amber-300">
+                <span>2-Player Co-op Shooter</span>
+                <span className="text-slate-600">•</span>
+                <span>Duo Combo & Rampage Mode</span>
+                <span className="text-slate-600">•</span>
+                <span>10s Revive</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card Body & Actions */}
+          <div className="p-4 sm:p-5 space-y-3 bg-slate-900/95">
+            {/* Tag Badges */}
+            <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-amber-300">6-DIGIT ROOM CODE</span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-sky-300">ASSAULT & HEAVY</span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-red-300">DESTRUCTIBLE CITY</span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-emerald-300">MUTANT BOSS</span>
+            </div>
+
+            {/* Tap To Play Button */}
+            <button
+              onClick={() => handlePlayGame('duo-rampage')}
+              className="w-full py-3.5 px-4 bg-gradient-to-r from-orange-600 via-amber-500 to-yellow-500 hover:from-orange-500 hover:to-yellow-400 text-slate-950 font-black text-sm rounded-2xl shadow-xl shadow-orange-600/30 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Play className="w-4 h-4 fill-slate-950" />
+              <span>PLAY DUO RAMPAGE</span>
+            </button>
+          </div>
         </div>
 
         {/* ============================================================ */}

@@ -21,16 +21,16 @@ export class LootSystem {
 
   private spawnDefaultLoot() {
     const locations: { type: LootType; x: number; z: number }[] = [
-      // Town square well
-      { type: 'medkit', x: 3, z: 3 },
-      { type: 'ammo_pistol', x: -3, z: 3 },
+      // Town square well (moved to plaza corner with the well)
+      { type: 'medkit', x: -12, z: 14 },
+      { type: 'ammo_pistol', x: -16, z: 14 },
       // General store interior
       { type: 'medkit', x: 28, z: 24 },
       { type: 'ammo_shotgun', x: 26, z: 22 },
       { type: 'ammo_rifle', x: 30, z: 26 },
       // Residential Houses
       { type: 'medkit', x: -35, z: 32 },
-      { type: 'ammo_pistol', x: -45, z: -10 },
+      { type: 'ammo_pistol', x: -45, z: -18 },
       { type: 'ammo_rifle', x: 38, z: -35 },
       // Farm & Red Barn
       { type: 'medkit', x: -80, z: -85 },

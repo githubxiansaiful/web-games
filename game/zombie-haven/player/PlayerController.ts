@@ -114,6 +114,10 @@ export class PlayerController {
   };
 
   private handleMouseDown = (e: MouseEvent) => {
+    if ((e.target as HTMLElement)?.closest('.no-pointer-lock')) {
+      return;
+    }
+
     if (!this.isPointerLocked) {
       this.requestPointerLock();
       return;
@@ -179,7 +183,7 @@ export class PlayerController {
 
     const isMoving = forward !== 0 || strafe !== 0;
     const isSprintKey = this.keys['ShiftLeft'] || this.keys['ShiftRight'];
-    const canSprint = isSprintKey && forward > 0 && this.player.stats.stamina > 5;
+    const canSprint = isSprintKey && forward > 0;
 
     // Movement speed from shared config (Spec Section 11)
     let baseSpeed = PLAYER_MOVEMENT_CONFIG.runSpeed; // 4.5 m/s
@@ -213,11 +217,10 @@ export class PlayerController {
     this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, targetVz, delta * accel);
 
     // Jump / Gravity (single keypress consumption prevents continuous auto-jumping)
-    if (this.keys['Space'] && this.isGrounded && this.player.stats.stamina >= 10) {
+    if (this.keys['Space'] && this.isGrounded) {
       this.verticalVelocity = 5.8;
       this.isGrounded = false;
       this.keys['Space'] = false;
-      this.player.stats.stamina -= 10;
       this.player.playJump();
     }
 

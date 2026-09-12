@@ -13,6 +13,30 @@ const handle = app.getRequestHandler();
 // In-memory room store for active multiplayer sessions
 const rooms = new Map();
 const zombieRooms = new Map();
+const duoRooms = new Map();
+
+function getOrCreateDuoRoom(code) {
+  if (!duoRooms.has(code)) {
+    duoRooms.set(code, {
+      code,
+      hostId: null,
+      status: 'lobby',
+      players: new Map(),
+      createdAt: Date.now(),
+    });
+  }
+  return duoRooms.get(code);
+}
+
+function serializeDuoRoom(room) {
+  return {
+    code: room.code,
+    hostId: room.hostId,
+    status: room.status,
+    players: Array.from(room.players.values()),
+    createdAt: room.createdAt,
+  };
+}
 
 function getOrCreateZombieRoom(code) {
   if (!zombieRooms.has(code)) {
@@ -366,6 +390,146 @@ app.prepare().then(() => {
       socket.to(roomCode).emit('zombie:remote_revived');
     });
 
+    // ============================================================
+    // DUO RAMPAGE 2-PLAYER CO-OP EVENTS
+    // ============================================================
+    let currentDuoRoomCode = null;
+
+    socket.on('duo:create_room', ({ playerName }, callback) => {
+      let code;
+      let attempts = 0;
+      do {
+        code = '#' + Math.floor(100000 + Math.random() * 900000);
+        attempts++;
+      } while (duoRooms.has(code) && attempts < 10);
+
+      const room = getOrCreateDuoRoom(code);
+      currentDuoRoomCode = code;
+      socket.join(code);
+
+      const playerData = {
+        id: socket.id,
+        name: playerName || 'Hero 1',
+        role: 'assault',
+        isHost: true,
+        isReady: true,
+      };
+
+      room.hostId = socket.id;
+      room.players.set(socket.id, playerData);
+
+      if (callback) callback({ success: true, room: serializeDuoRoom(room) });
+      io.to(code).emit('duo:room_updated', serializeDuoRoom(room));
+    });
+
+    socket.on('duo:join_room', ({ code, playerName }, callback) => {
+      let formattedCode = String(code).trim();
+      if (!formattedCode.startsWith('#')) formattedCode = '#' + formattedCode;
+
+      const room = duoRooms.get(formattedCode);
+      if (!room) {
+        if (callback) callback({ success: false, error: 'Room not found! Check your 6-digit code.' });
+        return;
+      }
+
+      if (room.players.size >= 2) {
+        if (callback) callback({ success: false, error: 'Room is full (Maximum 2 players).' });
+        return;
+      }
+
+      currentDuoRoomCode = formattedCode;
+      socket.join(formattedCode);
+
+      const playerData = {
+        id: socket.id,
+        name: playerName || 'Hero 2',
+        role: 'heavy',
+        isHost: false,
+        isReady: false,
+      };
+
+      room.players.set(socket.id, playerData);
+
+      if (callback) callback({ success: true, room: serializeDuoRoom(room) });
+      io.to(formattedCode).emit('duo:room_updated', serializeDuoRoom(room));
+    });
+
+    socket.on('duo:toggle_ready', ({ code, isReady }) => {
+      const roomCode = code || currentDuoRoomCode;
+      if (!roomCode) return;
+      const room = duoRooms.get(roomCode);
+      if (!room) return;
+
+      const p = room.players.get(socket.id);
+      if (p) {
+        p.isReady = isReady;
+        io.to(roomCode).emit('duo:room_updated', serializeDuoRoom(room));
+      }
+    });
+
+    socket.on('duo:start_game', ({ code }) => {
+      const roomCode = code || currentDuoRoomCode;
+      if (!roomCode) return;
+      const room = duoRooms.get(roomCode);
+      if (!room) return;
+
+      room.status = 'countdown';
+      io.to(roomCode).emit('duo:room_updated', serializeDuoRoom(room));
+
+      let count = 3;
+      const interval = setInterval(() => {
+        io.to(roomCode).emit('duo:countdown', count);
+        count--;
+        if (count < 0) {
+          clearInterval(interval);
+          room.status = 'playing';
+          io.to(roomCode).emit('duo:game_start');
+        }
+      }, 1000);
+    });
+
+    socket.on('duo:player_state', ({ code, ...state }) => {
+      const roomCode = code || currentDuoRoomCode;
+      if (!roomCode) return;
+      socket.to(roomCode).emit('duo:remote_player_state', {
+        id: socket.id,
+        ...state,
+      });
+    });
+
+    socket.on('duo:shoot', ({ code, origin, dir, weapon }) => {
+      const roomCode = code || currentDuoRoomCode;
+      if (!roomCode) return;
+      socket.to(roomCode).emit('duo:remote_shoot', {
+        id: socket.id,
+        origin,
+        dir,
+        weapon,
+      });
+    });
+
+    socket.on('duo:revive_done', ({ code }) => {
+      const roomCode = code || currentDuoRoomCode;
+      if (!roomCode) return;
+      socket.to(roomCode).emit('duo:remote_revived');
+    });
+
+    socket.on('duo:leave_room', ({ code }) => {
+      const roomCode = code || currentDuoRoomCode;
+      if (!roomCode) return;
+      const room = duoRooms.get(roomCode);
+      if (room) {
+        room.players.delete(socket.id);
+        socket.leave(roomCode);
+        if (room.players.size === 0) {
+          duoRooms.delete(roomCode);
+        } else {
+          io.to(roomCode).emit('duo:room_updated', serializeDuoRoom(room));
+        }
+      }
+      currentDuoRoomCode = null;
+    });
+
     // 10. Handle Disconnect
     socket.on('disconnect', () => {
       if (currentRoomCode) {
@@ -397,6 +561,18 @@ app.prepare().then(() => {
             zombieRooms.delete(currentZombieRoomCode);
           } else {
             io.to(currentZombieRoomCode).emit('zombie:room_updated', serializeZombieRoom(zRoom));
+          }
+        }
+      }
+
+      if (currentDuoRoomCode) {
+        const dRoom = duoRooms.get(currentDuoRoomCode);
+        if (dRoom) {
+          dRoom.players.delete(socket.id);
+          if (dRoom.players.size === 0) {
+            duoRooms.delete(currentDuoRoomCode);
+          } else {
+            io.to(currentDuoRoomCode).emit('duo:room_updated', serializeDuoRoom(dRoom));
           }
         }
       }

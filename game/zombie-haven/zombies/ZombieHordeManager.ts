@@ -150,8 +150,9 @@ export class ZombieHordeManager {
     for (let i = this.zombies.length - 1; i >= 0; i--) {
       const z = this.zombies[i];
 
-      // Remove dead zombies after 4.5s
+      // Update and remove dead zombies after 4.5s
       if (z.isDead) {
+        z.update(delta, null);
         if (z.deathTimer > 4.5) {
           this.scene.remove(z.group);
           this.zombies.splice(i, 1);

@@ -8,9 +8,6 @@ export const PLAYER_MOVEMENT_CONFIG = {
   runSpeed: 4.5,
   sprintSpeed: 6.0,
   aimSpeed: 2.8,
-  maxStamina: 100,
-  sprintDrainRate: 20, // points/sec
-  staminaRecoveryRate: 15, // points/sec
   colliderHeight: 1.8,
   colliderRadius: 0.35,
 };
@@ -90,8 +87,6 @@ export type PlayerState = 'alive' | 'downed' | 'dead';
 export interface PlayerStats {
   health: number;
   maxHealth: number;
-  stamina: number;
-  maxStamina: number;
   isSprinting: boolean;
   isAiming: boolean;
   isDowned: boolean;

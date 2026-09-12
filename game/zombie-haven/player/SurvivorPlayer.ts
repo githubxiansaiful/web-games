@@ -18,6 +18,7 @@ import { PlayerStats, WeaponType, PLAYER_MOVEMENT_CONFIG } from '../types';
 import { characterGLBLoader, SurvivorSkin } from './CharacterGLBLoader';
 import { gunGLBLoader } from '../weapons/GunGLBLoader';
 import { ualAnimationLoader } from '../animation/UALAnimationLoader';
+import { GUN_SETTINGS, applyGunTransform, applySocketTransform } from '../weapons/GunSettings';
 
 export const UAL_SKIN_PRESETS: Record<string, { mainColor: number; jointColor: number; name: string }> = {
   xian: { mainColor: 0x2563eb, jointColor: 0x1e293b, name: 'Xian (Tactical Blue)' },
@@ -46,6 +47,7 @@ export class SurvivorPlayer {
   private animActions: {
     idle?: THREE.AnimationAction;
     pistolIdle?: THREE.AnimationAction;
+    aim?: THREE.AnimationAction;
     walk?: THREE.AnimationAction;
     jog?: THREE.AnimationAction;
     sprint?: THREE.AnimationAction;
@@ -87,6 +89,7 @@ export class SurvivorPlayer {
   public rifleMuzzle: THREE.Object3D;
 
   public currentWeaponVisual: WeaponType = 'pistol';
+  public isLocal: boolean;
 
   // Animation state
   private animTimer: number = 0;
@@ -96,6 +99,7 @@ export class SurvivorPlayer {
     customColor = 0x2563eb,
     skin: SurvivorSkin | 'procedural' = isLocal ? 'xian' : 'crimson'
   ) {
+    this.isLocal = isLocal;
     this.group = new THREE.Group();
     this.activeSkin = skin;
 
@@ -113,8 +117,6 @@ export class SurvivorPlayer {
     this.stats = {
       health: 100,
       maxHealth: 100,
-      stamina: PLAYER_MOVEMENT_CONFIG.maxStamina,
-      maxStamina: PLAYER_MOVEMENT_CONFIG.maxStamina,
       isSprinting: false,
       isAiming: false,
       isDowned: false,
@@ -488,6 +490,14 @@ export class SurvivorPlayer {
 
     // Asynchronously load UAL 3D rigged character with 43 animations
     this.loadUALCharacter(customColor);
+
+    if (this.isLocal && typeof window !== 'undefined') {
+      (window as any).GUN_SETTINGS = GUN_SETTINGS;
+      (window as any).refreshGuns = () => this.refreshWeaponTransforms();
+      (window as any).printGunSettings = () => {
+        console.log('Current GUN_SETTINGS:\n', JSON.stringify(GUN_SETTINGS, null, 2));
+      };
+    }
   }
 
   /**
@@ -616,8 +626,18 @@ export class SurvivorPlayer {
     return worldPos;
   }
 
+  public refreshWeaponTransforms() {
+    if (this.ualModel) {
+      applySocketTransform(this.weaponSocket, GUN_SETTINGS.handSocket);
+    }
+    if (this.pistolMesh) applyGunTransform(this.pistolMesh, GUN_SETTINGS.pistol);
+    if (this.shotgunMesh) applyGunTransform(this.shotgunMesh, GUN_SETTINGS.shotgun);
+    if (this.rifleMesh) applyGunTransform(this.rifleMesh, GUN_SETTINGS.rifle);
+  }
+
   public setWeaponVisual(weapon: WeaponType) {
     this.currentWeaponVisual = weapon;
+    this.refreshWeaponTransforms();
     this.pistolMesh.visible = weapon === 'pistol';
     this.shotgunMesh.visible = weapon === 'shotgun';
     this.rifleMesh.visible = weapon === 'rifle';
@@ -674,6 +694,7 @@ export class SurvivorPlayer {
         this.weaponSocket.remove(this.pistolMesh);
         this.pistolMesh = p.group;
         this.pistolMuzzle = p.muzzle;
+        applyGunTransform(this.pistolMesh, GUN_SETTINGS.pistol);
         this.weaponSocket.add(this.pistolMesh);
       }
 
@@ -682,6 +703,7 @@ export class SurvivorPlayer {
         this.weaponSocket.remove(this.shotgunMesh);
         this.shotgunMesh = s.group;
         this.shotgunMuzzle = s.muzzle;
+        applyGunTransform(this.shotgunMesh, GUN_SETTINGS.shotgun);
         this.weaponSocket.add(this.shotgunMesh);
       }
 
@@ -690,6 +712,7 @@ export class SurvivorPlayer {
         this.weaponSocket.remove(this.rifleMesh);
         this.rifleMesh = r.group;
         this.rifleMuzzle = r.muzzle;
+        applyGunTransform(this.rifleMesh, GUN_SETTINGS.rifle);
         this.weaponSocket.add(this.rifleMesh);
       }
 
@@ -747,8 +770,8 @@ export class SurvivorPlayer {
       const handR = this.ualModel.getObjectByName('hand_r');
       if (handR) {
         handR.add(this.weaponSocket);
-        this.weaponSocket.position.set(0, 0.08, 0.01);
-        this.weaponSocket.rotation.set(-Math.PI / 2, 0, Math.PI);
+        applySocketTransform(this.weaponSocket, GUN_SETTINGS.handSocket);
+        this.refreshWeaponTransforms();
       }
 
       // Setup Animation Mixer & Actions
@@ -767,6 +790,7 @@ export class SurvivorPlayer {
       this.animActions = {
         idle: getAction('Idle_Loop'),
         pistolIdle: getAction('Pistol_Idle_Loop'),
+        aim: getAction('Pistol_Aim_Neutral'),
         walk: getAction('Walk_Loop'),
         jog: getAction('Jog_Fwd_Loop'),
         sprint: getAction('Sprint_Loop'),
@@ -978,22 +1002,7 @@ export class SurvivorPlayer {
     isSprinting: boolean,
     isGrounded: boolean = true
   ) {
-    // Stamina drain and regeneration (Spec Section 12)
-    if (isSprinting && velocity.lengthSq() > 0.1 && !this.stats.isDowned) {
-      this.stats.stamina = Math.max(0, this.stats.stamina - delta * PLAYER_MOVEMENT_CONFIG.sprintDrainRate);
-      if (this.stats.stamina === 0) {
-        this.stats.isSprinting = false;
-      } else {
-        this.stats.isSprinting = true;
-      }
-    } else {
-      this.stats.isSprinting = false;
-      this.stats.stamina = Math.min(
-        this.stats.maxStamina,
-        this.stats.stamina + delta * PLAYER_MOVEMENT_CONFIG.staminaRecoveryRate
-      );
-    }
-
+    this.stats.isSprinting = isSprinting && velocity.lengthSq() > 0.1 && !this.stats.isDowned;
     this.stats.isAiming = isAiming;
 
     // Downed / Dead State
@@ -1016,14 +1025,15 @@ export class SurvivorPlayer {
     if (this.animMixer && this.ualModelContainer.visible) {
       this.animMixer.update(delta);
 
-      let targetAction: THREE.AnimationAction | undefined = this.combatTimer > 0
-        ? (this.animActions.pistolIdle || this.animActions.idle)
-        : (this.animActions.idle || this.animActions.pistolIdle);
+      let targetAction: THREE.AnimationAction | undefined = this.animActions.pistolIdle || this.animActions.idle;
 
       if (this.stats.isDowned || this.stats.health <= 0) {
         targetAction = this.animActions.death;
       } else if (!isGrounded) {
         targetAction = this.animActions.jumpLoop;
+      } else if (isAiming) {
+        // Aiming stance: weapon raised pointing directly forward towards crosshair
+        targetAction = this.animActions.aim || this.animActions.pistolIdle;
       } else if (isMoving) {
         if (isSprinting) {
           targetAction = this.animActions.sprint;
@@ -1036,9 +1046,8 @@ export class SurvivorPlayer {
           if (targetAction) targetAction.timeScale = Math.max(0.85, Math.min(1.35, speed / 2.5));
         }
       } else {
-        targetAction = this.combatTimer > 0
-          ? (this.animActions.pistolIdle || this.animActions.idle)
-          : (this.animActions.idle || this.animActions.pistolIdle);
+        // Armed tactical ready stance (weapon held in two-handed grip)
+        targetAction = this.animActions.pistolIdle || this.animActions.idle;
       }
 
       this.wasGrounded = isGrounded;
