@@ -151,10 +151,10 @@ export const DuoMapSelection: React.FC<DuoMapSelectionProps> = ({
               <div
                 key={map.id}
                 onClick={() => handleMapClick(map, index)}
-                className={`relative shrink-0 rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 group select-none ${
+                className={`relative shrink-0 w-28 h-14 xs:w-34 xs:h-17 sm:w-44 sm:h-22 md:w-52 md:h-26 rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 group select-none ${
                   isSelected
-                    ? 'w-28 h-14 xs:w-34 xs:h-17 sm:w-44 sm:h-22 md:w-54 md:h-27 ring-2 ring-cyan-400 border border-cyan-300 shadow-[0_0_20px_rgba(6,182,212,0.7)] scale-105 z-10'
-                    : 'w-24 h-12 xs:w-28 xs:h-14 sm:w-36 sm:h-18 md:w-44 md:h-22 opacity-75 hover:opacity-100 border border-slate-700/80 hover:border-slate-500 shadow-md hover:scale-102'
+                    ? 'ring-2 ring-cyan-400 border border-cyan-300 shadow-[0_0_20px_rgba(6,182,212,0.7)] opacity-100 z-10'
+                    : 'border border-slate-700/80 hover:border-slate-500 opacity-75 hover:opacity-100 shadow-md'
                 }`}
               >
                 {/* Map Card Graphic Asset */}
