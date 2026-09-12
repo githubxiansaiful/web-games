@@ -26,8 +26,6 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   const [mode, setMode] = useState<'create' | 'join'>(initialMode);
   const [inputCode, setInputCode] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [region, setRegion] = useState('ASIA (AUTO)');
-  const [showRegionMenu, setShowRegionMenu] = useState(false);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sync mode if initialMode prop changes
@@ -190,7 +188,7 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
           transition: .18s;
           z-index: 10;
         }
-        .duo-back-btn:hover, .duo-settings-btn:hover, .duo-region-btn:hover {
+        .duo-back-btn:hover, .duo-settings-btn:hover {
           filter: brightness(1.18);
           transform: translateY(-1px);
         }
@@ -202,7 +200,7 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
           font-weight: 300;
           color: #38bdf8;
         }
-        .duo-back-btn strong, .duo-settings-btn strong, .duo-region-btn strong {
+        .duo-back-btn strong, .duo-settings-btn strong {
           display: block;
           font-size: 18px;
           letter-spacing: .5px;
@@ -226,7 +224,7 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
           gap: 12px;
           z-index: 10;
         }
-        .duo-region-btn, .duo-settings-btn {
+        .duo-settings-btn {
           height: 56px;
           padding: 0 17px;
           background: rgba(8,20,36,.88);
@@ -235,54 +233,13 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
           display: flex;
           align-items: center;
           gap: 12px;
-          transition: .18s;
-        }
-        .duo-region-btn {
-          min-width: 180px;
-          position: relative;
-        }
-        .duo-settings-btn {
           min-width: 139px;
-        }
-        .duo-online-dot {
-          width: 12px;
-          height: 12px;
-          border-radius: 50%;
-          background: #21e65d;
-          box-shadow: 0 0 12px #21e65d;
-        }
-        .duo-chevron {
-          font-family: Arial, sans-serif;
-          font-size: 26px;
-          margin-left: auto;
-          line-height: 1;
+          transition: .18s;
         }
         .duo-gear {
           font-size: 28px;
           line-height: 1;
         }
-
-        /* Region Dropdown Menu */
-        .duo-region-dropdown {
-          position: absolute;
-          right: 0;
-          top: 60px;
-          width: 100%;
-          background: rgba(6, 17, 31, 0.96);
-          border: 1px solid rgba(87, 126, 163, 0.7);
-          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
-          padding: 4px;
-          z-index: 50;
-        }
-        .duo-region-item {
-          padding: 8px 12px;
-          font-size: 13px;
-          font-weight: 700;
-          color: #9fb4c8;
-          cursor: pointer;
-          transition: .15s;
-        }
-        .duo-region-item:hover, .duo-region-item.active {
           background: rgba(18, 180, 255, 0.2);
           color: #38bdf8;
         }
@@ -775,7 +732,6 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
           .duo-room-panel { width: 410px; min-width: 410px; top: 18%; padding-left: 18px; padding-right: 18px; }
           .duo-top-right { right: 12px; }
           .duo-back-btn { left: 12px; }
-          .duo-region-btn { min-width: 155px; }
           .duo-settings-btn { min-width: 120px; }
           .duo-hero-heading { top: 24px; width: 500px; }
           .duo-hero-heading h1 { font-size: 52px; }
@@ -792,7 +748,6 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
         }
 
         @media (max-width: 680px) {
-          .duo-top-right .duo-region-btn { display: none; }
           .duo-settings-btn { min-width: 50px; width: 50px; padding: 0; justify-content: center; }
           .duo-settings-btn strong { display: none; }
           .duo-back-btn { min-width: 104px; width: 104px; }
@@ -836,40 +791,6 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
       </button>
 
       <div className="duo-top-right">
-        {/* Region Selector */}
-        <div className="relative">
-          <button
-            type="button"
-            className="duo-region-btn"
-            onClick={() => {
-              duoAudio.playUiClick();
-              setShowRegionMenu(!showRegionMenu);
-            }}
-          >
-            <span className="duo-online-dot" />
-            <strong>{region}</strong>
-            <span className="duo-chevron">⌄</span>
-          </button>
-
-          {showRegionMenu && (
-            <div className="duo-region-dropdown">
-              {['ASIA (AUTO)', 'EU (CENTRAL)', 'US (EAST)'].map((reg) => (
-                <div
-                  key={reg}
-                  className={`duo-region-item ${region === reg ? 'active' : ''}`}
-                  onClick={() => {
-                    setRegion(reg);
-                    setShowRegionMenu(false);
-                    duoAudio.playUiClick();
-                  }}
-                >
-                  {reg}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Settings Button */}
         <button
           type="button"
