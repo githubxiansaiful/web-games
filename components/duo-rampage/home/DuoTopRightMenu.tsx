@@ -5,13 +5,11 @@ import { Settings, Gamepad2, Users, Crown, ArrowLeft } from 'lucide-react';
 import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
 
 interface DuoTopRightMenuProps {
-  onlineCount?: number;
   onOpenModal: (modal: 'settings' | 'how_to_play' | 'friends' | 'leaderboard') => void;
   onExit?: () => void;
 }
 
 export const DuoTopRightMenu: React.FC<DuoTopRightMenuProps> = ({
-  onlineCount = 1248,
   onOpenModal,
   onExit,
 }) => {
@@ -73,15 +71,6 @@ export const DuoTopRightMenu: React.FC<DuoTopRightMenuProps> = ({
         <Crown className="w-3.5 h-3.5 text-amber-400" />
         <span className="hidden lg:inline">RANKS</span>
       </button>
-
-      {/* Online Count Indicator */}
-      <div className="flex items-center gap-1 px-2 sm:px-2.5 py-1 bg-slate-950/80 border border-emerald-500/30 rounded-full shadow-inner font-knight text-[10px] sm:text-xs">
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="text-slate-300">
-          <span className="hidden md:inline text-slate-400 mr-1">Online:</span>
-          <span className="text-emerald-400">{onlineCount.toLocaleString()}</span>
-        </span>
-      </div>
     </div>
   );
 };

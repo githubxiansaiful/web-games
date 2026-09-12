@@ -65,9 +65,8 @@ export const DuoRampageHomeScreen: React.FC<DuoRampageHomeScreenProps> = ({
         {/* Top-Left: Player Profile */}
         <DuoPlayerProfile name="RAMPAGE#001" level={1} xpPercent={65} />
 
-        {/* Top-Right: Settings, How to Play, Friends, Leaderboard, Online Count, Exit */}
+        {/* Top-Right: Settings, How to Play, Friends, Leaderboard, Exit */}
         <DuoTopRightMenu
-          onlineCount={1248}
           onOpenModal={(modal) => handleOpenModal(modal)}
           onExit={onExit}
         />
