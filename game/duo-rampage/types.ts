@@ -26,6 +26,7 @@ export interface PlayerStats {
   id: string;
   name: string;
   role: PlayerRole;
+  avatar?: string | null;
   isHost: boolean;
   isReady: boolean;
   health: number;

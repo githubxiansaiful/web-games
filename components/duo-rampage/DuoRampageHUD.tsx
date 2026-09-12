@@ -87,8 +87,17 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
       } else if (key === 's' || key === 'arrowdown') {
         controlsRef.current.moveZ = 1;
         changed = true;
-      } else if (key === ' ' || key === 'shift') {
+      } else if (key === ' ') {
+        controlsRef.current.moveZ = -1; // Jump
+        changed = true;
+      } else if (key === 'shift') {
         controlsRef.current.isDashing = true;
+        changed = true;
+      } else if (key === 'g') {
+        controlsRef.current.isGrenade = true;
+        changed = true;
+      } else if (key === 'j') {
+        controlsRef.current.isShooting = true;
         changed = true;
       } else if (key === 'r') {
         controlsRef.current.isReloading = true;
@@ -114,11 +123,17 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
       if (key === 'a' || key === 'arrowleft' || key === 'd' || key === 'arrowright') {
         controlsRef.current.moveX = 0;
         changed = true;
-      } else if (key === 'w' || key === 'arrowup' || key === 's' || key === 'arrowdown') {
+      } else if (key === 'w' || key === 'arrowup' || key === 's' || key === 'arrowdown' || key === ' ') {
         controlsRef.current.moveZ = 0;
         changed = true;
-      } else if (key === ' ' || key === 'shift') {
+      } else if (key === 'shift') {
         controlsRef.current.isDashing = false;
+        changed = true;
+      } else if (key === 'g') {
+        controlsRef.current.isGrenade = false;
+        changed = true;
+      } else if (key === 'j') {
+        controlsRef.current.isShooting = false;
         changed = true;
       } else if (key === 'r') {
         controlsRef.current.isReloading = false;
@@ -254,31 +269,57 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
         </div>
       )}
 
-      {/* 4. TOP BAR: HEALTH BARS & COMBO METER */}
-      <div className="w-full px-3 sm:px-6 pt-3 flex items-start justify-between">
-        {/* Left: Player 1 (Assault Hero) */}
-        <div className="flex items-center gap-2.5 bg-slate-950/80 backdrop-blur-md p-2 sm:p-2.5 rounded-2xl border border-sky-500/40 shadow-xl max-w-[170px] sm:max-w-xs">
-          <div className="w-10 h-10 rounded-xl bg-sky-600 flex items-center justify-center font-black text-white text-lg shadow-md shrink-0">
-            ⚡
+      {/* Wave Announcement Banner */}
+      {wave.waveAnnounceText && (
+        <div className="absolute top-1/3 inset-x-0 flex flex-col items-center pointer-events-none z-40 animate-pulse">
+          <div className="px-8 py-3 bg-slate-950/90 border-y-2 border-amber-400 text-amber-300 font-black text-xl sm:text-3xl tracking-widest uppercase shadow-[0_0_40px_rgba(245,158,11,0.6)]">
+            {wave.waveAnnounceText}
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between text-[11px] font-black text-sky-300 truncate">
-              <span>{player1 ? player1.name : 'Assault'}</span>
-              <span className="text-white">{player1 ? `${Math.round(player1.health)} HP` : '100 HP'}</span>
-            </div>
-            {/* HP Bar */}
-            <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden mt-1 border border-slate-700">
-              <div
-                className="h-full bg-gradient-to-r from-sky-500 to-cyan-400 transition-all duration-150"
-                style={{ width: `${player1 ? (player1.health / player1.maxHealth) * 100 : 100}%` }}
+        </div>
+      )}
+
+      {/* 4. TOP BAR: HEALTH BARS & COMBO METER */}
+      <div className="w-full px-3 sm:px-6 pt-3 flex items-start justify-between pointer-events-none">
+        {/* Left: DUO RAMPAGE LOGO & P1 HUD */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <img
+            src="/images/duo-rampage/duo_rampage_logo.png"
+            alt="Duo Rampage"
+            className="h-8 sm:h-11 w-auto drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] hidden xs:block"
+          />
+
+          {/* Player 1 Card (Assault Hero) */}
+          <div className="flex items-center gap-2 bg-slate-950/85 backdrop-blur-md p-1.5 sm:p-2 rounded-2xl border border-red-500/50 shadow-2xl">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden border-2 border-red-500 bg-slate-900 shadow-md shrink-0 relative">
+              <img
+                src={player1?.avatar || '/images/duo-rampage/player1.png'}
+                alt="P1"
+                className="w-full h-full object-cover"
+                style={{ objectPosition: '45% 18%', transform: 'scale(1.4)' }}
               />
-            </div>
-            {/* Ammo Badge */}
-            <div className="flex items-center justify-between text-[9px] font-bold text-slate-400 mt-0.5">
-              <span className="uppercase text-sky-400">{player1?.weapon || 'Rifle'}</span>
-              <span className="text-amber-400">
-                {player1?.isReloading ? 'RELOADING...' : `${player1?.ammo}/${player1?.maxAmmo}`}
+              <span className="absolute top-0.5 left-0.5 px-1 bg-red-600/90 rounded text-[9px] font-black text-white leading-tight">
+                P1
               </span>
+            </div>
+            <div className="w-24 sm:w-36">
+              <div className="flex items-center justify-between text-[11px] font-black tracking-wide text-red-400">
+                <span className="truncate">{player1 ? player1.name : 'HERO 1'}</span>
+                <span className="text-white text-[10px]">{player1 ? `${Math.round(player1.health)}` : '100'}</span>
+              </div>
+              {/* HP Bar */}
+              <div className="w-full h-3 bg-slate-900 rounded-sm overflow-hidden mt-0.5 border border-red-900/60 relative">
+                <div
+                  className="h-full bg-gradient-to-r from-red-600 to-rose-500 transition-all duration-150"
+                  style={{ width: `${player1 ? (player1.health / player1.maxHealth) * 100 : 100}%` }}
+                />
+              </div>
+              {/* Ammo Bar */}
+              <div className="w-full h-1.5 bg-slate-950 rounded-sm overflow-hidden mt-0.5 border border-slate-800">
+                <div
+                  className="h-full bg-gradient-to-r from-sky-400 to-blue-500"
+                  style={{ width: `${player1 ? (player1.ammo / player1.maxAmmo) * 100 : 100}%` }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -311,6 +352,41 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
 
         {/* Right: Player 2 (Heavy Hero) & Controls */}
         <div className="flex items-center gap-2">
+          {/* Player 2 Card */}
+          <div className="flex items-center gap-2 bg-slate-950/85 backdrop-blur-md p-1.5 sm:p-2 rounded-2xl border border-sky-500/50 shadow-2xl">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden border-2 border-sky-400 bg-slate-900 shadow-md shrink-0 relative">
+              <img
+                src={player2?.avatar || '/images/duo-rampage/player2_hologram.png'}
+                alt="P2"
+                className="w-full h-full object-cover"
+                style={{ objectPosition: '50% 20%', transform: 'scale(1.4)' }}
+              />
+              <span className="absolute top-0.5 right-0.5 px-1 bg-sky-600/90 rounded text-[9px] font-black text-white leading-tight">
+                P2
+              </span>
+            </div>
+            <div className="w-24 sm:w-36">
+              <div className="flex items-center justify-between text-[11px] font-black tracking-wide text-sky-400">
+                <span className="truncate">{player2 ? player2.name : 'HERO 2'}</span>
+                <span className="text-white text-[10px]">{player2 ? `${Math.round(player2.health)}` : '100'}</span>
+              </div>
+              {/* HP Bar */}
+              <div className="w-full h-3 bg-slate-900 rounded-sm overflow-hidden mt-0.5 border border-sky-900/60 relative">
+                <div
+                  className="h-full bg-gradient-to-r from-sky-500 to-cyan-400 transition-all duration-150"
+                  style={{ width: `${player2 ? (player2.health / player2.maxHealth) * 100 : 100}%` }}
+                />
+              </div>
+              {/* Ammo Bar */}
+              <div className="w-full h-1.5 bg-slate-950 rounded-sm overflow-hidden mt-0.5 border border-slate-800">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-400 to-yellow-500"
+                  style={{ width: `${player2 ? (player2.ammo / player2.maxAmmo) * 100 : 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Sound & Exit Buttons */}
           <div className="flex flex-col gap-1.5 pointer-events-auto">
             <button
@@ -330,33 +406,6 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
             >
               <ArrowLeft className="w-4 h-4 text-amber-400" />
             </button>
-          </div>
-
-          {/* Player 2 Card */}
-          <div className="flex items-center gap-2.5 bg-slate-950/80 backdrop-blur-md p-2 sm:p-2.5 rounded-2xl border border-orange-500/40 shadow-xl max-w-[170px] sm:max-w-xs">
-            <div className="w-10 h-10 rounded-xl bg-orange-600 flex items-center justify-center font-black text-white text-lg shadow-md shrink-0">
-              💥
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between text-[11px] font-black text-orange-300 truncate">
-                <span>{player2 ? player2.name : 'Heavy'}</span>
-                <span className="text-white">{player2 ? `${Math.round(player2.health)} HP` : '100 HP'}</span>
-              </div>
-              {/* HP Bar */}
-              <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden mt-1 border border-slate-700">
-                <div
-                  className="h-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-150"
-                  style={{ width: `${player2 ? (player2.health / player2.maxHealth) * 100 : 100}%` }}
-                />
-              </div>
-              {/* Ammo Badge */}
-              <div className="flex items-center justify-between text-[9px] font-bold text-slate-400 mt-0.5">
-                <span className="uppercase text-orange-400">{player2?.weapon || 'Shotgun'}</span>
-                <span className="text-amber-400">
-                  {player2?.isReloading ? 'RELOADING...' : `${player2?.ammo}/${player2?.maxAmmo}`}
-                </span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -396,27 +445,17 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
         <div className="flex items-end gap-3 pointer-events-auto">
           {/* Auxiliary Buttons Column */}
           <div className="flex flex-col gap-2.5">
-            {/* Special Ability Button (Q) */}
+            {/* Grenade Button (G) */}
             <button
-              onTouchStart={() => updateControls({ isSpecial: true })}
-              onTouchEnd={() => updateControls({ isSpecial: false })}
-              onMouseDown={() => updateControls({ isSpecial: true })}
-              onMouseUp={() => updateControls({ isSpecial: false })}
-              className={`w-12 h-12 rounded-2xl border flex flex-col items-center justify-center font-black text-[10px] shadow-lg transition active:scale-95 cursor-pointer relative overflow-hidden ${
-                myPlayer && myPlayer.specialCooldown > 0
-                  ? 'bg-slate-950/90 border-slate-800 text-slate-500'
-                  : myRole === 'assault'
-                  ? 'bg-gradient-to-tr from-sky-600 to-cyan-500 border-sky-300 text-white animate-pulse shadow-sky-500/30'
-                  : 'bg-gradient-to-tr from-amber-600 to-orange-500 border-amber-300 text-white animate-pulse shadow-amber-500/30'
-              }`}
-              title={myRole === 'assault' ? 'Tactical Cluster Airstrike (Q)' : 'Titan Shockwave Slam (Q)'}
+              onTouchStart={() => updateControls({ isGrenade: true })}
+              onTouchEnd={() => updateControls({ isGrenade: false })}
+              onMouseDown={() => updateControls({ isGrenade: true })}
+              onMouseUp={() => updateControls({ isGrenade: false })}
+              className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-600 to-orange-500 border border-amber-300 text-white flex flex-col items-center justify-center font-black text-[9px] shadow-lg transition active:scale-95 cursor-pointer"
+              title="Throw Grenade (G)"
             >
-              <span className="text-base leading-none">{myRole === 'assault' ? '🚀' : '🛡️'}</span>
-              <span className="text-[8px] font-black uppercase tracking-tighter mt-0.5">
-                {myPlayer && myPlayer.specialCooldown > 0
-                  ? `${Math.ceil(myPlayer.specialCooldown)}s`
-                  : 'ABILITY'}
-              </span>
+              <span className="text-base leading-none">💣</span>
+              <span className="text-[7px] font-black uppercase mt-0.5">BOMB</span>
             </button>
 
             {/* Quick Weapon Switch Button */}
@@ -467,34 +506,38 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
             >
               🗡️
             </button>
-
-            {/* Reload Button */}
-            <button
-              onTouchStart={() => updateControls({ isReloading: true })}
-              onTouchEnd={() => updateControls({ isReloading: false })}
-              onMouseDown={() => updateControls({ isReloading: true })}
-              onMouseUp={() => updateControls({ isReloading: false })}
-              className="w-12 h-12 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-amber-400 flex items-center justify-center font-black text-xs shadow-lg transition active:scale-95 cursor-pointer"
-            >
-              <RotateCw className="w-5 h-5" />
-            </button>
           </div>
 
-          {/* Primary Action: Large SHOOT Button */}
-          <button
-            onTouchStart={() => updateControls({ isShooting: true })}
-            onTouchEnd={() => updateControls({ isShooting: false })}
-            onMouseDown={() => updateControls({ isShooting: true })}
-            onMouseUp={() => updateControls({ isShooting: false })}
-            className={`w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex flex-col items-center justify-center font-black text-white text-xs sm:text-sm tracking-wider shadow-2xl border-2 transition-transform active:scale-90 cursor-pointer ${
-              combo.isRampage
-                ? 'bg-gradient-to-tr from-red-600 via-amber-500 to-yellow-400 border-white shadow-amber-500/50 animate-pulse'
-                : 'bg-gradient-to-tr from-rose-600 via-red-500 to-orange-500 border-amber-300/60 shadow-red-600/40'
-            }`}
-          >
-            <Crosshair className="w-7 h-7 sm:w-8 sm:h-8 mb-1" />
-            <span>FIRE</span>
-          </button>
+          {/* Primary Action Buttons: JUMP and FIRE */}
+          <div className="flex items-end gap-2.5">
+            {/* JUMP Button */}
+            <button
+              onTouchStart={() => updateControls({ moveZ: -1 })}
+              onTouchEnd={() => updateControls({ moveZ: 0 })}
+              onMouseDown={() => updateControls({ moveZ: -1 })}
+              onMouseUp={() => updateControls({ moveZ: 0 })}
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-tr from-sky-600 to-blue-500 hover:from-sky-500 hover:to-blue-400 border-2 border-sky-300 text-white flex flex-col items-center justify-center font-black text-xs sm:text-sm tracking-wider shadow-xl transition active:scale-90 cursor-pointer"
+            >
+              <span className="text-xl sm:text-2xl leading-none">▲</span>
+              <span className="text-[10px] sm:text-xs font-black mt-0.5">JUMP</span>
+            </button>
+
+            {/* Primary Action: Large SHOOT Button */}
+            <button
+              onTouchStart={() => updateControls({ isShooting: true })}
+              onTouchEnd={() => updateControls({ isShooting: false })}
+              onMouseDown={() => updateControls({ isShooting: true })}
+              onMouseUp={() => updateControls({ isShooting: false })}
+              className={`w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex flex-col items-center justify-center font-black text-white text-xs sm:text-sm tracking-wider shadow-2xl border-2 transition-transform active:scale-90 cursor-pointer ${
+                combo.isRampage
+                  ? 'bg-gradient-to-tr from-red-600 via-amber-500 to-yellow-400 border-white shadow-amber-500/50 animate-pulse'
+                  : 'bg-gradient-to-tr from-rose-600 via-red-500 to-orange-500 border-amber-300/60 shadow-red-600/40'
+              }`}
+            >
+              <Crosshair className="w-7 h-7 sm:w-8 sm:h-8 mb-1" />
+              <span>FIRE</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
