@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Mail, Lock, User as UserIcon, LogIn, UserPlus, Sparkles, CheckCircle, AlertCircle, Shield } from 'lucide-react';
+import { X, Mail, Lock, User as UserIcon, LogIn, UserPlus, Sparkles, CheckCircle, AlertCircle, Shield, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export const AuthModal: React.FC = () => {
@@ -10,6 +10,7 @@ export const AuthModal: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -153,9 +154,35 @@ export const AuthModal: React.FC = () => {
 
         {/* Error / Success Banners */}
         {error && (
-          <div className="mb-4 p-3 bg-rose-950/60 border border-rose-500/50 rounded-xl text-rose-200 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-            <span>{error}</span>
+          <div className="mb-4 p-3 bg-rose-950/70 border border-rose-500/60 rounded-xl text-rose-200 text-xs flex flex-col gap-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <span className="leading-relaxed">{error}</span>
+            </div>
+            {authModalView === 'login' && error.toLowerCase().includes('register') && (
+              <button
+                type="button"
+                onClick={() => {
+                  openAuthModal('register');
+                  setError(null);
+                }}
+                className="self-start inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 hover:text-amber-200 underline cursor-pointer mt-0.5"
+              >
+                👉 Click here to switch to Register & create this account
+              </button>
+            )}
+            {authModalView === 'register' && error.toLowerCase().includes('sign in') && (
+              <button
+                type="button"
+                onClick={() => {
+                  openAuthModal('login');
+                  setError(null);
+                }}
+                className="self-start inline-flex items-center gap-1 text-[11px] font-bold text-cyan-300 hover:text-cyan-200 underline cursor-pointer mt-0.5"
+              >
+                👉 Click here to switch to Sign In & log in
+              </button>
+            )}
           </div>
         )}
         {successMsg && (
@@ -216,13 +243,22 @@ export const AuthModal: React.FC = () => {
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-slate-800/80 border border-slate-700/80 focus:border-indigo-500 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none transition"
+                  className="w-full bg-slate-800/80 border border-slate-700/80 focus:border-indigo-500 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none transition"
                 />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 transition cursor-pointer"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
           )}
@@ -246,6 +282,38 @@ export const AuthModal: React.FC = () => {
               </>
             )}
           </button>
+
+          {authModalView === 'login' && (
+            <div className="mt-2.5 text-center text-xs text-slate-400">
+              Don&apos;t have an account yet?{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  openAuthModal('register');
+                  setError(null);
+                }}
+                className="text-amber-300 hover:text-amber-200 font-bold underline cursor-pointer"
+              >
+                Register now
+              </button>
+            </div>
+          )}
+
+          {authModalView === 'register' && (
+            <div className="mt-2.5 text-center text-xs text-slate-400">
+              Already have an account?{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  openAuthModal('login');
+                  setError(null);
+                }}
+                className="text-cyan-300 hover:text-cyan-200 font-bold underline cursor-pointer"
+              >
+                Sign In
+              </button>
+            </div>
+          )}
         </form>
 
         {/* Divider */}

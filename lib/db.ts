@@ -452,6 +452,19 @@ class DatabaseService {
     }
   }
 
+  private saveLocalJsonBackup() {
+    try {
+      const dataDir = path.join(process.cwd(), 'data');
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+      const dataFilePath = path.join(dataDir, 'xian_games_store.json');
+      fs.writeFileSync(dataFilePath, JSON.stringify(this.memoryFallback, null, 2), 'utf-8');
+    } catch (e) {
+      console.warn('[Storage] Failed to save local JSON backup:', e);
+    }
+  }
+
   // ---------------- Users ----------------
   async getUsers(): Promise<User[]> {
     await this.ensureInitialized();
@@ -540,6 +553,7 @@ class DatabaseService {
         },
       };
       this.memoryFallback.users.push(newUser);
+      this.saveLocalJsonBackup();
       return { ...newUser };
     }
 
@@ -561,6 +575,7 @@ class DatabaseService {
       const current = this.memoryFallback.users[idx];
       const updated: User = { ...current, ...updates, id: current.id };
       this.memoryFallback.users[idx] = updated;
+      this.saveLocalJsonBackup();
       return { ...updated };
     }
 
@@ -639,6 +654,7 @@ class DatabaseService {
     if (this.isFallbackMode || !this.pool) {
       const prev = this.memoryFallback.users.length;
       this.memoryFallback.users = this.memoryFallback.users.filter((u) => u.id !== id);
+      this.saveLocalJsonBackup();
       return this.memoryFallback.users.length < prev;
     }
     const res = await this.pool.query('DELETE FROM users WHERE id = $1', [id]);
@@ -685,6 +701,7 @@ class DatabaseService {
       if (this.memoryFallback.emailLogs.length > 300) {
         this.memoryFallback.emailLogs = this.memoryFallback.emailLogs.slice(-300);
       }
+      this.saveLocalJsonBackup();
       return entry;
     }
 

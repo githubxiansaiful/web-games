@@ -4,14 +4,18 @@ import { db, verifyPassword } from '@/lib/db';
 export async function POST(req: Request) {
   try {
     const { email, password } = await req.json();
+    const normalizedEmail = (email || '').trim().toLowerCase();
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
     }
 
-    const user = await db.getUserByEmail(email);
+    const user = await db.getUserByEmail(normalizedEmail);
     if (!user) {
-      return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'No account found with this email. Please switch to the Register tab to create an account.' },
+        { status: 404 }
+      );
     }
 
     if (user.status === 'suspended') {
@@ -23,7 +27,10 @@ export async function POST(req: Request) {
 
     const isValid = verifyPassword(password, user.passwordHash);
     if (!isValid) {
-      return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Incorrect password. Please check your password and try again.' },
+        { status: 401 }
+      );
     }
 
     // Update last login timestamp

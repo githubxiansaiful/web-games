@@ -19,7 +19,10 @@ export async function POST(req: Request) {
     // Check if user already exists
     const existing = await db.getUserByEmail(normalizedEmail);
     if (existing) {
-      return NextResponse.json({ error: 'An account with this email address already exists.' }, { status: 409 });
+      return NextResponse.json(
+        { error: 'An account with this email address already exists. Please switch to the Sign In tab to log in.' },
+        { status: 409 }
+      );
     }
 
     // Create user
