@@ -28,6 +28,7 @@ import {
 import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
 import Image from 'next/image';
 import { toast } from '@/hooks/use-toast';
+import { DuoCoin, DuoStarRating } from '../ui/DuoIcons';
 
 export type DuoModalType =
   | 'settings'
@@ -478,8 +479,16 @@ export const DuoModals: React.FC<DuoModalsProps> = ({
                     </span>
                   </div>
                   <div className="text-[10px] text-slate-400 space-y-1">
-                    <p>Damage: ★★★★☆ (28 DMG)</p>
-                    <p>Fire Rate: ★★★★★ (650 RPM)</p>
+                    <div className="flex items-center gap-1.5">
+                      <span>Damage:</span>
+                      <DuoStarRating rating={4} />
+                      <span className="text-slate-500">(28 DMG)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span>Fire Rate:</span>
+                      <DuoStarRating rating={5} />
+                      <span className="text-slate-500">(650 RPM)</span>
+                    </div>
                     <p>Clip Size: 30 Rounds</p>
                   </div>
                 </div>
@@ -492,8 +501,16 @@ export const DuoModals: React.FC<DuoModalsProps> = ({
                     </span>
                   </div>
                   <div className="text-[10px] text-slate-400 space-y-1">
-                    <p>Damage: ★★★★★ (72 DMG)</p>
-                    <p>Fire Rate: ★★☆☆☆ (120 RPM)</p>
+                    <div className="flex items-center gap-1.5">
+                      <span>Damage:</span>
+                      <DuoStarRating rating={5} />
+                      <span className="text-slate-500">(72 DMG)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span>Fire Rate:</span>
+                      <DuoStarRating rating={2} />
+                      <span className="text-slate-500">(120 RPM)</span>
+                    </div>
                     <p>Clip Size: 8 Shells</p>
                   </div>
                 </div>
@@ -506,8 +523,16 @@ export const DuoModals: React.FC<DuoModalsProps> = ({
                     </span>
                   </div>
                   <div className="text-[10px] text-slate-400 space-y-1">
-                    <p>Damage: ★★★★☆ (34 DMG)</p>
-                    <p>Fire Rate: ★★★★★★ (950 RPM)</p>
+                    <div className="flex items-center gap-1.5">
+                      <span>Damage:</span>
+                      <DuoStarRating rating={4} />
+                      <span className="text-slate-500">(34 DMG)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span>Fire Rate:</span>
+                      <DuoStarRating rating={5} />
+                      <span className="text-slate-500">(950 RPM)</span>
+                    </div>
                     <p>Clip Size: 100 Rounds</p>
                   </div>
                 </div>
@@ -626,9 +651,9 @@ export const DuoModals: React.FC<DuoModalsProps> = ({
                       variant: 'success',
                     });
                   }}
-                  className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] rounded-xl cursor-pointer transition active:scale-95"
+                  className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] rounded-xl cursor-pointer transition active:scale-95 flex items-center gap-1"
                 >
-                  CLAIM 50 🪙
+                  CLAIM 50 <DuoCoin className="w-3 h-3" />
                 </button>
               </div>
 
@@ -693,7 +718,18 @@ export const DuoModals: React.FC<DuoModalsProps> = ({
                       <span className="font-black text-[9px] text-slate-400 uppercase">DAY {day}</span>
                       <Sparkles className={`w-5 h-5 ${isCurrent ? 'text-amber-400 animate-spin' : 'text-slate-400'}`} />
                       <span className={`font-black text-[9px] ${isClaimed ? 'text-slate-500' : 'text-amber-300'}`}>
-                        {isClaimed ? 'CLAIMED' : isCurrent ? 'CLAIM!' : day === 7 ? 'SKIN' : `${day * 100}🪙`}
+                        {isClaimed ? (
+                          'CLAIMED'
+                        ) : isCurrent ? (
+                          'CLAIM!'
+                        ) : day === 7 ? (
+                          'SKIN'
+                        ) : (
+                          <span className="inline-flex items-center gap-0.5 justify-center">
+                            <DuoCoin className="w-2.5 h-2.5" />
+                            {day * 100}
+                          </span>
+                        )}
                       </span>
                     </div>
                   );
