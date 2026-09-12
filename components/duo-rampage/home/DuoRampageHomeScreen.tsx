@@ -9,6 +9,7 @@ import { DuoPrimaryButtons } from './DuoPrimaryButtons';
 import { DuoMapSelection } from './DuoMapSelection';
 import { DuoModals, DuoModalType } from './DuoModals';
 import { DuoHomeAnimatedBackground } from './DuoHomeAnimatedBackground';
+import { useAuth } from '@/context/AuthContext';
 
 interface DuoRampageHomeScreenProps {
   onCreateRoom: () => void;
@@ -25,8 +26,14 @@ export const DuoRampageHomeScreen: React.FC<DuoRampageHomeScreenProps> = ({
   onStartSolo,
   onExit,
 }) => {
+  const { user } = useAuth();
   const [activeModal, setActiveModal] = useState<DuoModalType>(null);
   const [selectedMapId, setSelectedMapId] = useState('abandoned_city');
+
+  const userName = user?.name || 'RAMPAGE#001';
+  const userAvatar = user?.avatar;
+  const userLevel = user ? Math.max(1, (user.stats?.runnerGames || 0) + (user.stats?.spaceGames || 0) + 1) : 1;
+  const userXpPercent = user ? Math.min(100, Math.max(25, (user.stats?.coinsTotal || 0) % 100)) : 65;
 
   const handleOpenModal = (modal: DuoModalType) => {
     setActiveModal(modal);
@@ -44,7 +51,12 @@ export const DuoRampageHomeScreen: React.FC<DuoRampageHomeScreenProps> = ({
       {/* 2. Top Header Navigation Bar */}
       <header className="relative w-full flex items-center justify-between z-20 gap-2 shrink-0">
         {/* Top-Left: Player Profile ("User Card") - Strictly constrained dimensions */}
-        <DuoPlayerProfile name="RAMPAGE#001" level={1} xpPercent={65} />
+        <DuoPlayerProfile
+          name={userName}
+          avatar={userAvatar}
+          level={userLevel}
+          xpPercent={userXpPercent}
+        />
 
         {/* Top-Right: Settings, How to Play, Friends, Leaderboard, Exit */}
         <DuoTopRightMenu

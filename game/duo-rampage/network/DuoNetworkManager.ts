@@ -86,11 +86,11 @@ export class DuoNetworkManager {
     });
   }
 
-  public createRoom(playerName: string): Promise<string> {
+  public createRoom(playerName: string, avatar?: string): Promise<string> {
     return new Promise((resolve, reject) => {
       if (!this.socket) return reject('Socket not connected');
 
-      this.socket.emit('duo:create_room', { playerName }, (res: any) => {
+      this.socket.emit('duo:create_room', { playerName, avatar }, (res: any) => {
         if (res.success) {
           this.room = res.room;
           this.isHost = true;
@@ -104,14 +104,14 @@ export class DuoNetworkManager {
     });
   }
 
-  public joinRoom(code: string, playerName: string): Promise<DuoRoomData> {
+  public joinRoom(code: string, playerName: string, avatar?: string): Promise<DuoRoomData> {
     return new Promise((resolve, reject) => {
       if (!this.socket) return reject('Socket not connected');
 
       // Normalize code: accept "123456" or "#123456"
       const cleanCode = code.trim().startsWith('#') ? code.trim() : `#${code.trim()}`;
 
-      this.socket.emit('duo:join_room', { code: cleanCode, playerName }, (res: any) => {
+      this.socket.emit('duo:join_room', { code: cleanCode, playerName, avatar }, (res: any) => {
         if (res.success) {
           this.room = res.room;
           this.isHost = false;

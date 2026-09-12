@@ -395,7 +395,7 @@ app.prepare().then(() => {
     // ============================================================
     let currentDuoRoomCode = null;
 
-    socket.on('duo:create_room', ({ playerName }, callback) => {
+    socket.on('duo:create_room', ({ playerName, avatar }, callback) => {
       let code;
       let attempts = 0;
       do {
@@ -410,6 +410,7 @@ app.prepare().then(() => {
       const playerData = {
         id: socket.id,
         name: playerName || 'Hero 1',
+        avatar: avatar || null,
         role: 'assault',
         isHost: true,
         isReady: true,
@@ -422,7 +423,7 @@ app.prepare().then(() => {
       io.to(code).emit('duo:room_updated', serializeDuoRoom(room));
     });
 
-    socket.on('duo:join_room', ({ code, playerName }, callback) => {
+    socket.on('duo:join_room', ({ code, playerName, avatar }, callback) => {
       let formattedCode = String(code).trim();
       if (!formattedCode.startsWith('#')) formattedCode = '#' + formattedCode;
 
@@ -443,6 +444,7 @@ app.prepare().then(() => {
       const playerData = {
         id: socket.id,
         name: playerName || 'Hero 2',
+        avatar: avatar || null,
         role: 'heavy',
         isHost: false,
         isReady: false,

@@ -152,6 +152,7 @@ export interface DuoRoomData {
   players: {
     id: string;
     name: string;
+    avatar?: string;
     role: PlayerRole;
     isHost: boolean;
     isReady: boolean;

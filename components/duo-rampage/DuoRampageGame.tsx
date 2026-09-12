@@ -19,12 +19,14 @@ import {
   DuoRoomData,
 } from '@/game/duo-rampage/types';
 import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
+import { useAuth } from '@/context/AuthContext';
 
 interface DuoRampageGameProps {
   onExit: () => void;
 }
 
 export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
+  const { user, openAuthModal } = useAuth();
   const [screen, setScreen] = useState<'menu' | 'create_room' | 'lobby' | 'playing' | 'game_over'>('menu');
   const [createRoomMode, setCreateRoomMode] = useState<'create' | 'join'>('create');
   const [room, setRoom] = useState<DuoRoomData | null>(null);
@@ -196,9 +198,16 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
 
   // Handlers
   const handleCreateRoom = async () => {
+    if (!user) {
+      openAuthModal('login');
+      return;
+    }
+    const myName = user.name || 'RAMPAGE#001';
+    const myAvatar = user.avatar;
+
     try {
       await duoNetwork.connect();
-      const code = await duoNetwork.createRoom('RAMPAGE#001');
+      const code = await duoNetwork.createRoom(myName, myAvatar);
       setIsSolo(false);
       setMyRole('assault');
       if (duoNetwork.room) setRoom(duoNetwork.room);
@@ -210,13 +219,14 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
       setMyRole('assault');
       setRoom({
         code: '#483921',
-        hostId: 'local-host',
+        hostId: user.id || 'local-host',
         status: 'lobby',
         countdownTimer: 0,
         players: [
           {
-            id: 'local-host',
-            name: 'RAMPAGE#001',
+            id: user.id || 'local-host',
+            name: myName,
+            avatar: myAvatar,
             role: 'assault',
             isReady: true,
             isHost: true,
@@ -231,14 +241,25 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
   };
 
   const handleOpenJoinRoom = () => {
+    if (!user) {
+      openAuthModal('login');
+      return;
+    }
     setCreateRoomMode('join');
     setScreen('create_room');
   };
 
   const handleJoinRoom = async (code: string) => {
+    if (!user) {
+      openAuthModal('login');
+      return;
+    }
+    const myName = user.name || 'Hero 2';
+    const myAvatar = user.avatar;
+
     try {
       await duoNetwork.connect();
-      const joinedRoom = await duoNetwork.joinRoom(code, 'Partner Hero');
+      const joinedRoom = await duoNetwork.joinRoom(code, myName, myAvatar);
       setRoom(joinedRoom);
       setIsSolo(false);
       setMyRole('heavy');
@@ -256,14 +277,15 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
         players: [
           {
             id: 'remote-host',
-            name: 'RAMPAGE#001',
+            name: 'HOST HERO',
             role: 'assault',
             isReady: true,
             isHost: true,
           },
           {
-            id: 'local-player',
-            name: 'PLAYER 2',
+            id: user.id || 'local-player',
+            name: myName,
+            avatar: myAvatar,
             role: 'heavy',
             isReady: true,
             isHost: false,

@@ -5,12 +5,14 @@ import Image from 'next/image';
 
 interface DuoPlayerProfileProps {
   name?: string;
+  avatar?: string;
   level?: number;
   xpPercent?: number;
 }
 
 export const DuoPlayerProfile: React.FC<DuoPlayerProfileProps> = ({
   name = 'RAMPAGE#001',
+  avatar,
   level = 1,
   xpPercent = 65,
 }) => {
@@ -19,7 +21,7 @@ export const DuoPlayerProfile: React.FC<DuoPlayerProfileProps> = ({
       {/* Avatar Portrait with Golden Rim Frame */}
       <div className="w-8 h-8 xs:w-9 xs:h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl overflow-hidden border-2 border-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.4)] relative bg-slate-900 shrink-0">
         <Image
-          src="/images/duo-rampage/avatar_hero.png"
+          src={avatar || "/images/duo-rampage/avatar_hero.png"}
           alt="Player Avatar"
           fill
           className="object-cover"

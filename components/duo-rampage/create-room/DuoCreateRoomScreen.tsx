@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DuoRoomData } from '@/game/duo-rampage/types';
 import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
+import { useAuth } from '@/context/AuthContext';
 
 interface DuoCreateRoomScreenProps {
   roomCode?: string;
@@ -23,10 +24,18 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   onJoinRoomSubmit,
   onOpenSettings,
 }) => {
+  const { user, openAuthModal } = useAuth();
   const [mode, setMode] = useState<'create' | 'join'>(initialMode);
   const [inputCode, setInputCode] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Real User Information
+  const realUserName = user?.name || 'RAMPAGE#001';
+  const realUserAvatar = user?.avatar;
+  const realUserLevel = user
+    ? Math.max(1, (user.stats?.runnerGames || 0) + (user.stats?.spaceGames || 0) + 1)
+    : 1;
 
   // Sync mode if initialMode prop changes
   useEffect(() => {
@@ -37,7 +46,12 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   const activeCode = (room?.code ? room.code.replace('#', '') : roomCode).toUpperCase();
 
   // Players
-  const player1 = room?.players?.[0] || { name: 'RAMPAGE#001', role: 'assault', isReady: true };
+  const player1 = room?.players?.[0] || {
+    name: realUserName,
+    avatar: realUserAvatar,
+    role: 'assault',
+    isReady: true,
+  };
   const player2 = room?.players?.[1] || null;
   const isPlayer2Joined = !!player2;
 
@@ -113,6 +127,11 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   };
 
   const handleConnect = async () => {
+    if (!user) {
+      openAuthModal('login');
+      showToast('Login required to join squad');
+      return;
+    }
     const codeToJoin = inputCode.trim().replace('#', '');
     if (codeToJoin.length < 4) {
       showToast('Please enter a valid room code');
@@ -126,6 +145,11 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   };
 
   const handleStart = () => {
+    if (!user) {
+      openAuthModal('login');
+      showToast('Login required to start mission');
+      return;
+    }
     duoAudio.playCountdown(0);
     onStartMission();
   };
@@ -897,10 +921,20 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
             <div className="duo-player-row">
               <article className="duo-player-card">
                 <div className="duo-portrait-wrap">
-                  <img src="/images/duo-rampage/player1.png" alt="Host Avatar" />
+                  <img
+                    src={player1.avatar || realUserAvatar || '/images/duo-rampage/player1.png'}
+                    alt="Host Avatar"
+                    style={{
+                      width: (player1.avatar || realUserAvatar) ? '100%' : '180%',
+                      height: (player1.avatar || realUserAvatar) ? '100%' : '180%',
+                      objectFit: 'cover',
+                      objectPosition: (player1.avatar || realUserAvatar) ? 'center' : '45% 18%',
+                      transform: (player1.avatar || realUserAvatar) ? 'none' : 'translate(-22%, -8%)',
+                    }}
+                  />
                 </div>
-                <div className="duo-player-name">{player1.name || 'RAMPAGE#001'}</div>
-                <div className="duo-level">LV. 1</div>
+                <div className="duo-player-name">{player1.name || realUserName}</div>
+                <div className="duo-level">LV. {realUserLevel}</div>
                 <div className="duo-ready">
                   <span>✓</span> READY
                 </div>
@@ -910,7 +944,17 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
                 {isPlayer2Joined ? (
                   <>
                     <div className="duo-portrait-wrap" style={{ borderColor: '#38bdf8' }}>
-                      <img src="/images/duo-rampage/player2_hologram.png" alt="Partner Avatar" />
+                      <img
+                        src={player2?.avatar || '/images/duo-rampage/player2_hologram.png'}
+                        alt="Partner Avatar"
+                        style={{
+                          width: player2?.avatar ? '100%' : '180%',
+                          height: player2?.avatar ? '100%' : '180%',
+                          objectFit: 'cover',
+                          objectPosition: player2?.avatar ? 'center' : '45% 18%',
+                          transform: player2?.avatar ? 'none' : 'translate(-22%, -8%)',
+                        }}
+                      />
                     </div>
                     <div className="duo-player-name">{player2?.name || 'PLAYER 2'}</div>
                     <div className="duo-level" style={{ color: '#38bdf8' }}>PARTNER HERO</div>
@@ -1009,10 +1053,20 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
             <div className="duo-player-row">
               <article className="duo-player-card">
                 <div className="duo-portrait-wrap">
-                  <img src="/images/duo-rampage/player1.png" alt="You" />
+                  <img
+                    src={realUserAvatar || '/images/duo-rampage/player1.png'}
+                    alt="You"
+                    style={{
+                      width: realUserAvatar ? '100%' : '180%',
+                      height: realUserAvatar ? '100%' : '180%',
+                      objectFit: 'cover',
+                      objectPosition: realUserAvatar ? 'center' : '45% 18%',
+                      transform: realUserAvatar ? 'none' : 'translate(-22%, -8%)',
+                    }}
+                  />
                 </div>
-                <div className="duo-player-name">YOU (JOINING)</div>
-                <div className="duo-level">HEAVY / ASSAULT</div>
+                <div className="duo-player-name">{realUserName}</div>
+                <div className="duo-level">LV. {realUserLevel} • HERO</div>
                 <div className="duo-ready">
                   <span>✓</span> READY
                 </div>
