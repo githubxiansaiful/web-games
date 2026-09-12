@@ -13,6 +13,7 @@ import { DuoHomeAnimatedBackground } from './DuoHomeAnimatedBackground';
 interface DuoRampageHomeScreenProps {
   onCreateRoom: () => void;
   onJoinRoom: (code: string) => Promise<void> | void;
+  onOpenJoinRoom?: () => void;
   onStartSolo: () => void;
   onExit?: () => void;
 }
@@ -20,6 +21,7 @@ interface DuoRampageHomeScreenProps {
 export const DuoRampageHomeScreen: React.FC<DuoRampageHomeScreenProps> = ({
   onCreateRoom,
   onJoinRoom,
+  onOpenJoinRoom,
   onStartSolo,
   onExit,
 }) => {
@@ -82,7 +84,13 @@ export const DuoRampageHomeScreen: React.FC<DuoRampageHomeScreenProps> = ({
           {/* 3 Large Action Buttons: JOIN ROOM / PLAY / QUICK PLAY */}
           <DuoPrimaryButtons
             onCreateRoom={onCreateRoom}
-            onJoinRoom={() => handleOpenModal('join_room')}
+            onJoinRoom={() => {
+              if (onOpenJoinRoom) {
+                onOpenJoinRoom();
+              } else {
+                handleOpenModal('join_room');
+              }
+            }}
             onQuickPlay={onStartSolo}
           />
 

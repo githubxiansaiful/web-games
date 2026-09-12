@@ -1,78 +1,129 @@
 'use client';
 
-import React, { useState } from 'react';
-import Image from 'next/image';
-import {
-  ChevronLeft,
-  ChevronDown,
-  Settings,
-  Copy,
-  Check,
-  Share2,
-  Crown,
-  Clock,
-  Play,
-  Lightbulb,
-  Plus,
-} from 'lucide-react';
-import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
-import { toast } from '@/hooks/use-toast';
+import React, { useState, useEffect, useRef } from 'react';
 import { DuoRoomData } from '@/game/duo-rampage/types';
+import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
 
 interface DuoCreateRoomScreenProps {
   roomCode?: string;
   room?: DuoRoomData | null;
+  initialMode?: 'create' | 'join';
   onBack: () => void;
   onStartMission: () => void;
+  onJoinRoomSubmit?: (code: string) => Promise<void> | void;
   onOpenSettings?: () => void;
 }
 
 export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   roomCode = '483921',
   room,
+  initialMode = 'create',
   onBack,
   onStartMission,
+  onJoinRoomSubmit,
   onOpenSettings,
 }) => {
-  const [copied, setCopied] = useState(false);
+  const [mode, setMode] = useState<'create' | 'join'>(initialMode);
+  const [inputCode, setInputCode] = useState('');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [region, setRegion] = useState('ASIA (AUTO)');
   const [showRegionMenu, setShowRegionMenu] = useState(false);
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Active Code (from prop, room object, or default)
+  // Sync mode if initialMode prop changes
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
+
+  // Extract clean code
   const activeCode = (room?.code ? room.code.replace('#', '') : roomCode).toUpperCase();
 
-  // Player 1 & Player 2 state
+  // Players
   const player1 = room?.players?.[0] || { name: 'RAMPAGE#001', role: 'assault', isReady: true };
   const player2 = room?.players?.[1] || null;
   const isPlayer2Joined = !!player2;
 
-  const handleCopyCode = () => {
-    navigator.clipboard?.writeText(activeCode);
-    setCopied(true);
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMessage(null);
+    }, 2000);
+  };
+
+  const copyRoomId = async (customCode?: string) => {
+    const codeToCopy = customCode || activeCode;
     duoAudio.playUiClick();
-    toast({
-      title: 'ROOM ID COPIED',
-      description: `#${activeCode} copied to clipboard! Share with your friend.`,
-      variant: 'amber',
-    });
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText('#' + codeToCopy);
+      } else {
+        const area = document.createElement('textarea');
+        area.value = '#' + codeToCopy;
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand('copy');
+        area.remove();
+      }
+      showToast(`Room ID #${codeToCopy} copied!`);
+    } catch {
+      showToast(`Room ID #${codeToCopy} copied!`);
+    }
   };
 
   const handleShare = async () => {
     duoAudio.playUiClick();
-    const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/?game=duo-rampage&room=${activeCode}` : '';
+    const shareUrl =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/?game=duo-rampage&room=${activeCode}`
+        : '';
+    const shareData = {
+      title: 'DUO RAMPAGE Co-op Squad',
+      text: `Join my DUO RAMPAGE co-op room: #${activeCode}`,
+      url: shareUrl,
+    };
+
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: 'Join me in DUO RAMPAGE!',
-          text: `Join my co-op squad in DUO RAMPAGE! Room ID: #${activeCode}`,
-          url: shareUrl,
-        });
+        await navigator.share(shareData);
       } catch {
-        handleCopyCode();
+        await copyRoomId();
+        showToast('Room ID copied for sharing');
       }
     } else {
-      handleCopyCode();
+      await copyRoomId();
+      showToast('Room ID copied for sharing');
+    }
+  };
+
+  const handlePasteCode = async () => {
+    duoAudio.playUiClick();
+    try {
+      if (navigator.clipboard?.readText) {
+        const text = await navigator.clipboard.readText();
+        const clean = text.replace(/[^0-9A-Za-z]/g, '').slice(0, 6).toUpperCase();
+        if (clean) {
+          setInputCode(clean);
+          showToast(`Pasted #${clean}`);
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    showToast('Paste from clipboard or type 6 digits');
+  };
+
+  const handleConnect = async () => {
+    const codeToJoin = inputCode.trim().replace('#', '');
+    if (codeToJoin.length < 4) {
+      showToast('Please enter a valid room code');
+      return;
+    }
+    duoAudio.playDash();
+    showToast(`Connecting to #${codeToJoin}...`);
+    if (onJoinRoomSubmit) {
+      await onJoinRoomSubmit(codeToJoin);
     }
   };
 
@@ -82,338 +133,1027 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   };
 
   return (
-    <div className="relative w-full min-h-[100dvh] h-[100dvh] bg-[#050711] select-none overflow-y-auto overflow-x-hidden flex flex-col justify-between p-2 xs:p-3 sm:p-4 md:p-5 text-white font-knight safe-top safe-bottom safe-left safe-right">
-      {/* 1. Cinematic Composite Background (Dhaka Armory Hangar with Assault Hero & Blue Hologram) */}
-      <div className="fixed inset-0 w-full h-full pointer-events-none z-0">
-        <Image
-          src="/images/duo-rampage/create_room_composite_bg.png"
-          alt="DUO RAMPAGE Armory Hangar Warzone"
-          fill
-          priority
-          className="object-cover object-center transform scale-100"
-          sizes="100vw"
-        />
+    <main className="duo-create-room-shell select-none">
+      <style>{`
+        .duo-create-room-shell {
+          position: relative;
+          width: 100vw;
+          height: 100vh;
+          min-height: 520px;
+          overflow: hidden;
+          background: #07111e;
+          font-family: 'Rajdhani', sans-serif;
+          color: #eef7ff;
+          touch-action: manipulation;
+        }
+        .duo-create-room-shell button {
+          font: inherit;
+          color: inherit;
+          border: 0;
+          cursor: pointer;
+        }
+        .duo-bg-layer {
+          position: absolute;
+          inset: 0;
+          background: url("/images/duo-rampage/create_room_bg.png") center center / cover no-repeat;
+          transform: scale(1.005);
+        }
+        .duo-vignette-layer {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(ellipse at center, transparent 48%, rgba(0,0,0,.18) 72%, rgba(0,0,0,.52) 100%);
+          pointer-events: none;
+        }
+        .duo-scanlines-layer {
+          position: absolute;
+          inset: 0;
+          opacity: .035;
+          background: repeating-linear-gradient(0deg, rgba(255,255,255,.8) 0 1px, transparent 1px 4px);
+          pointer-events: none;
+        }
 
-        {/* Ambient Lighting & Depth Vignette */}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/40 pointer-events-none" />
-        <div className="absolute inset-0 bg-radial-gradient from-transparent via-transparent to-black/60 pointer-events-none" />
+        /* Back Button */
+        .duo-back-btn {
+          position: absolute;
+          top: 20px;
+          left: 28px;
+          height: 56px;
+          min-width: 143px;
+          padding: 0 20px 0 13px;
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          background: linear-gradient(180deg, rgba(12,27,48,.95), rgba(6,17,31,.92));
+          border: 1px solid rgba(77,125,176,.55);
+          clip-path: polygon(0 50%, 10% 0, 100% 0, 100% 100%, 10% 100%);
+          box-shadow: 0 8px 22px rgba(0,0,0,.3), inset 0 0 18px rgba(35,100,160,.13);
+          transition: .18s;
+          z-index: 10;
+        }
+        .duo-back-btn:hover, .duo-settings-btn:hover, .duo-region-btn:hover {
+          filter: brightness(1.18);
+          transform: translateY(-1px);
+        }
+        .duo-back-arrow {
+          font-family: Arial, sans-serif;
+          font-size: 50px;
+          line-height: 1;
+          transform: translateY(-3px);
+          font-weight: 300;
+          color: #38bdf8;
+        }
+        .duo-back-btn strong, .duo-settings-btn strong, .duo-region-btn strong {
+          display: block;
+          font-size: 18px;
+          letter-spacing: .5px;
+          font-weight: 700;
+        }
+        .duo-back-btn small {
+          display: block;
+          font-size: 11px;
+          letter-spacing: .8px;
+          color: #9fb4c8;
+          margin-top: -2px;
+          font-weight: 600;
+        }
 
-        {/* Subtle Hangar Atmosphere Embers */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40">
-          <div className="absolute bottom-16 left-1/4 w-1.5 h-1.5 rounded-full bg-amber-400 blur-[1px] animate-pulse" />
-          <div className="absolute bottom-28 left-1/3 w-1 h-1 rounded-full bg-cyan-400 blur-[1px] animate-ping" />
-          <div className="absolute bottom-20 right-1/4 w-2 h-2 rounded-full bg-blue-400 blur-[1px] animate-pulse" />
-          <div className="absolute bottom-36 right-1/3 w-1 h-1 rounded-full bg-orange-400 blur-[1px] animate-ping" />
-        </div>
-      </div>
+        /* Top-Right Navigation */
+        .duo-top-right {
+          position: absolute;
+          top: 20px;
+          right: 28px;
+          display: flex;
+          gap: 12px;
+          z-index: 10;
+        }
+        .duo-region-btn, .duo-settings-btn {
+          height: 56px;
+          padding: 0 17px;
+          background: rgba(8,20,36,.88);
+          border: 1px solid rgba(87,126,163,.5);
+          box-shadow: 0 7px 20px rgba(0,0,0,.28);
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          transition: .18s;
+        }
+        .duo-region-btn {
+          min-width: 180px;
+          position: relative;
+        }
+        .duo-settings-btn {
+          min-width: 139px;
+        }
+        .duo-online-dot {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          background: #21e65d;
+          box-shadow: 0 0 12px #21e65d;
+        }
+        .duo-chevron {
+          font-family: Arial, sans-serif;
+          font-size: 26px;
+          margin-left: auto;
+          line-height: 1;
+        }
+        .duo-gear {
+          font-size: 28px;
+          line-height: 1;
+        }
 
-      {/* 2. Top Header Navigation Bar */}
-      <header className="relative w-full flex items-center justify-between z-20 gap-2 shrink-0">
-        {/* Top-Left: Back to Home Button */}
-        <button
-          type="button"
-          onClick={() => {
-            duoAudio.playUiClose();
-            onBack();
-          }}
-          className="flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 bg-slate-950/85 hover:bg-slate-900 border border-slate-700/80 hover:border-cyan-400/60 rounded-xl shadow-xl transition active:scale-95 cursor-pointer text-left shrink-0 group"
-          title="Return to Main Menu"
-        >
-          <ChevronLeft className="w-4 h-4 text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
-          <div className="flex flex-col leading-none">
-            <span className="font-knight font-bold text-[11px] sm:text-xs text-white uppercase tracking-wider">
-              BACK
-            </span>
-            <span className="font-knight font-medium text-[7.5px] sm:text-[8.5px] text-slate-400 tracking-wider">
-              TO HOME
-            </span>
-          </div>
-        </button>
+        /* Region Dropdown Menu */
+        .duo-region-dropdown {
+          position: absolute;
+          right: 0;
+          top: 60px;
+          width: 100%;
+          background: rgba(6, 17, 31, 0.96);
+          border: 1px solid rgba(87, 126, 163, 0.7);
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+          padding: 4px;
+          z-index: 50;
+        }
+        .duo-region-item {
+          padding: 8px 12px;
+          font-size: 13px;
+          font-weight: 700;
+          color: #9fb4c8;
+          cursor: pointer;
+          transition: .15s;
+        }
+        .duo-region-item:hover, .duo-region-item.active {
+          background: rgba(18, 180, 255, 0.2);
+          color: #38bdf8;
+        }
 
-        {/* Top-Center: CREATE ROOM Title & Tagline */}
-        <div className="flex flex-col items-center justify-center text-center">
-          <div className="flex items-center justify-center leading-none">
-            <span className="font-knight font-black text-2xl xs:text-3xl sm:text-4xl md:text-5xl text-white tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-              CREATE
-            </span>
-            <span className="font-knight font-black text-2xl xs:text-3xl sm:text-4xl md:text-5xl bg-gradient-to-b from-[#fde047] via-[#f97316] to-[#dc2626] text-transparent bg-clip-text tracking-wide drop-shadow-[0_0_15px_rgba(249,115,22,0.8)] ml-2">
-              ROOM
-            </span>
-          </div>
-          <span className="font-knight font-bold text-[7.5px] xs:text-[9px] sm:text-[11px] md:text-xs text-cyan-200 tracking-widest uppercase mt-0.5 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
-            INVITE YOUR FRIEND AND FIGHT TOGETHER
-          </span>
-        </div>
+        /* Hero Heading */
+        .duo-hero-heading {
+          position: absolute;
+          top: 26px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: min(680px, 54vw);
+          text-align: center;
+          z-index: 3;
+        }
+        .duo-hero-heading h1 {
+          margin: 0;
+          font-family: 'Rajdhani', sans-serif;
+          font-size: clamp(44px, 5.5vw, 92px);
+          line-height: .84;
+          font-weight: 700;
+          letter-spacing: -2px;
+          text-transform: uppercase;
+          text-shadow: 0 7px 0 #07101c, 0 10px 24px rgba(0,0,0,.65);
+        }
+        .duo-hero-heading h1 span {
+          color: #eaf7ff;
+          -webkit-text-stroke: 2px #284f78;
+        }
+        .duo-hero-heading h1 em {
+          font-style: normal;
+          color: #ff7b16;
+          -webkit-text-stroke: 2px #7d2708;
+          text-shadow: 0 6px 0 #5b1d0b, 0 10px 20px rgba(0,0,0,.65);
+        }
+        .duo-hero-heading p {
+          margin: 5px 0 0;
+          font-size: clamp(12px, 1.1vw, 20px);
+          font-weight: 700;
+          letter-spacing: 1.4px;
+          color: #d5efff;
+          text-shadow: 0 3px 9px #000;
+          text-transform: uppercase;
+        }
 
-        {/* Top-Right: Region Selector & Settings */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Region Dropdown */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowRegionMenu(!showRegionMenu)}
-              className="flex items-center gap-1.5 px-2 py-1.5 sm:px-2.5 sm:py-1.5 bg-slate-950/85 hover:bg-slate-900 border border-slate-700/80 rounded-xl text-xs font-knight font-bold text-slate-200 transition active:scale-95 shadow-md cursor-pointer"
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] sm:text-xs tracking-wider">{region}</span>
-              <ChevronDown className="w-3 h-3 text-slate-400" />
-            </button>
+        /* Mode Switcher Tabs */
+        .duo-mode-tabs {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin-top: 6px;
+          background: rgba(6, 17, 31, 0.8);
+          padding: 3px;
+          border: 1px solid rgba(87, 126, 163, 0.4);
+          border-radius: 6px;
+        }
+        .duo-mode-tab {
+          padding: 4px 14px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 1px;
+          text-transform: uppercase;
+          border-radius: 4px;
+          transition: .15s;
+          color: #94aec5;
+        }
+        .duo-mode-tab.active {
+          background: linear-gradient(180deg, #12b4ff, #0875d9);
+          color: #ffffff;
+          box-shadow: 0 0 12px rgba(18, 180, 255, 0.4);
+        }
 
-            {showRegionMenu && (
-              <div className="absolute right-0 mt-1 w-36 bg-slate-950/95 border border-slate-700 rounded-xl shadow-2xl p-1 z-50 animate-in fade-in duration-150">
-                {['ASIA (AUTO)', 'EU (CENTRAL)', 'US (EAST)'].map((reg) => (
-                  <div
-                    key={reg}
-                    onClick={() => {
-                      setRegion(reg);
-                      setShowRegionMenu(false);
-                      duoAudio.playUiClick();
-                    }}
-                    className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition ${
-                      region === reg ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-300 hover:bg-slate-800'
-                    }`}
-                  >
-                    {reg}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        /* Hero Characters */
+        .duo-hero-player {
+          position: absolute;
+          z-index: 2;
+          left: 12.5%;
+          bottom: 13.2%;
+          height: 80%;
+          max-height: 790px;
+          filter: drop-shadow(0 20px 16px rgba(0,0,0,.55));
+          pointer-events: none;
+          object-fit: contain;
+        }
+        .duo-hero-hologram {
+          position: absolute;
+          z-index: 2;
+          right: 13.2%;
+          bottom: 17%;
+          height: 64%;
+          filter: drop-shadow(0 0 24px rgba(30,170,255,.75));
+          pointer-events: none;
+          object-fit: contain;
+        }
 
-          {/* Settings Button */}
+        /* Central Terminal Panel */
+        .duo-room-panel {
+          position: absolute;
+          z-index: 4;
+          left: 50%;
+          top: 20%;
+          transform: translateX(-50%);
+          width: min(548px, 34vw);
+          min-width: 475px;
+          padding: 17px 25px 22px;
+          background: linear-gradient(180deg, rgba(7,20,36,.94), rgba(4,13,25,.9));
+          border: 1px solid rgba(69,117,165,.75);
+          clip-path: polygon(5% 0, 95% 0, 100% 7%, 100% 96%, 95% 100%, 5% 100%, 0 96%, 0 7%);
+          box-shadow: 0 20px 45px rgba(0,0,0,.5), inset 0 0 35px rgba(20,87,143,.13);
+        }
+
+        /* Room ID Box */
+        .duo-room-id-box {
+          padding: 2px 20px 8px;
+          text-align: center;
+        }
+        .duo-eyebrow {
+          font-size: 16px;
+          font-weight: 700;
+          letter-spacing: 1.2px;
+          color: #a9c8e4;
+          text-transform: uppercase;
+        }
+        .duo-room-id-row {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 15px;
+          margin-top: 4px;
+        }
+        .duo-room-id-text {
+          font-size: 47px;
+          line-height: 1;
+          font-weight: 700;
+          letter-spacing: 2px;
+          color: #ffc21c;
+          text-shadow: 0 0 16px rgba(255,180,0,.22);
+          user-select: all;
+        }
+        .duo-room-id-input {
+          font-size: 38px;
+          line-height: 1;
+          font-weight: 700;
+          letter-spacing: 6px;
+          color: #ffc21c;
+          text-shadow: 0 0 16px rgba(255,180,0,.22);
+          background: rgba(11, 41, 73, 0.6);
+          border: 2px solid #238ee5;
+          border-radius: 6px;
+          padding: 4px 14px;
+          text-align: center;
+          width: 230px;
+          outline: none;
+          text-transform: uppercase;
+        }
+        .duo-room-id-input::placeholder {
+          color: rgba(255, 194, 28, 0.4);
+          letter-spacing: 4px;
+        }
+        .duo-icon-btn {
+          width: 52px;
+          height: 43px;
+          background: #0b2949;
+          border: 2px solid #238ee5;
+          box-shadow: inset 0 0 14px rgba(0,160,255,.15);
+          font-size: 24px;
+          color: #dff5ff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: .15s;
+        }
+        .duo-icon-btn:hover {
+          filter: brightness(1.2);
+        }
+        .duo-room-id-box p {
+          margin: 6px 0 0;
+          color: #9db6cc;
+          font-size: 14px;
+          font-weight: 600;
+        }
+
+        /* Action Buttons Row */
+        .duo-action-row {
+          display: grid;
+          grid-template-columns: 1fr 1.18fr;
+          gap: 14px;
+          margin: 5px 0 14px;
+        }
+        .duo-action-btn {
+          height: 58px;
+          font-size: 16px;
+          font-weight: 700;
+          letter-spacing: .3px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          clip-path: polygon(5% 0, 95% 0, 100% 14%, 100% 86%, 95% 100%, 5% 100%, 0 86%, 0 14%);
+          transition: .16s;
+        }
+        .duo-action-btn.blue {
+          background: linear-gradient(180deg, #12b4ff, #0875d9);
+          border: 1px solid #6ad9ff;
+          box-shadow: 0 0 22px rgba(0,154,255,.2), inset 0 0 15px rgba(255,255,255,.12);
+        }
+        .duo-action-btn.green {
+          background: linear-gradient(180deg, #18e75d, #04aa42);
+          border: 1px solid #6dff9d;
+          box-shadow: 0 0 22px rgba(0,255,97,.18), inset 0 0 15px rgba(255,255,255,.1);
+        }
+        .duo-action-btn:hover {
+          filter: brightness(1.14);
+          transform: translateY(-1px);
+        }
+        .duo-btn-icon {
+          font-size: 22px;
+          line-height: 1;
+        }
+
+        /* Player Cards Row */
+        .duo-player-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+        }
+        .duo-player-card {
+          height: 172px;
+          background: linear-gradient(180deg, rgba(11,30,50,.94), rgba(5,17,31,.92));
+          border: 1px solid rgba(72,111,147,.62);
+          position: relative;
+          text-align: center;
+          padding-top: 12px;
+          box-shadow: inset 0 0 20px rgba(0,86,145,.08);
+        }
+        .duo-portrait-wrap {
+          width: 60px;
+          height: 60px;
+          margin: auto;
+          overflow: hidden;
+          border-radius: 50%;
+          border: 2px solid #f3a619;
+          background: #102033;
+          box-shadow: 0 0 14px rgba(255,174,20,.25);
+          position: relative;
+        }
+        .duo-portrait-wrap img {
+          width: 180%;
+          height: 180%;
+          object-fit: cover;
+          object-position: 45% 18%;
+          transform: translate(-22%, -8%);
+        }
+        .duo-player-name {
+          font-size: 16px;
+          font-weight: 700;
+          letter-spacing: .4px;
+          margin-top: 5px;
+          text-transform: uppercase;
+        }
+        .duo-level {
+          font-size: 13px;
+          color: #b8cbe0;
+          font-weight: 600;
+        }
+        .duo-ready {
+          margin: 7px auto 0;
+          color: #38f16e;
+          font-weight: 700;
+          font-size: 17px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+        }
+        .duo-ready span {
+          width: 25px;
+          height: 25px;
+          display: grid;
+          place-items: center;
+          background: #35ee64;
+          color: #04180b;
+          border-radius: 5px;
+          font-family: Arial;
+          font-weight: 900;
+          font-size: 15px;
+        }
+        .duo-waiting {
+          padding-top: 20px;
+        }
+        .duo-waiting-person {
+          height: 64px;
+          color: #248fe4;
+          font-family: Arial, sans-serif;
+          font-size: 56px;
+          line-height: .75;
+          text-shadow: 0 0 13px rgba(0,148,255,.3);
+          position: relative;
+        }
+        .duo-waiting-person span {
+          position: absolute;
+          font-size: 30px;
+          left: 50%;
+          top: 22px;
+          transform: translateX(-50%);
+        }
+        .duo-waiting-label {
+          margin-top: 14px;
+          color: #8bb4d8;
+          font-size: 17px;
+          font-weight: 700;
+        }
+        .duo-clock {
+          font-size: 24px;
+          vertical-align: -2px;
+          margin-right: 4px;
+        }
+
+        /* Waiting Status & Spinner */
+        .duo-waiting-status {
+          text-align: center;
+          padding: 12px 0 8px;
+        }
+        .duo-loader {
+          width: 28px;
+          height: 28px;
+          border: 4px dotted #00a9ff;
+          border-radius: 50%;
+          display: inline-block;
+          vertical-align: middle;
+          margin-right: 9px;
+          animation: duoSpin 1.2s linear infinite;
+        }
+        .duo-waiting-status strong {
+          font-size: 16px;
+          letter-spacing: .3px;
+          vertical-align: middle;
+          font-weight: 700;
+        }
+        .duo-waiting-status p {
+          margin: 3px 0 0;
+          color: #94aec5;
+          font-size: 13px;
+        }
+        @keyframes duoSpin {
+          to { transform: rotate(360deg); }
+        }
+
+        /* Start Mission Button */
+        .duo-start-btn {
+          width: 82%;
+          height: 64px;
+          margin: 0 auto;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 16px;
+          clip-path: polygon(4% 0, 96% 0, 100% 20%, 100% 80%, 96% 100%, 4% 100%, 0 80%, 0 20%);
+          transition: .18s;
+        }
+        .duo-start-btn.ready {
+          background: linear-gradient(180deg, #ffc727, #f77f00);
+          border: 2px solid #ffe072;
+          box-shadow: 0 0 28px rgba(247,127,0,.45), inset 0 0 22px rgba(255,255,255,.3);
+          color: #1a0800;
+        }
+        .duo-start-btn.ready .duo-play-triangle {
+          color: #1a0800;
+        }
+        .duo-start-btn.ready small {
+          color: #4a1e00;
+        }
+        .duo-start-btn.ready:hover {
+          filter: brightness(1.15);
+          transform: translateY(-1px);
+        }
+        .duo-start-btn.disabled {
+          background: linear-gradient(180deg, #73869a, #465666);
+          border: 2px solid #a5b7c8;
+          box-shadow: inset 0 0 22px rgba(255,255,255,.12), 0 9px 18px rgba(0,0,0,.3);
+          opacity: .85;
+          color: #eef7ff;
+        }
+        .duo-start-btn.disabled:hover {
+          filter: brightness(1.1);
+        }
+        .duo-start-btn strong {
+          display: block;
+          font-size: 22px;
+          letter-spacing: .4px;
+          font-weight: 700;
+        }
+        .duo-start-btn small {
+          display: block;
+          font-size: 12px;
+          color: #d4dee8;
+          font-weight: 600;
+        }
+        .duo-play-triangle {
+          font-size: 26px;
+          color: #e4edf4;
+        }
+
+        /* Bottom Logo & Pro Tip */
+        .duo-game-logo {
+          position: absolute;
+          z-index: 4;
+          left: 27px;
+          bottom: 17px;
+          width: 245px;
+          height: auto;
+          object-fit: contain;
+          filter: drop-shadow(0 7px 10px rgba(0,0,0,.5));
+          pointer-events: none;
+        }
+        .duo-tip-card {
+          position: absolute;
+          z-index: 5;
+          right: 27px;
+          bottom: 24px;
+          width: 337px;
+          min-height: 66px;
+          padding: 9px 14px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          background: rgba(7,19,33,.91);
+          border: 1px solid rgba(71,104,136,.7);
+          clip-path: polygon(5% 0, 95% 0, 100% 16%, 100% 84%, 95% 100%, 5% 100%, 0 84%, 0 16%);
+          box-shadow: 0 9px 25px rgba(0,0,0,.4);
+        }
+        .duo-tip-icon {
+          width: 29px;
+          height: 29px;
+          border-radius: 50%;
+          display: grid;
+          place-items: center;
+          border: 2px solid #ffb61a;
+          color: #ffb61a;
+          font-weight: 800;
+          font-size: 16px;
+          shrink-0: 0;
+        }
+        .duo-tip-card strong {
+          font-size: 14px;
+          color: #ffb61a;
+        }
+        .duo-tip-card p {
+          margin: 0;
+          color: #b7c7d5;
+          font-size: 13px;
+          line-height: 1.15;
+        }
+
+        /* Toast Popup */
+        .duo-toast {
+          position: absolute;
+          left: 50%;
+          bottom: 26px;
+          transform: translate(-50%, 20px);
+          padding: 10px 20px;
+          background: rgba(5,18,31,.96);
+          border: 1px solid #2b9eea;
+          box-shadow: 0 10px 30px rgba(0, 154, 255, 0.4);
+          border-radius: 6px;
+          opacity: 0;
+          pointer-events: none;
+          transition: .25s;
+          z-index: 50;
+          font-weight: 700;
+          font-size: 15px;
+          color: #eaf7ff;
+        }
+        .duo-toast.show {
+          opacity: 1;
+          transform: translate(-50%, 0);
+        }
+
+        /* Responsive Breakpoints from reference HTML/CSS */
+        @media (max-width: 1100px) {
+          .duo-hero-player { left: 7%; height: 71%; }
+          .duo-hero-hologram { right: 7%; height: 57%; }
+          .duo-room-panel { width: 470px; min-width: 470px; }
+          .duo-tip-card { width: 285px; }
+          .duo-game-logo { width: 190px; }
+        }
+
+        @media (max-width: 850px) {
+          .duo-hero-player { left: 1%; height: 59%; bottom: 20%; }
+          .duo-hero-hologram { right: 0; height: 48%; bottom: 23%; opacity: .88; }
+          .duo-room-panel { width: 410px; min-width: 410px; top: 18%; padding-left: 18px; padding-right: 18px; }
+          .duo-top-right { right: 12px; }
+          .duo-back-btn { left: 12px; }
+          .duo-region-btn { min-width: 155px; }
+          .duo-settings-btn { min-width: 120px; }
+          .duo-hero-heading { top: 24px; width: 500px; }
+          .duo-hero-heading h1 { font-size: 52px; }
+          .duo-game-logo { left: 12px; bottom: 12px; width: 160px; }
+          .duo-tip-card { right: 12px; bottom: 12px; width: 245px; }
+        }
+
+        @media (max-height: 700px) {
+          .duo-hero-player { height: 72%; bottom: 8%; }
+          .duo-hero-hologram { height: 57%; bottom: 13%; }
+          .duo-room-panel { top: 16%; transform: translateX(-50%) scale(.9); transform-origin: top center; }
+          .duo-hero-heading { top: 16px; }
+          .duo-hero-heading h1 { font-size: 50px; }
+        }
+
+        @media (max-width: 680px) {
+          .duo-top-right .duo-region-btn { display: none; }
+          .duo-settings-btn { min-width: 50px; width: 50px; padding: 0; justify-content: center; }
+          .duo-settings-btn strong { display: none; }
+          .duo-back-btn { min-width: 104px; width: 104px; }
+          .duo-back-btn small { display: none; }
+          .duo-back-btn strong { font-size: 16px; }
+          .duo-hero-player { opacity: .22; left: -5%; height: 54%; bottom: 28%; }
+          .duo-hero-hologram { opacity: .22; right: -6%; height: 44%; bottom: 29%; }
+          .duo-room-panel { width: min(94vw, 430px); min-width: 0; top: 13%; padding: 14px 15px 16px; }
+          .duo-room-id-text { font-size: 38px; }
+          .duo-room-id-input { font-size: 32px; width: 190px; }
+          .duo-action-btn { font-size: 14px; height: 52px; }
+          .duo-player-card { height: 152px; }
+          .duo-hero-heading { top: 18px; width: 78vw; }
+          .duo-hero-heading h1 { font-size: 40px; }
+          .duo-hero-heading p { font-size: 11px; }
+          .duo-game-logo { display: none; }
+          .duo-tip-card { display: none; }
+        }
+      `}</style>
+
+      {/* 1. Backdrop Layers */}
+      <div className="duo-bg-layer" />
+      <div className="duo-vignette-layer" />
+      <div className="duo-scanlines-layer" />
+
+      {/* 2. Navigation Header */}
+      <button
+        type="button"
+        className="duo-back-btn"
+        onClick={() => {
+          duoAudio.playUiClose();
+          onBack();
+        }}
+        aria-label="Back to home"
+      >
+        <span className="duo-back-arrow">‹</span>
+        <span>
+          <strong>BACK</strong>
+          <small>TO HOME</small>
+        </span>
+      </button>
+
+      <div className="duo-top-right">
+        {/* Region Selector */}
+        <div className="relative">
           <button
             type="button"
+            className="duo-region-btn"
             onClick={() => {
               duoAudio.playUiClick();
-              onOpenSettings?.();
+              setShowRegionMenu(!showRegionMenu);
             }}
-            className="flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 bg-slate-950/85 hover:bg-slate-900 border border-slate-700/80 rounded-xl text-slate-200 hover:text-white text-xs font-knight font-bold tracking-wider transition active:scale-95 shadow-md cursor-pointer"
-            title="Game Settings"
           >
-            <Settings className="w-3.5 h-3.5 text-slate-300" />
-            <span className="hidden md:inline">SETTINGS</span>
+            <span className="duo-online-dot" />
+            <strong>{region}</strong>
+            <span className="duo-chevron">⌄</span>
+          </button>
+
+          {showRegionMenu && (
+            <div className="duo-region-dropdown">
+              {['ASIA (AUTO)', 'EU (CENTRAL)', 'US (EAST)'].map((reg) => (
+                <div
+                  key={reg}
+                  className={`duo-region-item ${region === reg ? 'active' : ''}`}
+                  onClick={() => {
+                    setRegion(reg);
+                    setShowRegionMenu(false);
+                    duoAudio.playUiClick();
+                  }}
+                >
+                  {reg}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Settings Button */}
+        <button
+          type="button"
+          className="duo-settings-btn"
+          onClick={() => {
+            duoAudio.playUiClick();
+            if (onOpenSettings) onOpenSettings();
+            else showToast('Settings: Master Audio 100%');
+          }}
+        >
+          <span className="duo-gear">⚙</span>
+          <strong>SETTINGS</strong>
+        </button>
+      </div>
+
+      {/* 3. Hero Heading with Mode Toggle */}
+      <section className="duo-hero-heading">
+        <h1>
+          <span>{mode === 'create' ? 'CREATE' : 'JOIN'}</span>{' '}
+          <em>ROOM</em>
+        </h1>
+        <p>
+          {mode === 'create'
+            ? 'INVITE YOUR FRIEND AND FIGHT TOGETHER'
+            : 'ENTER A 6-DIGIT ROOM CODE TO SQUAD UP'}
+        </p>
+
+        {/* Quick Mode Toggle */}
+        <div className="duo-mode-tabs">
+          <button
+            type="button"
+            className={`duo-mode-tab ${mode === 'create' ? 'active' : ''}`}
+            onClick={() => {
+              duoAudio.playUiClick();
+              setMode('create');
+            }}
+          >
+            HOST ROOM
+          </button>
+          <button
+            type="button"
+            className={`duo-mode-tab ${mode === 'join' ? 'active' : ''}`}
+            onClick={() => {
+              duoAudio.playUiClick();
+              setMode('join');
+            }}
+          >
+            JOIN FRIEND
           </button>
         </div>
-      </header>
+      </section>
 
-      {/* 3. Middle Section: Center Tactical Command Terminal Panel */}
-      <main className="relative w-full flex-1 flex items-center justify-center z-20 my-auto py-1 sm:py-2 min-h-0">
-        <div className="w-full max-w-[340px] xs:max-w-[390px] sm:max-w-[470px] md:max-w-[510px] bg-gradient-to-b from-[#0c1322]/95 via-[#080e1a]/95 to-[#04060c]/95 border-2 border-cyan-500/40 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.9),inset_0_0_20px_rgba(6,182,212,0.15)] p-3.5 xs:p-4 sm:p-5 flex flex-col items-center gap-2.5 sm:gap-3.5">
-          {/* Header Label: YOUR ROOM ID */}
-          <div className="flex flex-col items-center leading-none">
-            <span className="font-knight font-extrabold text-[9px] sm:text-[10px] md:text-xs text-cyan-300 uppercase tracking-widest drop-shadow">
-              YOUR ROOM ID
-            </span>
+      {/* 4. Layered Standee Characters (from HTML assets) */}
+      <img
+        className="duo-hero-player"
+        src="/images/duo-rampage/player1.png"
+        alt="Player One Hero"
+      />
+      <img
+        className="duo-hero-hologram"
+        src="/images/duo-rampage/player2_hologram.png"
+        alt="Player Two Hologram"
+      />
 
-            {/* Room Code Display Hero + Quick Copy Button */}
-            <div className="flex items-center gap-2 mt-1 sm:mt-1.5">
-              <span className="font-knight font-black text-3xl xs:text-4xl sm:text-5xl text-amber-400 tracking-widest drop-shadow-[0_0_15px_rgba(245,158,11,0.6)] select-all">
-                # {activeCode}
-              </span>
+      {/* 5. Central Room Terminal Panel */}
+      <section className="duo-room-panel">
+        {mode === 'create' ? (
+          /* CREATE ROOM CONTENT */
+          <>
+            <div className="duo-room-id-box">
+              <div className="duo-eyebrow">YOUR ROOM ID</div>
+              <div className="duo-room-id-row">
+                <div className="duo-room-id-text">#{activeCode}</div>
+                <button
+                  type="button"
+                  className="duo-icon-btn"
+                  onClick={() => copyRoomId()}
+                  aria-label="Copy room ID"
+                  title="Copy room ID"
+                >
+                  ▣
+                </button>
+              </div>
+              <p>Share this Room ID with your friend to join</p>
+            </div>
+
+            <div className="duo-action-row">
               <button
                 type="button"
-                onClick={handleCopyCode}
-                className="p-1.5 sm:p-2 rounded-xl bg-cyan-600/30 hover:bg-cyan-500/40 border border-cyan-400/50 text-cyan-300 hover:text-white transition active:scale-90 cursor-pointer shadow-md"
-                title="Copy Room ID"
+                className="duo-action-btn blue"
+                onClick={() => copyRoomId()}
               >
-                {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <span className="duo-btn-icon">▣</span> COPY ROOM ID
+              </button>
+              <button
+                type="button"
+                className="duo-action-btn green"
+                onClick={handleShare}
+              >
+                <span className="duo-btn-icon">↗</span> SHARE WITH FRIEND
               </button>
             </div>
 
-            <span className="font-knight font-medium text-[8px] xs:text-[9px] sm:text-[10px] text-slate-400 mt-1">
-              Share this Room ID with your friend to join
-            </span>
-          </div>
+            <div className="duo-player-row">
+              <article className="duo-player-card">
+                <div className="duo-portrait-wrap">
+                  <img src="/images/duo-rampage/player1.png" alt="Host Avatar" />
+                </div>
+                <div className="duo-player-name">{player1.name || 'RAMPAGE#001'}</div>
+                <div className="duo-level">LV. 1</div>
+                <div className="duo-ready">
+                  <span>✓</span> READY
+                </div>
+              </article>
 
-          {/* Action Buttons Row: COPY ROOM ID (Cyan) & SHARE WITH FRIEND (Emerald) */}
-          <div className="flex items-center justify-center gap-2 sm:gap-3 w-full">
-            {/* COPY ROOM ID Button */}
-            <button
-              type="button"
-              onClick={handleCopyCode}
-              className="flex-1 h-10 xs:h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-b from-[#38bdf8] via-[#0284c7] to-[#0369a1] border-t-2 border-cyan-200/90 border-b-4 border-[#075985] text-white font-knight font-bold text-xs xs:text-sm tracking-wider uppercase shadow-[0_6px_20px_rgba(2,132,199,0.5)] flex items-center justify-center gap-1.5 transition-all duration-100 hover:brightness-110 active:translate-y-1 active:border-b-2 cursor-pointer relative overflow-hidden group"
-            >
-              <div className="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none" />
-              {copied ? (
-                <Check className="w-4 h-4 text-emerald-200 shrink-0" />
-              ) : (
-                <Copy className="w-4 h-4 text-white shrink-0 group-hover:scale-105 transition-transform drop-shadow" />
-              )}
-              <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] truncate">
-                {copied ? 'COPIED!' : 'COPY ROOM ID'}
-              </span>
-            </button>
-
-            {/* SHARE WITH FRIEND Button */}
-            <button
-              type="button"
-              onClick={handleShare}
-              className="flex-1 h-10 xs:h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-b from-[#4ade80] via-[#16a34a] to-[#15803d] border-t-2 border-emerald-200/90 border-b-4 border-[#14532d] text-white font-knight font-bold text-xs xs:text-sm tracking-wider uppercase shadow-[0_6px_20px_rgba(22,163,74,0.5)] flex items-center justify-center gap-1.5 transition-all duration-100 hover:brightness-110 active:translate-y-1 active:border-b-2 cursor-pointer relative overflow-hidden group"
-            >
-              <div className="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none" />
-              <Share2 className="w-4 h-4 text-white shrink-0 group-hover:scale-105 transition-transform drop-shadow" />
-              <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] truncate">
-                SHARE WITH FRIEND
-              </span>
-            </button>
-          </div>
-
-          {/* Squad Members Slots Row (Player 1 & Player 2 Cards) */}
-          <div className="flex items-center justify-center gap-2.5 sm:gap-3.5 w-full">
-            {/* Player 1 Card (Host / You) */}
-            <div className="flex-1 bg-slate-950/80 border border-cyan-500/40 rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-center relative shadow-inner">
-              {/* Crown Emblem */}
-              <Crown className="w-4 h-4 text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.8)] fill-amber-400 mb-1" />
-
-              {/* Square Avatar Portrait */}
-              <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-xl overflow-hidden border-2 border-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.4)] relative bg-slate-900 shrink-0">
-                <Image
-                  src="/images/duo-rampage/avatar_hero.png"
-                  alt="Player 1 Avatar"
-                  fill
-                  className="object-cover"
-                  sizes="52px"
-                />
-              </div>
-
-              {/* Name & Level */}
-              <span className="font-knight font-black text-xs sm:text-sm text-white tracking-wider uppercase mt-1 truncate">
-                {player1.name || 'RAMPAGE#001'}
-              </span>
-              <span className="font-knight font-medium text-[8px] sm:text-[9px] text-slate-400 -mt-0.5">
-                LV. 1
-              </span>
-
-              {/* Ready Pill Badge */}
-              <div className="mt-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center gap-1 shadow-sm">
-                <Check className="w-2.5 h-2.5 text-emerald-400" />
-                <span className="font-knight font-bold text-[8.5px] sm:text-[9.5px] text-emerald-400 uppercase tracking-wider">
-                  READY
-                </span>
-              </div>
-            </div>
-
-            {/* Player 2 Card (Waiting or Joined) */}
-            <div className="flex-1 bg-slate-950/60 border border-slate-700/80 rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-center relative shadow-inner">
-              {/* Spacer or Badge */}
-              <div className="h-4 mb-1" />
-
-              {/* Avatar: Blue Silhouette Box with Plus Sign */}
-              <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-xl border border-cyan-500/30 bg-cyan-950/30 flex items-center justify-center text-cyan-300 shadow-inner relative">
+              <article className="duo-player-card duo-waiting">
                 {isPlayer2Joined ? (
-                  <span className="font-knight font-black text-base text-cyan-300">P2</span>
+                  <>
+                    <div className="duo-portrait-wrap" style={{ borderColor: '#38bdf8' }}>
+                      <img src="/images/duo-rampage/player2_hologram.png" alt="Partner Avatar" />
+                    </div>
+                    <div className="duo-player-name">{player2?.name || 'PLAYER 2'}</div>
+                    <div className="duo-level" style={{ color: '#38bdf8' }}>PARTNER HERO</div>
+                    <div className="duo-ready">
+                      <span>✓</span> READY
+                    </div>
+                  </>
                 ) : (
-                  <Plus className="w-5 h-5 text-cyan-400 animate-pulse" />
+                  <>
+                    <div className="duo-waiting-person">
+                      ♙<span>+</span>
+                    </div>
+                    <div className="duo-player-name">PLAYER 2</div>
+                    <div className="duo-waiting-label">
+                      <span className="duo-clock">◷</span> WAITING...
+                    </div>
+                  </>
                 )}
-              </div>
-
-              {/* Name */}
-              <span className="font-knight font-bold text-xs sm:text-sm text-slate-300 tracking-wider uppercase mt-1 truncate">
-                {isPlayer2Joined ? player2.name : 'PLAYER 2'}
-              </span>
-              <span className="font-knight font-medium text-[8px] sm:text-[9px] text-slate-500 -mt-0.5">
-                {isPlayer2Joined ? 'READY TO FIGHT' : 'INVITE CODE SENT'}
-              </span>
-
-              {/* Waiting or Ready Pill */}
-              {isPlayer2Joined ? (
-                <div className="mt-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center gap-1 shadow-sm">
-                  <Check className="w-2.5 h-2.5 text-emerald-400" />
-                  <span className="font-knight font-bold text-[8.5px] sm:text-[9.5px] text-emerald-400 uppercase tracking-wider">
-                    READY
-                  </span>
-                </div>
-              ) : (
-                <div className="mt-1.5 px-2.5 py-0.5 rounded-full bg-slate-800/80 border border-slate-700 flex items-center gap-1 shadow-sm">
-                  <Clock className="w-2.5 h-2.5 text-slate-400" />
-                  <span className="font-knight font-bold text-[8.5px] sm:text-[9.5px] text-slate-300 uppercase tracking-wider">
-                    WAITING...
-                  </span>
-                </div>
-              )}
+              </article>
             </div>
-          </div>
 
-          {/* Waiting Spinner Notice */}
-          <div className="flex flex-col items-center justify-center text-center -my-0.5">
-            <div className="flex items-center gap-2">
-              <div className="w-3.5 h-3.5 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin shrink-0" />
-              <span className="font-knight font-black text-xs sm:text-sm text-white uppercase tracking-wider drop-shadow">
+            <div className="duo-waiting-status">
+              <div className="duo-loader" />
+              <strong>
                 {isPlayer2Joined ? 'SQUAD ASSEMBLED!' : 'WAITING FOR PLAYER 2...'}
-              </span>
+              </strong>
+              <p>
+                {isPlayer2Joined
+                  ? 'Both warriors ready. Tap Start Mission to launch!'
+                  : 'Once your friend joins, you can start the mission!'}
+              </p>
             </div>
-            <span className="font-knight font-medium text-[8px] xs:text-[9px] sm:text-[10px] text-slate-400 mt-0.5">
-              {isPlayer2Joined
-                ? 'Both warriors ready. Tap Start Mission to launch!'
-                : 'Once your friend joins, you can start the mission!'}
-            </span>
-          </div>
 
-          {/* Big START MISSION Button */}
-          <button
-            type="button"
-            onClick={handleStart}
-            className={`w-full h-11 xs:h-12 sm:h-14 rounded-2xl flex flex-col items-center justify-center transition-all duration-150 cursor-pointer relative overflow-hidden group shadow-xl ${
-              isPlayer2Joined
-                ? 'bg-gradient-to-b from-[#ffea38] via-[#f59e0b] to-[#d97706] border-t-2 border-yellow-100 border-b-5 border-[#78350f] text-slate-950 shadow-[0_10px_35px_rgba(245,158,11,0.65)] hover:brightness-110 active:translate-y-1 active:border-b-2'
-                : 'bg-gradient-to-b from-slate-700/90 via-slate-800/90 to-slate-900/90 hover:from-slate-650 hover:to-slate-850 border-t-2 border-slate-600 border-b-4 border-slate-950 text-slate-200 active:translate-y-1 active:border-b-2'
-            }`}
-          >
-            <div className="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none" />
-            <div className="flex items-center gap-2 leading-none">
-              <Play className={`w-4 h-4 sm:w-5 sm:h-5 fill-current ${isPlayer2Joined ? 'text-slate-950' : 'text-slate-200'}`} />
-              <span
-                className={`font-knight font-black text-sm xs:text-base sm:text-lg tracking-wider uppercase ${
-                  isPlayer2Joined ? 'text-slate-950 drop-shadow-[0_1px_2px_rgba(255,255,255,0.6)]' : 'text-white drop-shadow'
-                }`}
-              >
-                START MISSION
-              </span>
-            </div>
-            <span
-              className={`font-knight font-bold text-[7.5px] xs:text-[8.5px] sm:text-[9.5px] tracking-widest uppercase mt-0.5 ${
-                isPlayer2Joined ? 'text-[#78350f]' : 'text-slate-400'
-              }`}
+            <button
+              type="button"
+              className={`duo-start-btn ${isPlayer2Joined ? 'ready' : 'disabled'}`}
+              onClick={handleStart}
             >
-              {isPlayer2Joined ? 'LAUNCH 2-PLAYER SQUAD' : 'Click to launch (Solo Practice or Co-op)'}
-            </span>
-          </button>
-        </div>
-      </main>
+              <span className="duo-play-triangle">▶</span>
+              <span>
+                <strong>START MISSION</strong>
+                <small>
+                  {isPlayer2Joined ? 'LAUNCH 2-PLAYER SQUAD' : 'Click to launch (Solo or Waiting for friend)'}
+                </small>
+              </span>
+            </button>
+          </>
+        ) : (
+          /* JOIN ROOM CONTENT */
+          <>
+            <div className="duo-room-id-box">
+              <div className="duo-eyebrow">ENTER ROOM CODE</div>
+              <div className="duo-room-id-row">
+                <span style={{ fontSize: '32px', color: '#ffc21c', fontWeight: 700 }}>#</span>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={inputCode}
+                  onChange={(e) => {
+                    const clean = e.target.value.replace(/[^0-9A-Za-z]/g, '').slice(0, 6).toUpperCase();
+                    setInputCode(clean);
+                  }}
+                  placeholder="483921"
+                  className="duo-room-id-input font-knight"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  className="duo-icon-btn"
+                  onClick={handlePasteCode}
+                  title="Paste from clipboard"
+                >
+                  📋
+                </button>
+              </div>
+              <p>Enter the 6-digit PIN code shared by your squad leader</p>
+            </div>
 
-      {/* 4. Bottom Footer: DUO RAMPAGE Logo (Left) & PRO TIP Card (Right) */}
-      <footer className="relative w-full flex items-end justify-between z-20 gap-2 shrink-0 pt-1 xs:pt-2">
-        {/* Bottom-Left: 3D Game Logo & Tagline */}
-        <div className="flex flex-col items-start select-none">
-          <div className="relative w-28 xs:w-36 sm:w-44 h-7 xs:h-9 sm:h-11 flex items-center">
-            <Image
-              src="/images/duo-rampage/duo_rampage_logo.png"
-              alt="DUO RAMPAGE"
-              fill
-              className="object-contain filter drop-shadow-[0_4px_15px_rgba(245,158,11,0.5)]"
-              priority
-            />
-          </div>
-          <span className="font-knight text-[6.5px] xs:text-[7.5px] sm:text-[9px] text-cyan-200 tracking-wider uppercase -mt-0.5 drop-shadow">
-            TWO PLAYERS • ONE MISSION • ENDLESS ACTION
-          </span>
-        </div>
+            <div className="duo-action-row">
+              <button
+                type="button"
+                className="duo-action-btn blue"
+                onClick={handlePasteCode}
+              >
+                <span className="duo-btn-icon">📋</span> PASTE CODE
+              </button>
+              <button
+                type="button"
+                className="duo-action-btn green"
+                onClick={handleConnect}
+              >
+                <span className="duo-btn-icon">⚔</span> CONNECT
+              </button>
+            </div>
 
-        {/* Bottom-Right: PRO TIP Card */}
-        <div className="bg-slate-950/85 backdrop-blur-md border border-amber-500/40 rounded-2xl p-1.5 xs:p-2 sm:px-3 sm:py-2 flex items-center gap-1.5 xs:gap-2 max-w-[170px] xs:max-w-xs sm:max-w-sm shadow-xl shrink-0">
-          <div className="w-5 h-5 xs:w-6 xs:h-6 sm:w-7 sm:h-7 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
-            <Lightbulb className="w-3 h-3 xs:w-3.5 xs:h-3.5 sm:w-4 sm:h-4 text-amber-400" />
-          </div>
-          <div className="flex flex-col leading-tight">
-            <span className="font-knight font-black text-[7.5px] xs:text-[8.5px] sm:text-[10px] text-amber-400 uppercase tracking-wider">
-              PRO TIP:
-            </span>
-            <span className="font-knight font-medium text-[6.5px] xs:text-[7.5px] sm:text-[9px] text-slate-300 line-clamp-2">
-              Share the Room ID with your friend and get ready for some chaos!
-            </span>
-          </div>
+            <div className="duo-player-row">
+              <article className="duo-player-card">
+                <div className="duo-portrait-wrap">
+                  <img src="/images/duo-rampage/player1.png" alt="You" />
+                </div>
+                <div className="duo-player-name">YOU (JOINING)</div>
+                <div className="duo-level">HEAVY / ASSAULT</div>
+                <div className="duo-ready">
+                  <span>✓</span> READY
+                </div>
+              </article>
+
+              <article className="duo-player-card duo-waiting">
+                <div className="duo-portrait-wrap" style={{ borderColor: '#38bdf8' }}>
+                  <img src="/images/duo-rampage/player2_hologram.png" alt="Squad Leader" />
+                </div>
+                <div className="duo-player-name">
+                  {inputCode ? `#${inputCode}` : 'TARGET HOST'}
+                </div>
+                <div className="duo-waiting-label" style={{ color: '#38bdf8' }}>
+                  {inputCode.length >= 4 ? 'READY TO CONNECT' : 'ENTER PIN ABOVE'}
+                </div>
+              </article>
+            </div>
+
+            <div className="duo-waiting-status">
+              <div className="duo-loader" />
+              <strong>ENTER CODE & TAP CONNECT TO SQUAD UP!</strong>
+              <p>Instant peer connection across Asia, Europe and Americas</p>
+            </div>
+
+            <button
+              type="button"
+              className={`duo-start-btn ${inputCode.length >= 4 ? 'ready' : 'disabled'}`}
+              onClick={handleConnect}
+            >
+              <span className="duo-play-triangle">▶</span>
+              <span>
+                <strong>JOIN MISSION</strong>
+                <small>Connect to leader's room</small>
+              </span>
+            </button>
+          </>
+        )}
+      </section>
+
+      {/* 6. Footer Logo & Pro Tip Card */}
+      <img
+        className="duo-game-logo"
+        src="/images/duo-rampage/duo_rampage_logo.png"
+        alt="DUO RAMPAGE"
+      />
+
+      <aside className="duo-tip-card">
+        <span className="duo-tip-icon">!</span>
+        <div>
+          <strong>PRO TIP:</strong>
+          <p>
+            {mode === 'create'
+              ? 'Share the Room ID with your friend and get ready for some chaos!'
+              : 'Ask your friend for their 6-digit room PIN or click their invite link!'}
+          </p>
         </div>
-      </footer>
-    </div>
+      </aside>
+
+      {/* 7. Toast Notification */}
+      <div className={`duo-toast ${toastMessage ? 'show' : ''}`}>
+        {toastMessage}
+      </div>
+    </main>
   );
 };

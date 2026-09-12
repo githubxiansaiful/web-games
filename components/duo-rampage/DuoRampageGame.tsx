@@ -26,6 +26,7 @@ interface DuoRampageGameProps {
 
 export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
   const [screen, setScreen] = useState<'menu' | 'create_room' | 'lobby' | 'playing' | 'game_over'>('menu');
+  const [createRoomMode, setCreateRoomMode] = useState<'create' | 'join'>('create');
   const [room, setRoom] = useState<DuoRoomData | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [myRole, setMyRole] = useState<PlayerRole>('assault');
@@ -201,6 +202,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
       setIsSolo(false);
       setMyRole('assault');
       if (duoNetwork.room) setRoom(duoNetwork.room);
+      setCreateRoomMode('create');
       setScreen('create_room');
     } catch (err) {
       console.warn('Could not create network room, creating offline room:', err);
@@ -223,8 +225,14 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
         wave: 1,
         comboCount: 0,
       });
+      setCreateRoomMode('create');
       setScreen('create_room');
     }
+  };
+
+  const handleOpenJoinRoom = () => {
+    setCreateRoomMode('join');
+    setScreen('create_room');
   };
 
   const handleJoinRoom = async (code: string) => {
@@ -234,6 +242,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
       setRoom(joinedRoom);
       setIsSolo(false);
       setMyRole('heavy');
+      setCreateRoomMode('join');
       setScreen('create_room');
     } catch (err) {
       console.warn('Could not join room online, simulating joined state:', err);
@@ -263,6 +272,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
         wave: 1,
         comboCount: 0,
       });
+      setCreateRoomMode('join');
       setScreen('create_room');
     }
   };
@@ -302,6 +312,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
         <DuoRampageHomeScreen
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
+          onOpenJoinRoom={handleOpenJoinRoom}
           onStartSolo={handleStartSolo}
           onExit={onExit}
         />
@@ -312,7 +323,9 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
         <DuoCreateRoomScreen
           roomCode={room?.code || '483921'}
           room={room}
+          initialMode={createRoomMode}
           onBack={handleLeaveLobby}
+          onJoinRoomSubmit={handleJoinRoom}
           onStartMission={() => {
             if (room && room.players.length > 1 && !isSolo) {
               handleStartMultiplayerGame();
