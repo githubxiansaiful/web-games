@@ -1,6 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Nosifer&family=Rubik+Glitch&display=swap');
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'KnightWarrior';
+  src: url('/fonts/KnightWarrior.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-knight, .font-duo {
+  font-family: 'KnightWarrior', sans-serif;
+  letter-spacing: 0.04em;
+}
+
 :root {
   --background: #020617;
   --foreground: #f8fafc;

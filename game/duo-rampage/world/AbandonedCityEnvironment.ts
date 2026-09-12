@@ -81,6 +81,22 @@ export class AbandonedCityEnvironment {
     southSidewalk.position.set(0, 0.15, 7.5);
     southSidewalk.receiveShadow = true;
     this.group.add(southSidewalk);
+
+    // 5. Reflective Dark Wet Puddles (Glossy asphalt reflections)
+    const puddleMat = new THREE.MeshStandardMaterial({
+      color: 0x0f172a,
+      roughness: 0.12,
+      metalness: 0.8,
+    });
+    const puddleLocations = [-38, -20, -6, 10, 24, 40];
+    puddleLocations.forEach((px, idx) => {
+      const pGeo = new THREE.CircleGeometry(1.6 + (idx % 3) * 0.4, 16);
+      pGeo.rotateX(-Math.PI / 2);
+      const pMesh = new THREE.Mesh(pGeo, puddleMat);
+      pMesh.position.set(px, 0.015, idx % 2 === 0 ? 1.8 : -1.8);
+      pMesh.receiveShadow = true;
+      this.group.add(pMesh);
+    });
   }
 
   private buildCityBackdrop() {
@@ -243,6 +259,23 @@ export class AbandonedCityEnvironment {
     carGroup.add(fireLight);
 
     this.group.add(carGroup);
+
+    // Register car as high-health explosive destructible
+    const carProp: DestructibleProp = {
+      id: 'destructible_car_police',
+      type: 'barrel',
+      x: -16,
+      y: 0.6,
+      z: 2.2,
+      health: 140,
+      maxHealth: 140,
+      isDestroyed: false,
+      isExplosive: true,
+      explosionRadius: 9.0,
+      explosionDamage: 180,
+    };
+    this.destructibles.push(carProp);
+    this.propMeshes.set('destructible_car_police', carGroup);
 
     // Setup Animated Fire & Smoke Particles
     const particleCount = 45;

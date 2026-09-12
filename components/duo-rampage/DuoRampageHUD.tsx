@@ -25,6 +25,7 @@ interface DuoRampageHUDProps {
   wave: WaveState;
   warningStayTogether: boolean;
   onControlsChange: (controls: TouchControlsState) => void;
+  onSwitchWeapon?: () => void;
   onExit: () => void;
 }
 
@@ -36,6 +37,7 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
   wave,
   warningStayTogether,
   onControlsChange,
+  onSwitchWeapon,
   onExit,
 }) => {
   const [isMuted, setIsMuted] = useState(false);
@@ -71,7 +73,9 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
       const key = e.key.toLowerCase();
       let changed = false;
 
-      if (key === 'a' || key === 'arrowleft') {
+      if (key === '1' || key === '2' || key === '3' || key === 'x') {
+        onSwitchWeapon?.();
+      } else if (key === 'a' || key === 'arrowleft') {
         controlsRef.current.moveX = -1;
         changed = true;
       } else if (key === 'd' || key === 'arrowright') {
@@ -392,6 +396,41 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
         <div className="flex items-end gap-3 pointer-events-auto">
           {/* Auxiliary Buttons Column */}
           <div className="flex flex-col gap-2.5">
+            {/* Special Ability Button (Q) */}
+            <button
+              onTouchStart={() => updateControls({ isSpecial: true })}
+              onTouchEnd={() => updateControls({ isSpecial: false })}
+              onMouseDown={() => updateControls({ isSpecial: true })}
+              onMouseUp={() => updateControls({ isSpecial: false })}
+              className={`w-12 h-12 rounded-2xl border flex flex-col items-center justify-center font-black text-[10px] shadow-lg transition active:scale-95 cursor-pointer relative overflow-hidden ${
+                myPlayer && myPlayer.specialCooldown > 0
+                  ? 'bg-slate-950/90 border-slate-800 text-slate-500'
+                  : myRole === 'assault'
+                  ? 'bg-gradient-to-tr from-sky-600 to-cyan-500 border-sky-300 text-white animate-pulse shadow-sky-500/30'
+                  : 'bg-gradient-to-tr from-amber-600 to-orange-500 border-amber-300 text-white animate-pulse shadow-amber-500/30'
+              }`}
+              title={myRole === 'assault' ? 'Tactical Cluster Airstrike (Q)' : 'Titan Shockwave Slam (Q)'}
+            >
+              <span className="text-base leading-none">{myRole === 'assault' ? '🚀' : '🛡️'}</span>
+              <span className="text-[8px] font-black uppercase tracking-tighter mt-0.5">
+                {myPlayer && myPlayer.specialCooldown > 0
+                  ? `${Math.ceil(myPlayer.specialCooldown)}s`
+                  : 'ABILITY'}
+              </span>
+            </button>
+
+            {/* Quick Weapon Switch Button */}
+            <button
+              onClick={() => onSwitchWeapon?.()}
+              className="w-12 h-12 rounded-2xl bg-slate-900/90 hover:bg-slate-850 border border-slate-700 hover:border-amber-400/60 text-amber-400 flex flex-col items-center justify-center font-black text-[9px] shadow-lg transition active:scale-95 cursor-pointer"
+              title="Switch Weapon (1/2/3/X)"
+            >
+              <span className="text-sm">🔫</span>
+              <span className="text-[8px] uppercase tracking-tighter text-slate-300">
+                {myPlayer?.weapon === 'pistol' ? 'PISTOL' : myPlayer?.weapon === 'rifle' ? 'RIFLE' : 'SHOTGUN'}
+              </span>
+            </button>
+
             {/* Revive Button (Highlights if partner down) */}
             <button
               onTouchStart={() => updateControls({ isReviving: true })}
@@ -400,8 +439,8 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
               onMouseUp={() => updateControls({ isReviving: false })}
               className={`w-12 h-12 rounded-2xl border flex items-center justify-center font-black text-xs shadow-lg transition active:scale-95 cursor-pointer ${
                 partnerPlayer?.isDown
-                  ? 'bg-emerald-500 border-emerald-300 text-white animate-bounce'
-                  : 'bg-slate-900/80 border-slate-700 text-slate-300'
+                  ? 'bg-emerald-500 border-emerald-300 text-white animate-bounce shadow-emerald-500/40'
+                  : 'bg-slate-900/80 border-slate-700 text-slate-400'
               }`}
             >
               <Heart className="w-5 h-5 fill-current" />

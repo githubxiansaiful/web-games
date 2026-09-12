@@ -21,10 +21,12 @@ export class DuoPlayerEntity {
   private meleeTimer: number = 0;
   private isDashing: boolean = false;
   private dashDuration: number = 0;
+  public shieldDuration: number = 0;
 
   // Callbacks
   public onShoot?: (origin: THREE.Vector3, dir: THREE.Vector3, weapon: WeaponType) => void;
   public onMelee?: (hitbox: { x: number; z: number; radius: number; damage: number }) => void;
+  public onSpecialAbility?: (role: PlayerRole, pos: { x: number; z: number; facing: number }) => void;
   public onDown?: () => void;
   public onRevived?: () => void;
 
@@ -81,7 +83,7 @@ export class DuoPlayerEntity {
   }
 
   public takeDamage(amount: number): boolean {
-    if (this.stats.isDown || this.isDashing) return false;
+    if (this.stats.isDown || this.isDashing || this.shieldDuration > 0) return false;
 
     this.stats.health = Math.max(0, this.stats.health - amount);
     duoAudio.playPlayerHit();
@@ -151,12 +153,32 @@ export class DuoPlayerEntity {
     });
   }
 
+  public triggerSpecialAbility() {
+    if (this.stats.isDown || this.stats.specialCooldown > 0) return;
+    this.stats.specialCooldown = this.stats.specialMaxCooldown;
+
+    if (this.stats.role === 'heavy') {
+      this.shieldDuration = 4.0;
+    }
+
+    this.onSpecialAbility?.(this.stats.role, {
+      x: this.stats.x,
+      z: this.stats.z,
+      facing: this.stats.facing,
+    });
+  }
+
   public update(
     delta: number,
     time: number,
     controls: TouchControlsState,
     isRampage: boolean
   ) {
+    if (this.shieldDuration > 0) this.shieldDuration -= delta;
+    if (controls.isDashing) this.triggerDash();
+    if (controls.isReloading) this.triggerReload(isRampage);
+    if (controls.isMelee) this.triggerMelee();
+    if (controls.isSpecial) this.triggerSpecialAbility();
     // 1. If Player is DOWN: handle 10-second countdown
     if (this.stats.isDown) {
       if (!this.stats.isReviving) {

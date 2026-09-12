@@ -14,6 +14,7 @@ import { DuoCombatSystem } from './systems/DuoCombatSystem';
 import { DuoWaveSystem } from './systems/DuoWaveSystem';
 import { DuoPlayerEntity } from './entities/DuoPlayerEntity';
 import { DuoEnemyEntity } from './entities/DuoEnemyEntity';
+import { DuoPickupSystem } from './systems/DuoPickupSystem';
 import { duoAudio } from './audio/DuoAudioEngine';
 
 export interface EngineCallbacks {
@@ -26,6 +27,8 @@ export interface EngineCallbacks {
     warningStayTogether: boolean
   ) => void;
   onGameOver?: (victory: boolean, stats: { score: number; kills: number; maxCombo: number; wave: number }) => void;
+  onShootBroadcast?: (origin: THREE.Vector3, dir: THREE.Vector3, weapon: any) => void;
+  onReviveSuccessBroadcast?: () => void;
 }
 
 export class DuoRampageEngine {
@@ -43,6 +46,7 @@ export class DuoRampageEngine {
   public comboSystem: DuoComboSystem;
   public combatSystem: DuoCombatSystem;
   public waveSystem: DuoWaveSystem;
+  public pickupSystem: DuoPickupSystem;
 
   // Players & Enemies
   public player1: DuoPlayerEntity;
@@ -136,8 +140,10 @@ export class DuoRampageEngine {
       this.environment
     );
     this.scene.add(this.combatSystem.group);
-
     this.waveSystem = new DuoWaveSystem();
+
+    this.pickupSystem = new DuoPickupSystem(this.particleSystem);
+    this.scene.add(this.pickupSystem.group);
 
     // 5. Initialize Players (Player 1 Assault & Player 2 Heavy)
     this.player1 = new DuoPlayerEntity('p1', 'Player 1 (Assault)', 'assault', true, -3, 0);
@@ -149,14 +155,24 @@ export class DuoRampageEngine {
     // Hook up shooting callbacks
     this.player1.onShoot = (origin, dir, weapon) => {
       this.combatSystem.firePlayerWeapon('p1', origin, dir, weapon, this.comboSystem.state.isRampage);
+      if (!this.isSoloMode && this.myRole === 'assault') {
+        this.callbacks.onShootBroadcast?.(origin, dir, weapon);
+      }
     };
     this.player2.onShoot = (origin, dir, weapon) => {
       this.combatSystem.firePlayerWeapon('p2', origin, dir, weapon, this.comboSystem.state.isRampage);
+      if (!this.isSoloMode && this.myRole === 'heavy') {
+        this.callbacks.onShootBroadcast?.(origin, dir, weapon);
+      }
     };
 
     // Hook up Melee
     this.player1.onMelee = (hitbox) => this.handleMeleeStrike(hitbox);
     this.player2.onMelee = (hitbox) => this.handleMeleeStrike(hitbox);
+
+    // Hook up Special Abilities
+    this.player1.onSpecialAbility = (role, pos) => this.handleSpecialAbility(role, pos);
+    this.player2.onSpecialAbility = (role, pos) => this.handleSpecialAbility(role, pos);
 
     // Hook up Wave System
     this.waveSystem.onSpawnEnemy = (type, x, z) => {
@@ -196,6 +212,15 @@ export class DuoRampageEngine {
     enemy.onDeath = (e) => {
       this.totalKills++;
       this.waveSystem.onEnemyKilled();
+
+      // Chance to spawn ground supply pickup upon death
+      const dropRoll = Math.random();
+      if (e.state.type === 'boss' || e.state.type === 'tank') {
+        this.pickupSystem.spawnPickup(dropRoll > 0.5 ? 'weapon_shotgun' : 'ammo', e.state.x, e.state.z);
+      } else if (dropRoll < 0.3) {
+        this.pickupSystem.spawnPickup(dropRoll < 0.15 ? 'health' : 'ammo', e.state.x, e.state.z);
+      }
+
       setTimeout(() => {
         const idx = this.enemies.indexOf(e);
         if (idx !== -1) {
@@ -225,6 +250,56 @@ export class DuoRampageEngine {
         }
       }
     });
+  }
+
+  private handleSpecialAbility(role: PlayerRole, pos: { x: number; z: number; facing: number }) {
+    if (role === 'assault') {
+      // Tactical Cluster Strike: 4 sequential explosions carpeting forward
+      duoAudio.playExplosion();
+      this.particleSystem.triggerScreenShake(0.8);
+      for (let i = 1; i <= 4; i++) {
+        setTimeout(() => {
+          if (!this.isRunning) return;
+          const targetX = pos.x + pos.facing * (i * 4.5);
+          const targetZ = pos.z + (Math.random() - 0.5) * 2.5;
+          this.particleSystem.spawnExplosion(targetX, 0.5, targetZ, 1.4);
+          duoAudio.playExplosion();
+
+          // Damage enemies in radius
+          this.enemies.forEach((enemy) => {
+            if (enemy.state.isDead) return;
+            const d = Math.hypot(enemy.state.x - targetX, enemy.state.z - targetZ);
+            if (d <= 4.5) {
+              const dmg = 120;
+              const died = enemy.takeDamage(dmg);
+              const comboInfo = this.comboSystem.registerHit();
+              this.particleSystem.addDamageNumber(`${dmg} AIRSTRIKE!`, enemy.state.x, 1.6, enemy.state.z, true);
+              if (died) this.totalScore += enemy.state.scoreValue * comboInfo.multiplier;
+            }
+          });
+        }, i * 150);
+      }
+    } else {
+      // Titan Shockwave Slam
+      duoAudio.playExplosion();
+      this.particleSystem.spawnExplosion(pos.x, 0.5, pos.z, 2.2);
+      this.particleSystem.triggerScreenShake(1.2);
+
+      // Expanding Shockwave knockback
+      this.enemies.forEach((enemy) => {
+        if (enemy.state.isDead) return;
+        const d = Math.hypot(enemy.state.x - pos.x, enemy.state.z - pos.z);
+        if (d <= 7.5) {
+          const dmg = 175;
+          const died = enemy.takeDamage(dmg);
+          // Knockback
+          enemy.state.x += Math.sign(enemy.state.x - pos.x) * 4.0;
+          const comboInfo = this.comboSystem.registerHit();
+          this.particleSystem.addDamageNumber(`${dmg} SLAM!`, enemy.state.x, 1.8, enemy.state.z, true);
+          if (died) this.totalScore += enemy.state.scoreValue * comboInfo.multiplier;
+        }
+      });
+    }
   }
 
   public start() {
@@ -310,9 +385,10 @@ export class DuoRampageEngine {
     const avgPlayerX = (this.player1.stats.x + this.player2.stats.x) / 2;
     this.waveSystem.update(delta, avgPlayerX);
 
-    // 6. Update Environment & Particles
+    // 6. Update Environment & Particles & Pickups
     this.environment.update(delta, time);
     this.particleSystem.update(delta);
+    this.pickupSystem.update(delta, time, [this.player1, this.player2]);
 
     // 7. Dynamic Camera Following & Auto-Zoom
     this.updateCamera(delta, avgPlayerX, distBetweenPlayers);

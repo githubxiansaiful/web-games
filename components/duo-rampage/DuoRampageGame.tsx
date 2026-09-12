@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import * as THREE from 'three';
 import { DuoRampageEngine } from '@/game/duo-rampage/DuoRampageEngine';
 import { duoNetwork } from '@/game/duo-rampage/network/DuoNetworkManager';
-import { DuoRampageMainMenu } from './DuoRampageMainMenu';
+import { DuoRampageHomeScreen } from './home/DuoRampageHomeScreen';
 import { DuoRampageLobby } from './DuoRampageLobby';
 import { DuoRampageHUD } from './DuoRampageHUD';
 import { DuoRampageGameOver } from './DuoRampageGameOver';
@@ -83,12 +84,69 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
       setScreen('playing');
     };
 
+    duoNetwork.onRemotePlayerState = (state) => {
+      if (!engineRef.current || isSolo) return;
+      const remote = myRole === 'assault' ? engineRef.current.player2 : engineRef.current.player1;
+      remote.stats.x = state.x;
+      remote.stats.z = state.z;
+      remote.stats.facing = state.facing;
+      remote.stats.health = state.health;
+      remote.stats.weapon = state.weapon;
+      remote.stats.ammo = state.ammo;
+      remote.stats.isDown = state.isDown;
+      remote.stats.isReviving = state.isReviving;
+      remote.stats.animState = state.animState;
+      remote.group.position.set(state.x, 0, state.z);
+    };
+
+    duoNetwork.onRemoteShoot = (data) => {
+      if (!engineRef.current || isSolo) return;
+      const remote = myRole === 'assault' ? engineRef.current.player2 : engineRef.current.player1;
+      engineRef.current.combatSystem.firePlayerWeapon(
+        remote.stats.id,
+        new THREE.Vector3(data.origin.x, data.origin.y, data.origin.z),
+        new THREE.Vector3(data.dir.x, data.dir.y, data.dir.z),
+        data.weapon,
+        engineRef.current.comboSystem.state.isRampage
+      );
+      duoAudio.playGunshot(data.weapon);
+    };
+
+    duoNetwork.onRemoteRevived = () => {
+      if (!engineRef.current) return;
+      const me = myRole === 'assault' ? engineRef.current.player1 : engineRef.current.player2;
+      if (me.stats.isDown) me.reviveSuccess();
+    };
+
     return () => {
       duoNetwork.leaveRoom();
     };
-  }, []);
+  }, [isSolo, myRole]);
 
-  // 2. Initialize Three.js Engine when entering 'playing' screen
+  // 2. Stream local player state at 20Hz in multiplayer mode
+  useEffect(() => {
+    if (screen !== 'playing' || isSolo) return;
+
+    const interval = setInterval(() => {
+      if (!engineRef.current) return;
+      const me = myRole === 'assault' ? engineRef.current.player1 : engineRef.current.player2;
+      duoNetwork.sendPlayerState({
+        x: me.stats.x,
+        z: me.stats.z,
+        facing: me.stats.facing,
+        health: me.stats.health,
+        weapon: me.stats.weapon,
+        ammo: me.stats.ammo,
+        isDown: me.stats.isDown,
+        isReviving: me.stats.isReviving,
+        animState: me.stats.animState,
+      });
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, [screen, isSolo, myRole]);
+
+  // 3. Initialize Three.js Engine when entering 'playing' screen
   useEffect(() => {
     if (screen !== 'playing') {
       if (engineRef.current) {
@@ -115,6 +173,12 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
         onGameOver: (victory, stats) => {
           setGameOverResult({ victory, stats });
           setScreen('game_over');
+        },
+        onShootBroadcast: (origin, dir, weapon) => {
+          duoNetwork.sendShoot(origin, dir, weapon);
+        },
+        onReviveSuccessBroadcast: () => {
+          duoNetwork.sendReviveSuccess();
         },
       }
     );
@@ -181,9 +245,9 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
         className={`absolute inset-0 w-full h-full z-10 ${screen === 'playing' ? 'block' : 'hidden'}`}
       />
 
-      {/* 1. Main Menu */}
+      {/* 1. Main Menu (Production Quality 3D Cartoon Home Screen) */}
       {screen === 'menu' && (
-        <DuoRampageMainMenu
+        <DuoRampageHomeScreen
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
           onStartSolo={handleStartSolo}
@@ -214,6 +278,12 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
           wave={waveState}
           warningStayTogether={warningStayTogether}
           onControlsChange={handleControlsChange}
+          onSwitchWeapon={() => {
+            if (engineRef.current) {
+              const active = myRole === 'assault' ? engineRef.current.player1 : engineRef.current.player2;
+              active.switchWeapon();
+            }
+          }}
           onExit={() => setScreen('menu')}
         />
       )}
