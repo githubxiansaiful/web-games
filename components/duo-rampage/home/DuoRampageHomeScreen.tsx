@@ -8,6 +8,7 @@ import { DuoSideMenu } from './DuoSideMenu';
 import { DuoPrimaryButtons } from './DuoPrimaryButtons';
 import { DuoMapSelection } from './DuoMapSelection';
 import { DuoModals, DuoModalType } from './DuoModals';
+import { DuoHomeAnimatedBackground } from './DuoHomeAnimatedBackground';
 
 interface DuoRampageHomeScreenProps {
   onCreateRoom: () => void;
@@ -35,30 +36,8 @@ export const DuoRampageHomeScreen: React.FC<DuoRampageHomeScreenProps> = ({
 
   return (
     <div className="relative w-full h-[100dvh] max-h-[100dvh] bg-[#050711] select-none overflow-hidden flex flex-col justify-between p-2 xs:p-2.5 sm:p-4 md:p-5 text-white font-knight safe-top safe-bottom safe-left safe-right">
-      {/* 1. Master High-Resolution Cinematic Dhaka Background */}
-      <div className="absolute inset-0 w-full h-full pointer-events-none z-0">
-        <Image
-          src="/images/duo-rampage/background.jpg"
-          alt="DUO RAMPAGE Dhaka City Warzone"
-          fill
-          priority
-          className="object-cover object-center transform scale-100 transition-transform duration-1000 ease-out"
-          sizes="100vw"
-        />
-
-        {/* Atmospheric Fiery Lighting & Subtle Edge Vignette */}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-slate-950/40 pointer-events-none" />
-        <div className="absolute inset-0 bg-radial-gradient from-transparent via-transparent to-black/50 pointer-events-none" />
-
-        {/* Floating Sparks & Embers Rising From Burning Street */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-50">
-          <div className="absolute bottom-12 left-1/4 w-1.5 h-1.5 rounded-full bg-amber-400 blur-[1px] animate-pulse" />
-          <div className="absolute bottom-20 left-1/3 w-1 h-1 rounded-full bg-orange-500 blur-[1px] animate-ping" />
-          <div className="absolute bottom-16 right-1/4 w-2 h-2 rounded-full bg-yellow-400 blur-[1px] animate-pulse" />
-          <div className="absolute bottom-28 right-1/3 w-1 h-1 rounded-full bg-red-400 blur-[1px] animate-ping" />
-          <div className="absolute bottom-8 left-1/2 w-1.5 h-1.5 rounded-full bg-amber-300 blur-[1px] animate-pulse" />
-        </div>
-      </div>
+      {/* 1. Master Animated Cinematic Dhaka Uprising Background (from home-bg.html) */}
+      <DuoHomeAnimatedBackground />
 
       {/* 2. Top Header Navigation Bar */}
       <header className="relative w-full flex items-center justify-between z-20 gap-2 shrink-0">
