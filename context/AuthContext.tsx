@@ -66,35 +66,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const persistSession = (userData: AuthUser) => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('xian_active_user_id', userData.id);
+        localStorage.setItem('xian_cached_user', JSON.stringify(userData));
+        localStorage.setItem('runner_player_name', userData.name);
+        // Persist cookie for 10 years (315,360,000s) on client as well
+        document.cookie = `xian_user_id=${encodeURIComponent(userData.id)}; path=/; max-age=315360000; SameSite=Lax`;
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const clearSession = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('xian_active_user_id');
+        localStorage.removeItem('xian_cached_user');
+        localStorage.removeItem('runner_player_name');
+        document.cookie = 'xian_user_id=; path=/; max-age=0; SameSite=Lax';
+      } catch {
+        // ignore
+      }
+    }
+  };
+
   const fetchCurrentUser = useCallback(async () => {
     try {
-      const savedUserId = typeof window !== 'undefined' ? localStorage.getItem('xian_active_user_id') : null;
-      const res = await fetch(`/api/auth/me${savedUserId ? `?userId=${encodeURIComponent(savedUserId)}` : ''}`);
+      let savedUserId: string | null = null;
+      if (typeof window !== 'undefined') {
+        savedUserId = localStorage.getItem('xian_active_user_id');
+        if (!savedUserId) {
+          const match = document.cookie.match(/xian_user_id=([^;]+)/);
+          if (match && match[1]) {
+            savedUserId = decodeURIComponent(match[1]);
+          }
+        }
+      }
+
+      if (!savedUserId) {
+        setIsLoading(false);
+        return;
+      }
+
+      const res = await fetch(`/api/auth/me?userId=${encodeURIComponent(savedUserId)}`);
       if (res.ok) {
         const data = await res.json();
         if (data.user) {
           setUser(data.user);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('xian_active_user_id', data.user.id);
-            localStorage.setItem('xian_cached_user', JSON.stringify(data.user));
-            localStorage.setItem('runner_player_name', data.user.name);
-          }
-        } else {
+          persistSession(data.user);
+        } else if (data.suspended) {
+          // Explicit admin suspension -> log out
           setUser(null);
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('xian_active_user_id');
-            localStorage.removeItem('xian_cached_user');
-          }
+          clearSession();
         }
-      } else if (res.status === 401 || res.status === 403) {
+      } else if (res.status === 403) {
         setUser(null);
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('xian_active_user_id');
-          localStorage.removeItem('xian_cached_user');
-        }
+        clearSession();
       }
+      // Note: If 500, offline, or transient error, NEVER clear the cached user!
     } catch (e) {
-      console.warn('Failed to load session:', e);
+      console.warn('Network issue checking session, keeping cached user active:', e);
     } finally {
       setIsLoading(false);
     }
@@ -133,11 +167,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: data.error || 'Failed to sign in' };
       }
       setUser(data.user);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('xian_active_user_id', data.user.id);
-        localStorage.setItem('xian_cached_user', JSON.stringify(data.user));
-        localStorage.setItem('runner_player_name', data.user.name);
-      }
+      persistSession(data.user);
       setIsAuthModalOpen(false);
       return { success: true };
     } catch (err: any) {
@@ -157,11 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: data.error || 'Failed to create account' };
       }
       setUser(data.user);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('xian_active_user_id', data.user.id);
-        localStorage.setItem('xian_cached_user', JSON.stringify(data.user));
-        localStorage.setItem('runner_player_name', data.user.name);
-      }
+      persistSession(data.user);
       setIsAuthModalOpen(false);
       return { success: true, message: data.message };
     } catch (err: any) {
@@ -185,11 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: data.error || 'Google login failed' };
       }
       setUser(data.user);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('xian_active_user_id', data.user.id);
-        localStorage.setItem('xian_cached_user', JSON.stringify(data.user));
-        localStorage.setItem('runner_player_name', data.user.name);
-      }
+      persistSession(data.user);
       setIsAuthModalOpen(false);
       return { success: true };
     } catch (err: any) {
@@ -204,10 +226,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // ignore
     } finally {
       setUser(null);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('xian_active_user_id');
-        localStorage.removeItem('xian_cached_user');
-      }
+      clearSession();
     }
   };
 
@@ -222,12 +241,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const resData = await res.json();
       if (!res.ok) return { success: false, error: resData.error || 'Update failed' };
       setUser(resData.user);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('xian_cached_user', JSON.stringify(resData.user));
-        if (resData.user?.name) {
-          localStorage.setItem('runner_player_name', resData.user.name);
-        }
-      }
+      persistSession(resData.user);
       return { success: true };
     } catch (e: any) {
       return { success: false, error: e?.message || 'Network error' };
@@ -245,11 +259,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const resData = await res.json();
       if (!res.ok) return { success: false, error: resData.error || 'Account deletion failed' };
       setUser(null);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('xian_active_user_id');
-        localStorage.removeItem('xian_cached_user');
-        localStorage.removeItem('runner_player_name');
-      }
+      clearSession();
       return { success: true };
     } catch (e: any) {
       return { success: false, error: e?.message || 'Network error' };
