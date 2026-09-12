@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
 import Image from 'next/image';
+import { toast } from '@/hooks/use-toast';
 
 export type DuoModalType =
   | 'settings'
@@ -86,6 +87,11 @@ export const DuoModals: React.FC<DuoModalsProps> = ({
     navigator.clipboard?.writeText(createdRoomCode);
     setCopied(true);
     duoAudio.playUiClick();
+    toast({
+      title: 'ROOM PIN COPIED',
+      description: `#${createdRoomCode} copied to clipboard! Share with your partner to jump into the fight.`,
+      variant: 'amber',
+    });
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -95,10 +101,20 @@ export const DuoModals: React.FC<DuoModalsProps> = ({
     if (clean.length < 4) {
       setJoinError('Please enter a valid 6-digit Room Code');
       duoAudio.playUiClose();
+      toast({
+        title: 'INVALID ROOM PIN',
+        description: 'Please enter a valid 6-digit Room PIN code.',
+        variant: 'destructive',
+      });
       return;
     }
     duoAudio.playUiClick();
     setJoinError('');
+    toast({
+      title: 'CONNECTING TO ROOM',
+      description: `Infiltrating Room #${clean}...`,
+      variant: 'default',
+    });
     onJoinRoom?.(clean);
   };
 
@@ -412,7 +428,17 @@ export const DuoModals: React.FC<DuoModalsProps> = ({
                     <span className="text-[10px] font-black text-cyan-400 block uppercase">Cyberpunk Assault Skin</span>
                     <span className="text-[9px] text-slate-400">Legendary Outfit</span>
                   </div>
-                  <button className="py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] rounded-xl">
+                  <button
+                    onClick={() => {
+                      duoAudio.playUiClick();
+                      toast({
+                        title: 'ARMORY UPGRADE',
+                        description: 'Cyberpunk Assault Skin unlocked and equipped!',
+                        variant: 'amber',
+                      });
+                    }}
+                    className="py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] rounded-xl cursor-pointer transition active:scale-95"
+                  >
                     1,200 CREDITS
                   </button>
                 </div>
@@ -422,7 +448,17 @@ export const DuoModals: React.FC<DuoModalsProps> = ({
                     <span className="text-[10px] font-black text-orange-400 block uppercase">Titan Juggernaut Heavy</span>
                     <span className="text-[9px] text-slate-400">Heavy Armor Skin</span>
                   </div>
-                  <button className="py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] rounded-xl">
+                  <button
+                    onClick={() => {
+                      duoAudio.playUiClick();
+                      toast({
+                        title: 'ARMORY UPGRADE',
+                        description: 'Titan Juggernaut Heavy skin unlocked and equipped!',
+                        variant: 'amber',
+                      });
+                    }}
+                    className="py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] rounded-xl cursor-pointer transition active:scale-95"
+                  >
                     1,200 CREDITS
                   </button>
                 </div>
@@ -476,7 +512,16 @@ export const DuoModals: React.FC<DuoModalsProps> = ({
                   </div>
                 </div>
 
-                <div className="p-3 bg-slate-950/90 border border-slate-800/80 rounded-2xl opacity-60 flex flex-col justify-center items-center">
+                <div
+                  onClick={() => {
+                    toast({
+                      title: 'WEAPON LOCKED',
+                      description: 'Plasma Cannon unlocks when your profile reaches Level 10!',
+                      variant: 'default',
+                    });
+                  }}
+                  className="p-3 bg-slate-950/90 border border-slate-800/80 rounded-2xl opacity-60 flex flex-col justify-center items-center cursor-pointer"
+                >
                   <Lock className="w-5 h-5 text-slate-500 mb-1" />
                   <span className="font-black text-xs text-slate-400">PLASMA CANNON</span>
                   <span className="text-[9px] text-slate-500">Unlocks at Level 10</span>
@@ -572,7 +617,17 @@ export const DuoModals: React.FC<DuoModalsProps> = ({
                     <div className="w-full h-full bg-emerald-400" />
                   </div>
                 </div>
-                <button className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] rounded-xl">
+                <button
+                  onClick={() => {
+                    duoAudio.playComboUp(2);
+                    toast({
+                      title: 'BOUNTY CLAIMED',
+                      description: '+50 Hero Coins credited to your vault!',
+                      variant: 'success',
+                    });
+                  }}
+                  className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] rounded-xl cursor-pointer transition active:scale-95"
+                >
                   CLAIM 50 🪙
                 </button>
               </div>
@@ -608,6 +663,23 @@ export const DuoModals: React.FC<DuoModalsProps> = ({
                         if (isCurrent && !isClaimed) {
                           setClaimedDays([...claimedDays, 2]);
                           duoAudio.playComboUp(3);
+                          toast({
+                            title: 'DAILY REWARD CLAIMED',
+                            description: 'Day 2 reward unlocked: +200 Hero Coins added to your vault!',
+                            variant: 'success',
+                          });
+                        } else if (isClaimed) {
+                          toast({
+                            title: 'ALREADY CLAIMED',
+                            description: `You have already collected Day ${day} reward!`,
+                            variant: 'default',
+                          });
+                        } else {
+                          toast({
+                            title: 'DAY LOCKED',
+                            description: `Log in on consecutive days to unlock Day ${day} reward!`,
+                            variant: 'default',
+                          });
                         }
                       }}
                       className={`p-2 rounded-2xl border flex flex-col items-center justify-between h-24 text-center cursor-pointer transition ${
