@@ -4,6 +4,7 @@ import React from 'react';
 import Image from 'next/image';
 import { Lock, Sparkles } from 'lucide-react';
 import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
+import { toast } from '@/hooks/use-toast';
 
 export interface MapCardData {
   id: string;
@@ -66,8 +67,18 @@ export const DuoMapSelection: React.FC<DuoMapSelectionProps> = ({
     if (map.unlocked) {
       duoAudio.playUiClick();
       onSelectMap?.(map.id);
+      toast({
+        title: 'DEPLOYMENT ZONE',
+        description: `Zone selected: ${map.name}`,
+        variant: 'amber',
+      });
     } else {
       duoAudio.playUiClose();
+      toast({
+        title: 'ZONE LOCKED',
+        description: `${map.name} unlocks in the next story chapter!`,
+        variant: 'default',
+      });
     }
   };
 
