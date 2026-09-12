@@ -67,6 +67,16 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
 
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<DuoRampageEngine | null>(null);
+  const isSoloRef = useRef(isSolo);
+  const myRoleRef = useRef(myRole);
+
+  useEffect(() => {
+    isSoloRef.current = isSolo;
+  }, [isSolo]);
+
+  useEffect(() => {
+    myRoleRef.current = myRole;
+  }, [myRole]);
 
   // 1. Connect to Network Manager
   useEffect(() => {
@@ -89,8 +99,8 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
     };
 
     duoNetwork.onRemotePlayerState = (state) => {
-      if (!engineRef.current || isSolo) return;
-      const remote = myRole === 'assault' ? engineRef.current.player2 : engineRef.current.player1;
+      if (!engineRef.current || isSoloRef.current) return;
+      const remote = myRoleRef.current === 'assault' ? engineRef.current.player2 : engineRef.current.player1;
       remote.stats.x = state.x;
       remote.stats.z = state.z;
       remote.stats.facing = state.facing;
@@ -104,8 +114,8 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
     };
 
     duoNetwork.onRemoteShoot = (data) => {
-      if (!engineRef.current || isSolo) return;
-      const remote = myRole === 'assault' ? engineRef.current.player2 : engineRef.current.player1;
+      if (!engineRef.current || isSoloRef.current) return;
+      const remote = myRoleRef.current === 'assault' ? engineRef.current.player2 : engineRef.current.player1;
       engineRef.current.combatSystem.firePlayerWeapon(
         remote.stats.id,
         new THREE.Vector3(data.origin.x, data.origin.y, data.origin.z),
@@ -118,14 +128,14 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
 
     duoNetwork.onRemoteRevived = () => {
       if (!engineRef.current) return;
-      const me = myRole === 'assault' ? engineRef.current.player1 : engineRef.current.player2;
+      const me = myRoleRef.current === 'assault' ? engineRef.current.player1 : engineRef.current.player2;
       if (me.stats.isDown) me.reviveSuccess();
     };
 
     return () => {
       duoNetwork.leaveRoom();
     };
-  }, [isSolo, myRole]);
+  }, []);
 
   // 2. Stream local player state at 20Hz in multiplayer mode
   useEffect(() => {
@@ -218,7 +228,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
       setIsSolo(true);
       setMyRole('assault');
       setRoom({
-        code: '#483921',
+        code: String(Math.floor(100000 + Math.random() * 900000)),
         hostId: user.id || 'local-host',
         status: 'lobby',
         countdownTimer: 0,
@@ -257,46 +267,13 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
     const myName = user.name || 'Hero 2';
     const myAvatar = user.avatar;
 
-    try {
-      await duoNetwork.connect();
-      const joinedRoom = await duoNetwork.joinRoom(code, myName, myAvatar);
-      setRoom(joinedRoom);
-      setIsSolo(false);
-      setMyRole('heavy');
-      setCreateRoomMode('join');
-      setScreen('create_room');
-    } catch (err) {
-      console.warn('Could not join room online, simulating joined state:', err);
-      setIsSolo(false);
-      setMyRole('heavy');
-      setRoom({
-        code: code.startsWith('#') ? code : `#${code}`,
-        hostId: 'remote-host',
-        status: 'lobby',
-        countdownTimer: 0,
-        players: [
-          {
-            id: 'remote-host',
-            name: 'HOST HERO',
-            role: 'assault',
-            isReady: true,
-            isHost: true,
-          },
-          {
-            id: user.id || 'local-player',
-            name: myName,
-            avatar: myAvatar,
-            role: 'heavy',
-            isReady: true,
-            isHost: false,
-          },
-        ],
-        wave: 1,
-        comboCount: 0,
-      });
-      setCreateRoomMode('join');
-      setScreen('create_room');
-    }
+    await duoNetwork.connect();
+    const joinedRoom = await duoNetwork.joinRoom(code, myName, myAvatar);
+    setRoom(joinedRoom);
+    setIsSolo(false);
+    setMyRole('heavy');
+    setCreateRoomMode('create');
+    setScreen('create_room');
   };
 
   const handleStartSolo = () => {

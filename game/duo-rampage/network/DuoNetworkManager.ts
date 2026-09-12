@@ -91,14 +91,15 @@ export class DuoNetworkManager {
       if (!this.socket) return reject('Socket not connected');
 
       this.socket.emit('duo:create_room', { playerName, avatar }, (res: any) => {
-        if (res.success) {
+        if (res && res.success) {
           this.room = res.room;
           this.isHost = true;
           this.myRole = 'assault';
-          resolve(res.room.code);
+          resolve(res.room.code.replace(/^#/, ''));
         } else {
-          this.onError?.(res.error || 'Could not create room.');
-          reject(res.error);
+          const err = res?.error || 'Could not create room.';
+          this.onError?.(err);
+          reject(err);
         }
       });
     });
@@ -108,18 +109,19 @@ export class DuoNetworkManager {
     return new Promise((resolve, reject) => {
       if (!this.socket) return reject('Socket not connected');
 
-      // Normalize code: accept "123456" or "#123456"
-      const cleanCode = code.trim().startsWith('#') ? code.trim() : `#${code.trim()}`;
+      // Normalize code: clean 6-digit number
+      const cleanCode = code.trim().replace(/^#/, '');
 
       this.socket.emit('duo:join_room', { code: cleanCode, playerName, avatar }, (res: any) => {
-        if (res.success) {
+        if (res && res.success) {
           this.room = res.room;
           this.isHost = false;
           this.myRole = 'heavy';
           resolve(res.room);
         } else {
-          this.onError?.(res.error || 'Room not found! Please check the 6-digit code.');
-          reject(res.error);
+          const err = res?.error || 'Room not found! Please check the 6-digit code.';
+          this.onError?.(err);
+          reject(err);
         }
       });
     });

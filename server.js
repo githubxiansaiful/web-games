@@ -399,9 +399,9 @@ app.prepare().then(() => {
       let code;
       let attempts = 0;
       do {
-        code = '#' + Math.floor(100000 + Math.random() * 900000);
+        code = String(Math.floor(100000 + Math.random() * 900000));
         attempts++;
-      } while (duoRooms.has(code) && attempts < 10);
+      } while ((duoRooms.has(code) || duoRooms.has('#' + code)) && attempts < 10);
 
       const room = getOrCreateDuoRoom(code);
       currentDuoRoomCode = code;
@@ -424,10 +424,9 @@ app.prepare().then(() => {
     });
 
     socket.on('duo:join_room', ({ code, playerName, avatar }, callback) => {
-      let formattedCode = String(code).trim();
-      if (!formattedCode.startsWith('#')) formattedCode = '#' + formattedCode;
+      const cleanCode = String(code || '').trim().replace(/^#/, '');
+      const room = duoRooms.get(cleanCode) || duoRooms.get('#' + cleanCode);
 
-      const room = duoRooms.get(formattedCode);
       if (!room) {
         if (callback) callback({ success: false, error: 'Room not found! Check your 6-digit code.' });
         return;
@@ -438,8 +437,8 @@ app.prepare().then(() => {
         return;
       }
 
-      currentDuoRoomCode = formattedCode;
-      socket.join(formattedCode);
+      currentDuoRoomCode = room.code;
+      socket.join(room.code);
 
       const playerData = {
         id: socket.id,
@@ -447,13 +446,13 @@ app.prepare().then(() => {
         avatar: avatar || null,
         role: 'heavy',
         isHost: false,
-        isReady: false,
+        isReady: true,
       };
 
       room.players.set(socket.id, playerData);
 
       if (callback) callback({ success: true, room: serializeDuoRoom(room) });
-      io.to(formattedCode).emit('duo:room_updated', serializeDuoRoom(room));
+      io.to(room.code).emit('duo:room_updated', serializeDuoRoom(room));
     });
 
     socket.on('duo:toggle_ready', ({ code, isReady }) => {

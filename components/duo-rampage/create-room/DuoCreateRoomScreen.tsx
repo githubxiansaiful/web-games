@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DuoRoomData } from '@/game/duo-rampage/types';
 import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
+import { duoNetwork } from '@/game/duo-rampage/network/DuoNetworkManager';
 import { useAuth } from '@/context/AuthContext';
 
 interface DuoCreateRoomScreenProps {
@@ -27,6 +28,7 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   const { user, openAuthModal } = useAuth();
   const [mode, setMode] = useState<'create' | 'join'>(initialMode);
   const [inputCode, setInputCode] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -42,8 +44,8 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
     setMode(initialMode);
   }, [initialMode]);
 
-  // Extract clean code
-  const activeCode = (room?.code ? room.code.replace('#', '') : roomCode).toUpperCase();
+  // Clean room code without '#'
+  const activeCode = (room?.code ? room.code.replace(/^#/, '') : roomCode.replace(/^#/, '')).toUpperCase();
 
   // Players
   const player1 = room?.players?.[0] || {
@@ -54,6 +56,23 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   };
   const player2 = room?.players?.[1] || null;
   const isPlayer2Joined = !!player2;
+
+  // Host detection
+  const isHost = duoNetwork.isHost || !player2 || player1.name === realUserName;
+
+  // Determine if we should display the active room lobby
+  const isInLobby =
+    mode === 'create' ||
+    isPlayer2Joined ||
+    Boolean(room && room.players && room.players.length > 0 && room.players.some((p) => p.name === realUserName));
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMessage(null);
+    }, 2500);
+  };
 
   const renderAvatar = (avatarStr?: string | null, fallbackImg = '/images/duo-rampage/player1.png', alt = 'Avatar') => {
     const isUrl = Boolean(
@@ -94,92 +113,33 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
     );
   };
 
-  const showToast = (message: string) => {
-    setToastMessage(message);
-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    toastTimeoutRef.current = setTimeout(() => {
-      setToastMessage(null);
-    }, 2000);
-  };
-
-  const copyRoomId = async (customCode?: string) => {
-    const codeToCopy = customCode || activeCode;
-    duoAudio.playUiClick();
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText('#' + codeToCopy);
-      } else {
-        const area = document.createElement('textarea');
-        area.value = '#' + codeToCopy;
-        document.body.appendChild(area);
-        area.select();
-        document.execCommand('copy');
-        area.remove();
-      }
-      showToast(`Room ID #${codeToCopy} copied!`);
-    } catch {
-      showToast(`Room ID #${codeToCopy} copied!`);
-    }
-  };
-
-  const handleShare = async () => {
-    duoAudio.playUiClick();
-    const shareUrl =
-      typeof window !== 'undefined'
-        ? `${window.location.origin}/?game=duo-rampage&room=${activeCode}`
-        : '';
-    const shareData = {
-      title: 'DUO RAMPAGE Co-op Squad',
-      text: `Join my DUO RAMPAGE co-op room: #${activeCode}`,
-      url: shareUrl,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch {
-        await copyRoomId();
-        showToast('Room ID copied for sharing');
-      }
-    } else {
-      await copyRoomId();
-      showToast('Room ID copied for sharing');
-    }
-  };
-
-  const handlePasteCode = async () => {
-    duoAudio.playUiClick();
-    try {
-      if (navigator.clipboard?.readText) {
-        const text = await navigator.clipboard.readText();
-        const clean = text.replace(/[^0-9A-Za-z]/g, '').slice(0, 6).toUpperCase();
-        if (clean) {
-          setInputCode(clean);
-          showToast(`Pasted #${clean}`);
-          return;
-        }
-      }
-    } catch {
-      // ignore
-    }
-    showToast('Paste from clipboard or type 6 digits');
-  };
-
   const handleConnect = async () => {
     if (!user) {
       openAuthModal('login');
       showToast('Login required to join squad');
       return;
     }
-    const codeToJoin = inputCode.trim().replace('#', '');
-    if (codeToJoin.length < 4) {
-      showToast('Please enter a valid room code');
+    const clean = inputCode.trim().replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+    if (clean.length < 4) {
+      showToast('Please enter a valid 6-digit room PIN');
       return;
     }
+
+    setIsConnecting(true);
     duoAudio.playDash();
-    showToast(`Connecting to #${codeToJoin}...`);
-    if (onJoinRoomSubmit) {
-      await onJoinRoomSubmit(codeToJoin);
+    showToast(`Connecting to squad ${clean}...`);
+
+    try {
+      if (onJoinRoomSubmit) {
+        await onJoinRoomSubmit(clean);
+      }
+      setMode('create');
+      showToast('Squad joined! In mission lobby.');
+    } catch (err: any) {
+      const msg = typeof err === 'string' ? err : (err?.message || 'Room not found! Check the 6-digit code.');
+      showToast(msg);
+    } finally {
+      setIsConnecting(false);
     }
   };
 
@@ -187,6 +147,14 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
     if (!user) {
       openAuthModal('login');
       showToast('Login required to start mission');
+      return;
+    }
+    if (!isHost) {
+      showToast('Only the squad leader can launch the mission');
+      return;
+    }
+    if (!isPlayer2Joined) {
+      showToast(`Waiting for Player 2 to join with PIN ${activeCode}`);
       return;
     }
     duoAudio.playCountdown(0);
@@ -238,12 +206,12 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
           position: absolute;
           top: 20px;
           left: 28px;
-          height: 56px;
-          min-width: 143px;
-          padding: 0 20px 0 13px;
+          height: 54px;
+          min-width: 135px;
+          padding: 0 18px 0 12px;
           display: flex;
           align-items: center;
-          gap: 11px;
+          gap: 10px;
           background: linear-gradient(180deg, rgba(12,27,48,.95), rgba(6,17,31,.92));
           border: 1px solid rgba(77,125,176,.55);
           clip-path: polygon(0 50%, 10% 0, 100% 0, 100% 100%, 10% 100%);
@@ -257,60 +225,64 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
         }
         .duo-back-arrow {
           font-family: Arial, sans-serif;
-          font-size: 50px;
+          font-size: 44px;
           line-height: 1;
-          transform: translateY(-3px);
+          transform: translateY(-2px);
           font-weight: 300;
           color: #38bdf8;
         }
         .duo-back-btn strong, .duo-settings-btn strong {
           display: block;
-          font-size: 18px;
+          font-size: 16px;
           letter-spacing: .5px;
           font-weight: 700;
         }
         .duo-back-btn small {
           display: block;
-          font-size: 11px;
+          font-size: 10px;
           letter-spacing: .8px;
           color: #9fb4c8;
           margin-top: -2px;
           font-weight: 600;
         }
 
-        /* Top-Right Navigation */
+        /* Top-Right Navigation & User Badge */
         .duo-top-right {
           position: absolute;
           top: 20px;
           right: 28px;
           display: flex;
+          align-items: center;
           gap: 12px;
           z-index: 10;
         }
         .duo-settings-btn {
-          height: 56px;
-          padding: 0 17px;
+          height: 54px;
+          padding: 0 16px;
           background: rgba(8,20,36,.88);
           border: 1px solid rgba(87,126,163,.5);
           box-shadow: 0 7px 20px rgba(0,0,0,.28);
           display: flex;
           align-items: center;
-          gap: 12px;
-          min-width: 139px;
+          gap: 10px;
           transition: .18s;
         }
-        .duo-gear {
-          font-size: 28px;
-          line-height: 1;
-        }
-          background: rgba(18, 180, 255, 0.2);
-          color: #38bdf8;
+        .duo-user-pill {
+          height: 54px;
+          padding: 0 16px 0 10px;
+          background: rgba(6,17,31,.92);
+          border: 1px solid rgba(56,189,248,.4);
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          box-shadow: 0 4px 15px rgba(0,0,0,.4);
         }
 
         /* Hero Heading */
         .duo-hero-heading {
           position: absolute;
-          top: 26px;
+          top: 24px;
           left: 50%;
           transform: translateX(-50%);
           width: min(680px, 54vw);
@@ -320,10 +292,10 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
         .duo-hero-heading h1 {
           margin: 0;
           font-family: 'Rajdhani', sans-serif;
-          font-size: clamp(44px, 5.5vw, 92px);
-          line-height: .84;
+          font-size: clamp(38px, 5vw, 76px);
+          line-height: .86;
           font-weight: 700;
-          letter-spacing: -2px;
+          letter-spacing: -1.5px;
           text-transform: uppercase;
           text-shadow: 0 7px 0 #07101c, 0 10px 24px rgba(0,0,0,.65);
         }
@@ -338,10 +310,10 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
           text-shadow: 0 6px 0 #5b1d0b, 0 10px 20px rgba(0,0,0,.65);
         }
         .duo-hero-heading p {
-          margin: 5px 0 0;
-          font-size: clamp(12px, 1.1vw, 20px);
+          margin: 4px 0 0;
+          font-size: clamp(11px, 1vw, 16px);
           font-weight: 700;
-          letter-spacing: 1.4px;
+          letter-spacing: 1.5px;
           color: #d5efff;
           text-shadow: 0 3px 9px #000;
           text-transform: uppercase;
@@ -352,36 +324,36 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          margin-top: 6px;
-          background: rgba(6, 17, 31, 0.8);
+          margin-top: 8px;
+          background: rgba(6, 17, 31, 0.85);
           padding: 3px;
           border: 1px solid rgba(87, 126, 163, 0.4);
-          border-radius: 6px;
+          border-radius: 8px;
         }
         .duo-mode-tab {
-          padding: 4px 14px;
-          font-size: 11px;
+          padding: 6px 18px;
+          font-size: 12px;
           font-weight: 700;
           letter-spacing: 1px;
           text-transform: uppercase;
-          border-radius: 4px;
+          border-radius: 6px;
           transition: .15s;
           color: #94aec5;
         }
         .duo-mode-tab.active {
           background: linear-gradient(180deg, #12b4ff, #0875d9);
           color: #ffffff;
-          box-shadow: 0 0 12px rgba(18, 180, 255, 0.4);
+          box-shadow: 0 0 14px rgba(18, 180, 255, 0.45);
         }
 
         /* Hero Characters */
         .duo-hero-player {
           position: absolute;
           z-index: 2;
-          left: 12.5%;
-          bottom: 13.2%;
-          height: 80%;
-          max-height: 790px;
+          left: 12%;
+          bottom: 12%;
+          height: 76%;
+          max-height: 750px;
           filter: drop-shadow(0 20px 16px rgba(0,0,0,.55));
           pointer-events: none;
           object-fit: contain;
@@ -389,9 +361,9 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
         .duo-hero-hologram {
           position: absolute;
           z-index: 2;
-          right: 13.2%;
-          bottom: 17%;
-          height: 64%;
+          right: 12%;
+          bottom: 15%;
+          height: 62%;
           filter: drop-shadow(0 0 24px rgba(30,170,255,.75));
           pointer-events: none;
           object-fit: contain;
@@ -402,124 +374,77 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
           position: absolute;
           z-index: 4;
           left: 50%;
-          top: 20%;
+          top: 18%;
           transform: translateX(-50%);
-          width: min(548px, 34vw);
-          min-width: 475px;
-          padding: 17px 25px 22px;
-          background: linear-gradient(180deg, rgba(7,20,36,.94), rgba(4,13,25,.9));
+          width: min(540px, 36vw);
+          min-width: 440px;
+          padding: 20px 24px 24px;
+          background: linear-gradient(180deg, rgba(7,20,36,.96), rgba(4,13,25,.92));
           border: 1px solid rgba(69,117,165,.75);
           clip-path: polygon(5% 0, 95% 0, 100% 7%, 100% 96%, 95% 100%, 5% 100%, 0 96%, 0 7%);
-          box-shadow: 0 20px 45px rgba(0,0,0,.5), inset 0 0 35px rgba(20,87,143,.13);
+          box-shadow: 0 20px 45px rgba(0,0,0,.6), inset 0 0 35px rgba(20,87,143,.15);
         }
 
-        /* Room ID Box */
+        /* Clean Room PIN Box (NO #, NO Buttons) */
         .duo-room-id-box {
-          padding: 2px 20px 8px;
+          padding: 10px 18px 12px;
           text-align: center;
+          background: rgba(4, 15, 29, 0.7);
+          border: 1px solid rgba(56, 189, 248, 0.25);
+          border-radius: 10px;
+          margin-bottom: 16px;
         }
         .duo-eyebrow {
-          font-size: 16px;
+          font-size: 13px;
           font-weight: 700;
-          letter-spacing: 1.2px;
-          color: #a9c8e4;
+          letter-spacing: 2px;
+          color: #38bdf8;
           text-transform: uppercase;
         }
         .duo-room-id-row {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 15px;
-          margin-top: 4px;
+          margin: 6px 0 2px;
         }
         .duo-room-id-text {
-          font-size: 47px;
+          font-size: 52px;
           line-height: 1;
-          font-weight: 700;
-          letter-spacing: 2px;
+          font-weight: 900;
+          letter-spacing: 8px;
           color: #ffc21c;
-          text-shadow: 0 0 16px rgba(255,180,0,.22);
+          text-shadow: 0 0 22px rgba(255,180,0,.35);
           user-select: all;
+          font-family: 'Rajdhani', sans-serif;
         }
         .duo-room-id-input {
-          font-size: 38px;
+          font-size: 42px;
           line-height: 1;
-          font-weight: 700;
-          letter-spacing: 6px;
+          font-weight: 900;
+          letter-spacing: 8px;
           color: #ffc21c;
-          text-shadow: 0 0 16px rgba(255,180,0,.22);
-          background: rgba(11, 41, 73, 0.6);
-          border: 2px solid #238ee5;
-          border-radius: 6px;
-          padding: 4px 14px;
+          text-shadow: 0 0 22px rgba(255,180,0,.35);
+          background: rgba(8, 30, 56, 0.85);
+          border: 2px solid #38bdf8;
+          border-radius: 8px;
+          padding: 8px 18px;
           text-align: center;
-          width: 230px;
+          width: 100%;
+          max-width: 310px;
           outline: none;
           text-transform: uppercase;
+          box-shadow: inset 0 0 16px rgba(56, 189, 248, 0.25);
         }
         .duo-room-id-input::placeholder {
-          color: rgba(255, 194, 28, 0.4);
-          letter-spacing: 4px;
-        }
-        .duo-icon-btn {
-          width: 52px;
-          height: 43px;
-          background: #0b2949;
-          border: 2px solid #238ee5;
-          box-shadow: inset 0 0 14px rgba(0,160,255,.15);
-          font-size: 24px;
-          color: #dff5ff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: .15s;
-        }
-        .duo-icon-btn:hover {
-          filter: brightness(1.2);
+          color: rgba(255, 194, 28, 0.3);
+          letter-spacing: 6px;
         }
         .duo-room-id-box p {
           margin: 6px 0 0;
           color: #9db6cc;
-          font-size: 14px;
+          font-size: 13px;
           font-weight: 600;
-        }
-
-        /* Action Buttons Row */
-        .duo-action-row {
-          display: grid;
-          grid-template-columns: 1fr 1.18fr;
-          gap: 14px;
-          margin: 5px 0 14px;
-        }
-        .duo-action-btn {
-          height: 58px;
-          font-size: 16px;
-          font-weight: 700;
-          letter-spacing: .3px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          clip-path: polygon(5% 0, 95% 0, 100% 14%, 100% 86%, 95% 100%, 5% 100%, 0 86%, 0 14%);
-          transition: .16s;
-        }
-        .duo-action-btn.blue {
-          background: linear-gradient(180deg, #12b4ff, #0875d9);
-          border: 1px solid #6ad9ff;
-          box-shadow: 0 0 22px rgba(0,154,255,.2), inset 0 0 15px rgba(255,255,255,.12);
-        }
-        .duo-action-btn.green {
-          background: linear-gradient(180deg, #18e75d, #04aa42);
-          border: 1px solid #6dff9d;
-          box-shadow: 0 0 22px rgba(0,255,97,.18), inset 0 0 15px rgba(255,255,255,.1);
-        }
-        .duo-action-btn:hover {
-          filter: brightness(1.14);
-          transform: translateY(-1px);
-        }
-        .duo-btn-icon {
-          font-size: 22px;
-          line-height: 1;
+          letter-spacing: .5px;
         }
 
         /* Player Cards Row */
@@ -534,300 +459,330 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
           border: 1px solid rgba(72,111,147,.62);
           position: relative;
           text-align: center;
-          padding-top: 12px;
+          padding-top: 14px;
           box-shadow: inset 0 0 20px rgba(0,86,145,.08);
+          border-radius: 8px;
         }
         .duo-portrait-wrap {
-          width: 60px;
-          height: 60px;
+          width: 62px;
+          height: 62px;
           margin: auto;
           overflow: hidden;
           border-radius: 50%;
           border: 2px solid #f3a619;
           background: #102033;
-          box-shadow: 0 0 14px rgba(255,174,20,.25);
+          box-shadow: 0 0 16px rgba(255,174,20,.3);
           position: relative;
         }
-        .duo-portrait-wrap img {
-          width: 180%;
-          height: 180%;
-          object-fit: cover;
-          object-position: 45% 18%;
-          transform: translate(-22%, -8%);
-        }
         .duo-player-name {
-          font-size: 16px;
+          font-size: 15px;
           font-weight: 700;
           letter-spacing: .4px;
-          margin-top: 5px;
+          margin-top: 6px;
           text-transform: uppercase;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          padding: 0 8px;
         }
         .duo-level {
-          font-size: 13px;
+          font-size: 12px;
           color: #b8cbe0;
           font-weight: 600;
+          letter-spacing: .5px;
         }
         .duo-ready {
           margin: 7px auto 0;
           color: #38f16e;
           font-weight: 700;
-          font-size: 17px;
+          font-size: 15px;
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 6px;
         }
         .duo-ready span {
-          width: 25px;
-          height: 25px;
+          width: 22px;
+          height: 22px;
           display: grid;
           place-items: center;
           background: #35ee64;
           color: #04180b;
-          border-radius: 5px;
+          border-radius: 4px;
           font-family: Arial;
           font-weight: 900;
-          font-size: 15px;
+          font-size: 14px;
         }
         .duo-waiting {
-          padding-top: 20px;
+          padding-top: 22px;
         }
         .duo-waiting-person {
-          height: 64px;
+          height: 56px;
           color: #248fe4;
           font-family: Arial, sans-serif;
-          font-size: 56px;
+          font-size: 50px;
           line-height: .75;
           text-shadow: 0 0 13px rgba(0,148,255,.3);
           position: relative;
         }
         .duo-waiting-person span {
           position: absolute;
-          font-size: 30px;
-          left: 50%;
-          top: 22px;
-          transform: translateX(-50%);
+          font-size: 26px;
+          right: 32%;
+          top: 14%;
+          font-weight: 900;
         }
         .duo-waiting-label {
-          margin-top: 14px;
-          color: #8bb4d8;
-          font-size: 17px;
+          color: #f7bb25;
+          font-size: 14px;
           font-weight: 700;
-        }
-        .duo-clock {
-          font-size: 24px;
-          vertical-align: -2px;
-          margin-right: 4px;
-        }
-
-        /* Waiting Status & Spinner */
-        .duo-waiting-status {
-          text-align: center;
-          padding: 12px 0 8px;
-        }
-        .duo-loader {
-          width: 28px;
-          height: 28px;
-          border: 4px dotted #00a9ff;
-          border-radius: 50%;
-          display: inline-block;
-          vertical-align: middle;
-          margin-right: 9px;
-          animation: duoSpin 1.2s linear infinite;
-        }
-        .duo-waiting-status strong {
-          font-size: 16px;
-          letter-spacing: .3px;
-          vertical-align: middle;
-          font-weight: 700;
-        }
-        .duo-waiting-status p {
-          margin: 3px 0 0;
-          color: #94aec5;
-          font-size: 13px;
-        }
-        @keyframes duoSpin {
-          to { transform: rotate(360deg); }
-        }
-
-        /* Start Mission Button */
-        .duo-start-btn {
-          width: 82%;
-          height: 64px;
-          margin: 0 auto;
+          letter-spacing: .7px;
+          margin-top: 5px;
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 16px;
+          gap: 6px;
+        }
+        .duo-clock {
+          font-size: 16px;
+          display: inline-block;
+          animation: duoPulse 1.4s infinite;
+        }
+
+        /* Waiting / Ready Status Bar */
+        .duo-waiting-status {
+          margin: 14px 0 16px;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 2px;
+        }
+        .duo-loader {
+          width: 32px;
+          height: 32px;
+          border: 3px solid rgba(48,153,255,.2);
+          border-top-color: #38bdf8;
+          border-radius: 50%;
+          animation: duoSpin 1.1s linear infinite;
+          margin-bottom: 5px;
+        }
+        .duo-ready-check {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: #10b981;
+          color: #064e3b;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          font-weight: 900;
+          box-shadow: 0 0 16px rgba(16, 185, 129, 0.6);
+          margin-bottom: 5px;
+        }
+        .duo-waiting-status strong {
+          font-size: 17px;
+          color: #d8eeff;
+          letter-spacing: .8px;
+        }
+        .duo-waiting-status p {
+          margin: 0;
+          font-size: 13px;
+          color: #9cb5cc;
+          font-weight: 600;
+        }
+
+        /* Large Start / Join Button */
+        .duo-start-btn {
+          width: 100%;
+          height: 68px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
           clip-path: polygon(4% 0, 96% 0, 100% 20%, 100% 80%, 96% 100%, 4% 100%, 0 80%, 0 20%);
           transition: .18s;
+          text-align: left;
         }
         .duo-start-btn.ready {
-          background: linear-gradient(180deg, #ffc727, #f77f00);
-          border: 2px solid #ffe072;
-          box-shadow: 0 0 28px rgba(247,127,0,.45), inset 0 0 22px rgba(255,255,255,.3);
-          color: #1a0800;
-        }
-        .duo-start-btn.ready .duo-play-triangle {
-          color: #1a0800;
-        }
-        .duo-start-btn.ready small {
-          color: #4a1e00;
+          background: linear-gradient(180deg, #10b981, #059669);
+          border: 1px solid #6ee7b7;
+          box-shadow: 0 0 30px rgba(16,185,129,.4), inset 0 0 18px rgba(255,255,255,.2);
+          color: #ffffff;
         }
         .duo-start-btn.ready:hover {
           filter: brightness(1.15);
-          transform: translateY(-1px);
+          transform: translateY(-2px);
         }
         .duo-start-btn.disabled {
-          background: linear-gradient(180deg, #73869a, #465666);
-          border: 2px solid #a5b7c8;
-          box-shadow: inset 0 0 22px rgba(255,255,255,.12), 0 9px 18px rgba(0,0,0,.3);
-          opacity: .85;
-          color: #eef7ff;
+          background: linear-gradient(180deg, #2d3748, #1a202c);
+          border: 1px solid #4a5568;
+          color: #718096;
+          cursor: not-allowed;
+          opacity: 0.85;
         }
-        .duo-start-btn.disabled:hover {
-          filter: brightness(1.1);
+        .duo-play-triangle {
+          font-size: 26px;
+          line-height: 1;
         }
         .duo-start-btn strong {
           display: block;
           font-size: 22px;
-          letter-spacing: .4px;
-          font-weight: 700;
+          letter-spacing: .7px;
+          line-height: 1;
+          font-weight: 900;
         }
         .duo-start-btn small {
           display: block;
           font-size: 12px;
-          color: #d4dee8;
+          letter-spacing: .8px;
+          margin-top: 3px;
           font-weight: 600;
-        }
-        .duo-play-triangle {
-          font-size: 26px;
-          color: #e4edf4;
+          opacity: .9;
         }
 
-        /* Bottom Logo & Pro Tip */
+        /* Partner Status Pill */
+        .duo-partner-status-pill {
+          width: 100%;
+          height: 64px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          background: linear-gradient(180deg, rgba(8, 40, 70, 0.95), rgba(4, 20, 40, 0.95));
+          border: 1px solid #38bdf8;
+          border-radius: 8px;
+          box-shadow: 0 0 24px rgba(56, 189, 248, 0.3);
+          color: #e0f2fe;
+          text-align: left;
+        }
+        .duo-pulse-dot {
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: #38bdf8;
+          box-shadow: 0 0 12px #38bdf8;
+          animation: duoPulse 1.5s infinite;
+        }
+        .duo-partner-status-pill strong {
+          display: block;
+          font-size: 18px;
+          font-weight: 800;
+          color: #38bdf8;
+          letter-spacing: 1px;
+        }
+        .duo-partner-status-pill small {
+          display: block;
+          font-size: 12px;
+          color: #94a3b8;
+        }
+
+        /* Footer Logo & Pro Tip */
         .duo-game-logo {
           position: absolute;
-          z-index: 4;
-          left: 27px;
-          bottom: 17px;
-          width: 245px;
-          height: auto;
-          object-fit: contain;
-          filter: drop-shadow(0 7px 10px rgba(0,0,0,.5));
-          pointer-events: none;
+          left: 28px;
+          bottom: 24px;
+          width: 220px;
+          filter: drop-shadow(0 10px 18px rgba(0,0,0,.6));
+          z-index: 10;
         }
         .duo-tip-card {
           position: absolute;
-          z-index: 5;
-          right: 27px;
+          right: 28px;
           bottom: 24px;
-          width: 337px;
-          min-height: 66px;
-          padding: 9px 14px;
+          width: 320px;
           display: flex;
           align-items: center;
           gap: 12px;
-          background: rgba(7,19,33,.91);
-          border: 1px solid rgba(71,104,136,.7);
-          clip-path: polygon(5% 0, 95% 0, 100% 16%, 100% 84%, 95% 100%, 5% 100%, 0 84%, 0 16%);
-          box-shadow: 0 9px 25px rgba(0,0,0,.4);
+          padding: 12px 16px;
+          background: rgba(6,17,31,.9);
+          border: 1px solid rgba(87,126,163,.45);
+          box-shadow: 0 10px 24px rgba(0,0,0,.35);
+          z-index: 10;
+          border-radius: 8px;
         }
         .duo-tip-icon {
-          width: 29px;
-          height: 29px;
+          width: 28px;
+          height: 28px;
           border-radius: 50%;
+          background: #f59e0b;
+          color: #000;
           display: grid;
           place-items: center;
-          border: 2px solid #ffb61a;
-          color: #ffb61a;
-          font-weight: 800;
+          font-weight: 900;
           font-size: 16px;
-          shrink-0: 0;
+          shrink-0;
         }
         .duo-tip-card strong {
-          font-size: 14px;
-          color: #ffb61a;
+          display: block;
+          font-size: 12px;
+          color: #f59e0b;
+          letter-spacing: 1px;
         }
         .duo-tip-card p {
-          margin: 0;
-          color: #b7c7d5;
-          font-size: 13px;
-          line-height: 1.15;
+          margin: 2px 0 0;
+          font-size: 11px;
+          color: #cbd5e1;
+          line-height: 1.3;
         }
 
-        /* Toast Popup */
+        /* Toast */
         .duo-toast {
           position: absolute;
+          bottom: 30px;
           left: 50%;
-          bottom: 26px;
-          transform: translate(-50%, 20px);
-          padding: 10px 20px;
-          background: rgba(5,18,31,.96);
-          border: 1px solid #2b9eea;
-          box-shadow: 0 10px 30px rgba(0, 154, 255, 0.4);
-          border-radius: 6px;
+          transform: translateX(-50%) translateY(20px);
+          background: rgba(15, 23, 42, 0.95);
+          border: 1px solid #38bdf8;
+          color: #f0f9ff;
+          padding: 10px 24px;
+          border-radius: 9999px;
+          font-size: 14px;
+          font-weight: 700;
+          letter-spacing: 1px;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
           opacity: 0;
           pointer-events: none;
-          transition: .25s;
+          transition: all 0.25s ease;
           z-index: 50;
-          font-weight: 700;
-          font-size: 15px;
-          color: #eaf7ff;
         }
         .duo-toast.show {
           opacity: 1;
-          transform: translate(-50%, 0);
+          transform: translateX(-50%) translateY(0);
         }
 
-        /* Responsive Breakpoints from reference HTML/CSS */
+        @keyframes duoSpin {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes duoPulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.35); opacity: 0.6; }
+        }
+
+        /* Responsive Breakpoints */
         @media (max-width: 1100px) {
-          .duo-hero-player { left: 7%; height: 71%; }
-          .duo-hero-hologram { right: 7%; height: 57%; }
-          .duo-room-panel { width: 470px; min-width: 470px; }
-          .duo-tip-card { width: 285px; }
-          .duo-game-logo { width: 190px; }
+          .duo-hero-player { left: 4%; height: 68%; }
+          .duo-hero-hologram { right: 4%; height: 54%; }
+          .duo-room-panel { width: 440px; min-width: 440px; }
         }
 
-        @media (max-width: 850px) {
-          .duo-hero-player { left: 1%; height: 59%; bottom: 20%; }
-          .duo-hero-hologram { right: 0; height: 48%; bottom: 23%; opacity: .88; }
-          .duo-room-panel { width: 410px; min-width: 410px; top: 18%; padding-left: 18px; padding-right: 18px; }
+        @media (max-width: 900px) {
+          .duo-hero-player { display: none; }
+          .duo-hero-hologram { display: none; }
+          .duo-room-panel { width: min(94vw, 440px); min-width: 0; top: 16%; padding: 16px; }
+          .duo-hero-heading { width: 90vw; }
+          .duo-hero-heading h1 { font-size: 42px; }
+          .duo-game-logo { display: none; }
+          .duo-tip-card { display: none; }
           .duo-top-right { right: 12px; }
           .duo-back-btn { left: 12px; }
-          .duo-settings-btn { min-width: 120px; }
-          .duo-hero-heading { top: 24px; width: 500px; }
-          .duo-hero-heading h1 { font-size: 52px; }
-          .duo-game-logo { left: 12px; bottom: 12px; width: 160px; }
-          .duo-tip-card { right: 12px; bottom: 12px; width: 245px; }
         }
 
         @media (max-height: 700px) {
-          .duo-hero-player { height: 72%; bottom: 8%; }
-          .duo-hero-hologram { height: 57%; bottom: 13%; }
-          .duo-room-panel { top: 16%; transform: translateX(-50%) scale(.9); transform-origin: top center; }
-          .duo-hero-heading { top: 16px; }
-          .duo-hero-heading h1 { font-size: 50px; }
-        }
-
-        @media (max-width: 680px) {
-          .duo-settings-btn { min-width: 50px; width: 50px; padding: 0; justify-content: center; }
-          .duo-settings-btn strong { display: none; }
-          .duo-back-btn { min-width: 104px; width: 104px; }
-          .duo-back-btn small { display: none; }
-          .duo-back-btn strong { font-size: 16px; }
-          .duo-hero-player { opacity: .22; left: -5%; height: 54%; bottom: 28%; }
-          .duo-hero-hologram { opacity: .22; right: -6%; height: 44%; bottom: 29%; }
-          .duo-room-panel { width: min(94vw, 430px); min-width: 0; top: 13%; padding: 14px 15px 16px; }
-          .duo-room-id-text { font-size: 38px; }
-          .duo-room-id-input { font-size: 32px; width: 190px; }
-          .duo-action-btn { font-size: 14px; height: 52px; }
-          .duo-player-card { height: 152px; }
-          .duo-hero-heading { top: 18px; width: 78vw; }
+          .duo-room-panel { top: 15%; transform: translateX(-50%) scale(.9); transform-origin: top center; }
+          .duo-hero-heading { top: 14px; }
           .duo-hero-heading h1 { font-size: 40px; }
-          .duo-hero-heading p { font-size: 11px; }
-          .duo-game-logo { display: none; }
-          .duo-tip-card { display: none; }
         }
       `}</style>
 
@@ -849,64 +804,90 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
         <span className="duo-back-arrow">‹</span>
         <span>
           <strong>BACK</strong>
-          <small>TO HOME</small>
+          <small>TO MENU</small>
         </span>
       </button>
 
       <div className="duo-top-right">
+        {/* User Pill */}
+        <div className="duo-user-pill">
+          <div className="w-7 h-7 rounded-full overflow-hidden border border-amber-400 shrink-0 flex items-center justify-center bg-slate-900">
+            {renderAvatar(realUserAvatar, '/images/duo-rampage/player1.png', realUserName)}
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xs font-bold font-knight uppercase tracking-wider text-white truncate max-w-[90px]">
+              {realUserName}
+            </span>
+            <span className="text-[10px] text-amber-300 font-bold">
+              LV.{realUserLevel}
+            </span>
+          </div>
+        </div>
+
         {/* Settings Button */}
         <button
           type="button"
-          className="duo-settings-btn"
+          className="duo-settings-btn rounded-xl"
           onClick={() => {
             duoAudio.playUiClick();
             if (onOpenSettings) onOpenSettings();
-            else showToast('Settings: Master Audio 100%');
+            else showToast('Audio: Master 100%');
           }}
         >
-          <span className="duo-gear">⚙</span>
-          <strong>SETTINGS</strong>
+          <span className="text-lg">⚙</span>
+          <strong className="hidden sm:inline">SETTINGS</strong>
         </button>
       </div>
 
       {/* 3. Hero Heading with Mode Toggle */}
       <section className="duo-hero-heading">
         <h1>
-          <span>{mode === 'create' ? 'CREATE' : 'JOIN'}</span>{' '}
-          <em>ROOM</em>
+          {isInLobby ? (
+            <>
+              <span>MISSION</span> <em>LOBBY</em>
+            </>
+          ) : (
+            <>
+              <span>JOIN</span> <em>SQUAD</em>
+            </>
+          )}
         </h1>
         <p>
-          {mode === 'create'
-            ? 'INVITE YOUR FRIEND AND FIGHT TOGETHER'
-            : 'ENTER A 6-DIGIT ROOM CODE TO SQUAD UP'}
+          {isInLobby
+            ? isPlayer2Joined
+              ? 'SQUAD ASSEMBLED • STAND BY FOR COMBAT DROP'
+              : 'WAITING FOR SQUAD MATE TO JOIN'
+            : 'ENTER THE 6-DIGIT ROOM PIN TO SQUAD UP'}
         </p>
 
-        {/* Quick Mode Toggle */}
-        <div className="duo-mode-tabs">
-          <button
-            type="button"
-            className={`duo-mode-tab ${mode === 'create' ? 'active' : ''}`}
-            onClick={() => {
-              duoAudio.playUiClick();
-              setMode('create');
-            }}
-          >
-            HOST ROOM
-          </button>
-          <button
-            type="button"
-            className={`duo-mode-tab ${mode === 'join' ? 'active' : ''}`}
-            onClick={() => {
-              duoAudio.playUiClick();
-              setMode('join');
-            }}
-          >
-            JOIN FRIEND
-          </button>
-        </div>
+        {/* Quick Mode Switcher (Visible before joining) */}
+        {!isPlayer2Joined && (
+          <div className="duo-mode-tabs">
+            <button
+              type="button"
+              className={`duo-mode-tab ${mode === 'create' ? 'active' : ''}`}
+              onClick={() => {
+                duoAudio.playUiClick();
+                setMode('create');
+              }}
+            >
+              HOST SQUAD
+            </button>
+            <button
+              type="button"
+              className={`duo-mode-tab ${mode === 'join' ? 'active' : ''}`}
+              onClick={() => {
+                duoAudio.playUiClick();
+                setMode('join');
+              }}
+            >
+              JOIN SQUAD
+            </button>
+          </div>
+        )}
       </section>
 
-      {/* 4. Layered Standee Characters (from HTML assets) */}
+      {/* 4. Layered Standee Characters */}
       <img
         className="duo-hero-player"
         src="/images/duo-rampage/player1.png"
@@ -920,65 +901,45 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
 
       {/* 5. Central Room Terminal Panel */}
       <section className="duo-room-panel">
-        {mode === 'create' ? (
-          /* CREATE ROOM CONTENT */
+        {isInLobby ? (
+          /* ACTIVE ROOM LOBBY CONTENT (Both P1 and P2 see this!) */
           <>
             <div className="duo-room-id-box">
-              <div className="duo-eyebrow">YOUR ROOM ID</div>
+              <div className="duo-eyebrow">MISSION ROOM PIN</div>
               <div className="duo-room-id-row">
-                <div className="duo-room-id-text">#{activeCode}</div>
-                <button
-                  type="button"
-                  className="duo-icon-btn"
-                  onClick={() => copyRoomId()}
-                  aria-label="Copy room ID"
-                  title="Copy room ID"
-                >
-                  ▣
-                </button>
+                <div className="duo-room-id-text">{activeCode}</div>
               </div>
-              <p>Share this Room ID with your friend to join</p>
-            </div>
-
-            <div className="duo-action-row">
-              <button
-                type="button"
-                className="duo-action-btn blue"
-                onClick={() => copyRoomId()}
-              >
-                <span className="duo-btn-icon">▣</span> COPY ROOM ID
-              </button>
-              <button
-                type="button"
-                className="duo-action-btn green"
-                onClick={handleShare}
-              >
-                <span className="duo-btn-icon">↗</span> SHARE WITH FRIEND
-              </button>
+              <p>
+                {isPlayer2Joined
+                  ? 'Squad assembled! Stand by for combat drop'
+                  : `Share room PIN ${activeCode} with your teammate`}
+              </p>
             </div>
 
             <div className="duo-player-row">
+              {/* Player 1 Card (Squad Leader / Assault) */}
               <article className="duo-player-card">
                 <div className="duo-portrait-wrap">
-                  {renderAvatar(player1.avatar || realUserAvatar, '/images/duo-rampage/player1.png', 'Host Avatar')}
+                  {renderAvatar(player1.avatar || realUserAvatar, '/images/duo-rampage/player1.png', 'Squad Leader')}
                 </div>
                 <div className="duo-player-name">{player1.name || realUserName}</div>
-                <div className="duo-level">LV. {realUserLevel}</div>
+                <div className="duo-level">LV. {realUserLevel} • SQUAD LEADER</div>
                 <div className="duo-ready">
                   <span>✓</span> READY
                 </div>
               </article>
 
-              <article className="duo-player-card duo-waiting">
+              {/* Player 2 Card (Partner Hero / Heavy Gunner) */}
+              <article className={`duo-player-card ${isPlayer2Joined ? '' : 'duo-waiting'}`}>
                 {isPlayer2Joined ? (
                   <>
                     <div className="duo-portrait-wrap" style={{ borderColor: '#38bdf8' }}>
-                      {renderAvatar(player2?.avatar, '/images/duo-rampage/player2_hologram.png', 'Partner Avatar')}
+                      {renderAvatar(player2?.avatar, '/images/duo-rampage/player2_hologram.png', 'Partner Hero')}
                     </div>
-                    <div className="duo-player-name">{player2?.name || 'PLAYER 2'}</div>
+                    <div className="duo-player-name">{player2?.name || 'PARTNER'}</div>
                     <div className="duo-level" style={{ color: '#38bdf8' }}>PARTNER HERO</div>
-                    <div className="duo-ready">
-                      <span>✓</span> READY
+                    <div className="duo-ready" style={{ color: '#38bdf8' }}>
+                      <span style={{ background: '#38bdf8', color: '#032030' }}>✓</span> READY
                     </div>
                   </>
                 ) : (
@@ -996,38 +957,55 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
             </div>
 
             <div className="duo-waiting-status">
-              <div className="duo-loader" />
-              <strong>
-                {isPlayer2Joined ? 'SQUAD ASSEMBLED!' : 'WAITING FOR PLAYER 2...'}
-              </strong>
-              <p>
-                {isPlayer2Joined
-                  ? 'Both warriors ready. Tap Start Mission to launch!'
-                  : 'Once your friend joins, you can start the mission!'}
-              </p>
+              {isPlayer2Joined ? (
+                <>
+                  <div className="duo-ready-check">✓</div>
+                  <strong style={{ color: '#34d399' }}>SQUAD ASSEMBLED (2/2)!</strong>
+                  <p>
+                    {isHost
+                      ? 'All warriors linked. Squad Leader, launch the mission!'
+                      : 'Connected to Squad Leader. Waiting for host to launch!'}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="duo-loader" />
+                  <strong>WAITING FOR PLAYER 2...</strong>
+                  <p>Give your teammate room PIN {activeCode} to squad up</p>
+                </>
+              )}
             </div>
 
-            <button
-              type="button"
-              className={`duo-start-btn ${isPlayer2Joined ? 'ready' : 'disabled'}`}
-              onClick={handleStart}
-            >
-              <span className="duo-play-triangle">▶</span>
-              <span>
-                <strong>START MISSION</strong>
-                <small>
-                  {isPlayer2Joined ? 'LAUNCH 2-PLAYER SQUAD' : 'Click to launch (Solo or Waiting for friend)'}
-                </small>
-              </span>
-            </button>
+            {isHost ? (
+              <button
+                type="button"
+                className={`duo-start-btn ${isPlayer2Joined ? 'ready' : 'disabled'}`}
+                onClick={handleStart}
+              >
+                <span className="duo-play-triangle">▶</span>
+                <span>
+                  <strong>START MISSION</strong>
+                  <small>
+                    {isPlayer2Joined ? 'LAUNCH 2-PLAYER SQUAD DROP' : 'Waiting for partner to join...'}
+                  </small>
+                </span>
+              </button>
+            ) : (
+              <div className="duo-partner-status-pill">
+                <span className="duo-pulse-dot" />
+                <div>
+                  <strong>SQUAD READY</strong>
+                  <small>Waiting for squad leader to launch mission...</small>
+                </div>
+              </div>
+            )}
           </>
         ) : (
-          /* JOIN ROOM CONTENT */
+          /* JOIN CODE INPUT VIEW (Clean, Fast, No Clutter, No #) */
           <>
             <div className="duo-room-id-box">
-              <div className="duo-eyebrow">ENTER ROOM CODE</div>
+              <div className="duo-eyebrow">ENTER 6-DIGIT ROOM PIN</div>
               <div className="duo-room-id-row">
-                <span style={{ fontSize: '32px', color: '#ffc21c', fontWeight: 700 }}>#</span>
                 <input
                   type="text"
                   maxLength={6}
@@ -1036,37 +1014,15 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
                     const clean = e.target.value.replace(/[^0-9A-Za-z]/g, '').slice(0, 6).toUpperCase();
                     setInputCode(clean);
                   }}
-                  placeholder="483921"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleConnect();
+                  }}
+                  placeholder="123456"
                   className="duo-room-id-input font-knight"
                   autoFocus
                 />
-                <button
-                  type="button"
-                  className="duo-icon-btn"
-                  onClick={handlePasteCode}
-                  title="Paste from clipboard"
-                >
-                  📋
-                </button>
               </div>
-              <p>Enter the 6-digit PIN code shared by your squad leader</p>
-            </div>
-
-            <div className="duo-action-row">
-              <button
-                type="button"
-                className="duo-action-btn blue"
-                onClick={handlePasteCode}
-              >
-                <span className="duo-btn-icon">📋</span> PASTE CODE
-              </button>
-              <button
-                type="button"
-                className="duo-action-btn green"
-                onClick={handleConnect}
-              >
-                <span className="duo-btn-icon">⚔</span> CONNECT
-              </button>
+              <p>Type the 6-digit room PIN from your squad leader</p>
             </div>
 
             <div className="duo-player-row">
@@ -1083,10 +1039,10 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
 
               <article className="duo-player-card duo-waiting">
                 <div className="duo-portrait-wrap" style={{ borderColor: '#38bdf8' }}>
-                  <img src="/images/duo-rampage/player2_hologram.png" alt="Squad Leader" />
+                  <img src="/images/duo-rampage/player2_hologram.png" alt="Target Host" />
                 </div>
                 <div className="duo-player-name">
-                  {inputCode ? `#${inputCode}` : 'TARGET HOST'}
+                  {inputCode ? inputCode : 'TARGET HOST'}
                 </div>
                 <div className="duo-waiting-label" style={{ color: '#38bdf8' }}>
                   {inputCode.length >= 4 ? 'READY TO CONNECT' : 'ENTER PIN ABOVE'}
@@ -1095,20 +1051,31 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
             </div>
 
             <div className="duo-waiting-status">
-              <div className="duo-loader" />
-              <strong>ENTER CODE & TAP CONNECT TO SQUAD UP!</strong>
-              <p>Instant peer connection across Asia, Europe and Americas</p>
+              {isConnecting ? (
+                <>
+                  <div className="duo-loader" />
+                  <strong>CONNECTING TO SQUAD...</strong>
+                  <p>Linking peer network</p>
+                </>
+              ) : (
+                <>
+                  <div className="duo-loader" />
+                  <strong>ENTER PIN & TAP JOIN TO SQUAD UP!</strong>
+                  <p>Instant peer connection across browsers</p>
+                </>
+              )}
             </div>
 
             <button
               type="button"
-              className={`duo-start-btn ${inputCode.length >= 4 ? 'ready' : 'disabled'}`}
+              className={`duo-start-btn ${inputCode.length >= 4 && !isConnecting ? 'ready' : 'disabled'}`}
               onClick={handleConnect}
+              disabled={inputCode.length < 4 || isConnecting}
             >
               <span className="duo-play-triangle">▶</span>
               <span>
-                <strong>JOIN MISSION</strong>
-                <small>Connect to leader's room</small>
+                <strong>{isConnecting ? 'CONNECTING...' : 'JOIN MISSION'}</strong>
+                <small>Connect to leader&apos;s room</small>
               </span>
             </button>
           </>
@@ -1127,9 +1094,9 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
         <div>
           <strong>PRO TIP:</strong>
           <p>
-            {mode === 'create'
-              ? 'Share the Room ID with your friend and get ready for some chaos!'
-              : 'Ask your friend for their 6-digit room PIN or click their invite link!'}
+            {isInLobby
+              ? 'Stay close together during missions to trigger 2x Damage Rampage boost!'
+              : 'Enter the 6-digit PIN code shared by your squad leader and tap Join Mission.'}
           </p>
         </div>
       </aside>
