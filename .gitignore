@@ -30,10 +30,17 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
+# env & secrets
 .env*
-!.env.example
-!.env.production.example
+*.env
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
+credentials*.json
+service-account*.json
 
 # database backups & local json stores
 /data/*.json
