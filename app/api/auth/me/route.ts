@@ -17,11 +17,14 @@ export async function GET(req: Request) {
     }
 
     const user = await db.getUserById(userId);
-    if (!user || user.status === 'suspended') {
+    if (!user) {
       return NextResponse.json({ user: null });
     }
+    if (user.status === 'suspended') {
+      return NextResponse.json({ user: null, suspended: true });
+    }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       user: {
         id: user.id,
         name: user.name,
@@ -34,6 +37,17 @@ export async function GET(req: Request) {
         stats: user.stats,
       },
     });
+
+    // Continuously renew 10-year persistent cookie
+    response.cookies.set('xian_user_id', user.id, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365 * 10, // 10 years persistent
+    });
+
+    return response;
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
   }
