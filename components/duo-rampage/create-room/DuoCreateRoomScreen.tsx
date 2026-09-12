@@ -55,6 +55,45 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   const player2 = room?.players?.[1] || null;
   const isPlayer2Joined = !!player2;
 
+  const renderAvatar = (avatarStr?: string | null, fallbackImg = '/images/duo-rampage/player1.png', alt = 'Avatar') => {
+    const isUrl = Boolean(
+      avatarStr &&
+        (avatarStr.startsWith('http://') ||
+          avatarStr.startsWith('https://') ||
+          avatarStr.startsWith('/'))
+    );
+    if (isUrl) {
+      return (
+        <img
+          src={avatarStr!}
+          alt={alt}
+          referrerPolicy="no-referrer"
+          className="w-full h-full object-cover"
+        />
+      );
+    }
+    if (avatarStr && !isUrl) {
+      return (
+        <span className="text-3xl select-none flex items-center justify-center w-full h-full">
+          {avatarStr}
+        </span>
+      );
+    }
+    return (
+      <img
+        src={fallbackImg}
+        alt={alt}
+        style={{
+          width: '180%',
+          height: '180%',
+          objectFit: 'cover',
+          objectPosition: '45% 18%',
+          transform: 'translate(-22%, -8%)',
+        }}
+      />
+    );
+  };
+
   const showToast = (message: string) => {
     setToastMessage(message);
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -921,17 +960,7 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
             <div className="duo-player-row">
               <article className="duo-player-card">
                 <div className="duo-portrait-wrap">
-                  <img
-                    src={player1.avatar || realUserAvatar || '/images/duo-rampage/player1.png'}
-                    alt="Host Avatar"
-                    style={{
-                      width: (player1.avatar || realUserAvatar) ? '100%' : '180%',
-                      height: (player1.avatar || realUserAvatar) ? '100%' : '180%',
-                      objectFit: 'cover',
-                      objectPosition: (player1.avatar || realUserAvatar) ? 'center' : '45% 18%',
-                      transform: (player1.avatar || realUserAvatar) ? 'none' : 'translate(-22%, -8%)',
-                    }}
-                  />
+                  {renderAvatar(player1.avatar || realUserAvatar, '/images/duo-rampage/player1.png', 'Host Avatar')}
                 </div>
                 <div className="duo-player-name">{player1.name || realUserName}</div>
                 <div className="duo-level">LV. {realUserLevel}</div>
@@ -944,17 +973,7 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
                 {isPlayer2Joined ? (
                   <>
                     <div className="duo-portrait-wrap" style={{ borderColor: '#38bdf8' }}>
-                      <img
-                        src={player2?.avatar || '/images/duo-rampage/player2_hologram.png'}
-                        alt="Partner Avatar"
-                        style={{
-                          width: player2?.avatar ? '100%' : '180%',
-                          height: player2?.avatar ? '100%' : '180%',
-                          objectFit: 'cover',
-                          objectPosition: player2?.avatar ? 'center' : '45% 18%',
-                          transform: player2?.avatar ? 'none' : 'translate(-22%, -8%)',
-                        }}
-                      />
+                      {renderAvatar(player2?.avatar, '/images/duo-rampage/player2_hologram.png', 'Partner Avatar')}
                     </div>
                     <div className="duo-player-name">{player2?.name || 'PLAYER 2'}</div>
                     <div className="duo-level" style={{ color: '#38bdf8' }}>PARTNER HERO</div>
@@ -1053,17 +1072,7 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
             <div className="duo-player-row">
               <article className="duo-player-card">
                 <div className="duo-portrait-wrap">
-                  <img
-                    src={realUserAvatar || '/images/duo-rampage/player1.png'}
-                    alt="You"
-                    style={{
-                      width: realUserAvatar ? '100%' : '180%',
-                      height: realUserAvatar ? '100%' : '180%',
-                      objectFit: 'cover',
-                      objectPosition: realUserAvatar ? 'center' : '45% 18%',
-                      transform: realUserAvatar ? 'none' : 'translate(-22%, -8%)',
-                    }}
-                  />
+                  {renderAvatar(realUserAvatar, '/images/duo-rampage/player1.png', 'You')}
                 </div>
                 <div className="duo-player-name">{realUserName}</div>
                 <div className="duo-level">LV. {realUserLevel} • HERO</div>
