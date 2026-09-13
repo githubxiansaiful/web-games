@@ -10,6 +10,7 @@ import { PlayerRole } from '@/game/duo-rampage/types';
 
 interface ParkourGameViewProps {
   onExit: () => void;
+  selectedLevel?: number;
   isMultiplayer?: boolean;
   myRole?: PlayerRole;
   localPlayerName?: string;
@@ -20,6 +21,7 @@ interface ParkourGameViewProps {
 
 export const ParkourGameView: React.FC<ParkourGameViewProps> = ({
   onExit,
+  selectedLevel = 1,
   isMultiplayer = false,
   myRole = 'assault',
   localPlayerName = 'Hero 1',
@@ -72,6 +74,7 @@ export const ParkourGameView: React.FC<ParkourGameViewProps> = ({
         onExit,
       },
       {
+        selectedLevel,
         isMultiplayer,
         myRole,
         localPlayerName,
@@ -90,7 +93,7 @@ export const ParkourGameView: React.FC<ParkourGameViewProps> = ({
       engine.destroy();
       engineRef.current = null;
     };
-  }, [onExit, isMultiplayer, myRole, localPlayerName, partnerPlayerName, characterId, onEngineReady]);
+  }, [onExit, selectedLevel, isMultiplayer, myRole, localPlayerName, partnerPlayerName, characterId, onEngineReady]);
 
   useEffect(() => {
     if (engineRef.current) {

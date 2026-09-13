@@ -114,7 +114,7 @@ export const ParkourHUD: React.FC<ParkourHUDProps> = ({
         sprintPressed.current = true;
         onInputChange({ sprintHeld: true });
       } else if (key === 's' || key === 'arrowdown') {
-        onInputChange({ moveY: 1, slidePressed: true });
+        onInputChange({ moveY: 1, slidePressed: true, crouchHeld: true });
       } else if (key === 'r') {
         onReset();
       }
@@ -132,7 +132,7 @@ export const ParkourHUD: React.FC<ParkourHUDProps> = ({
       } else if (key === ' ' || key === 'w' || key === 'arrowup') {
         onInputChange({ jumpHeld: false, moveY: 0 });
       } else if (key === 's' || key === 'arrowdown') {
-        onInputChange({ moveY: 0 });
+        onInputChange({ moveY: 0, slidePressed: false, crouchHeld: false });
       } else if (key === 'shift') {
         sprintPressed.current = false;
         onInputChange({ sprintHeld: false });
@@ -167,15 +167,15 @@ export const ParkourHUD: React.FC<ParkourHUDProps> = ({
     onInputChange({ jumpHeld: false });
   };
 
-  const handleSlideDown = (e: React.PointerEvent) => {
+  const handleCrouchDown = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onInputChange({ slidePressed: true, moveY: 1 });
+    onInputChange({ slidePressed: true, crouchHeld: true, moveY: 1 });
   };
-  const handleSlideUp = (e: React.PointerEvent) => {
+  const handleCrouchUp = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onInputChange({ slidePressed: false });
+    onInputChange({ slidePressed: false, crouchHeld: false, moveY: 0 });
   };
 
   const handleSprintDown = (e: React.PointerEvent) => {
@@ -379,13 +379,15 @@ export const ParkourHUD: React.FC<ParkourHUDProps> = ({
                 });
 
                 if (isDownPressed) {
-                  onInputChange({ slidePressed: true });
+                  onInputChange({ slidePressed: true, crouchHeld: true });
+                } else {
+                  onInputChange({ crouchHeld: false });
                 }
               }}
             />
           </div>
 
-          {/* Right Side: Action Cluster (SPRINT, SLIDE, JUMP) */}
+          {/* Right Side: Action Cluster (SPRINT, CROUCH, JUMP) */}
           <div className="flex items-center gap-2.5 pointer-events-auto select-none touch-none">
             {/* Sprint Button */}
             <button
@@ -396,16 +398,16 @@ export const ParkourHUD: React.FC<ParkourHUDProps> = ({
               <span className="text-[8px] font-black tracking-tight mt-0.5">SPRINT</span>
             </button>
 
-            {/* Slide / Drop Button */}
+            {/* Crouch / Sit Down Button */}
             <button
-              onPointerDown={handleSlideDown}
-              onPointerUp={handleSlideUp}
-              onPointerCancel={handleSlideUp}
-              onPointerLeave={handleSlideUp}
+              onPointerDown={handleCrouchDown}
+              onPointerUp={handleCrouchUp}
+              onPointerCancel={handleCrouchUp}
+              onPointerLeave={handleCrouchUp}
               className="w-12 h-12 xs:w-13 xs:h-13 rounded-2xl bg-slate-950/70 active:bg-slate-900 border-2 border-cyan-400/50 backdrop-blur-md text-cyan-300 font-black flex flex-col items-center justify-center shadow-lg transition active:scale-95 touch-none cursor-pointer"
             >
-              <span className="text-lg leading-none">▼</span>
-              <span className="text-[8px] font-black tracking-tight mt-0.5">SLIDE</span>
+              <span className="text-lg leading-none">🧎</span>
+              <span className="text-[8px] font-black tracking-tight mt-0.5">CROUCH</span>
             </button>
 
             {/* Primary JUMP Button */}
@@ -438,7 +440,7 @@ export const ParkourHUD: React.FC<ParkourHUDProps> = ({
               <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-amber-300 font-bold border border-slate-700">Shift</kbd> Sprint
             </span>
             <span>
-              <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-amber-300 font-bold border border-slate-700">S</kbd> Slide
+              <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-amber-300 font-bold border border-slate-700">S / ↓</kbd> Crouch / Sit
             </span>
             <span>
               <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-slate-400 border border-slate-700">R</kbd> Respawn
