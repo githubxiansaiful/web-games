@@ -31,6 +31,15 @@ export const DuoRampageGameOver: React.FC<DuoRampageGameOverProps> = ({
           }`}
         />
 
+        {/* Duo Rampage Logo */}
+        <div className="flex justify-center -mb-1">
+          <img
+            src="/images/duo-rampage/duo_rampage_logo.png"
+            alt="DUO RAMPAGE"
+            className="h-10 sm:h-12 w-auto object-contain drop-shadow-lg"
+          />
+        </div>
+
         {/* Icon & Title */}
         <div className="flex flex-col items-center">
           <div

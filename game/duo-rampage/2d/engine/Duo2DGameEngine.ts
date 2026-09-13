@@ -67,6 +67,8 @@ export class Duo2DGameEngine {
   // Revive channel timer
   private reviveTimer: number = 0;
   private shootCooldown: number = 0;
+  private container: HTMLElement;
+  private resizeObserver: ResizeObserver | null = null;
 
   constructor(
     container: HTMLElement,
@@ -74,18 +76,16 @@ export class Duo2DGameEngine {
     isSolo: boolean,
     callbacks: Duo2DCallbacks
   ) {
+    this.container = container;
     this.myRole = myRole;
     this.isSolo = isSolo;
     this.callbacks = callbacks;
 
-    // Create Canvas
+    // Create Canvas (Full edge-to-edge dynamic sizing, no black letterbox bars)
     this.canvas = document.createElement('canvas');
-    this.canvas.width = 1920;
-    this.canvas.height = 1080;
     this.canvas.style.width = '100%';
     this.canvas.style.height = '100%';
     this.canvas.style.display = 'block';
-    this.canvas.style.objectFit = 'contain';
     container.innerHTML = '';
     container.appendChild(this.canvas);
 
@@ -99,7 +99,20 @@ export class Duo2DGameEngine {
     this.particles = new ParticleEngine2D();
     this.weapons = new WeaponSystem2D();
     this.waveSys = new WaveSystem2D();
-    this.camera = new DuoCamera2D(1920, 1080);
+    this.camera = new DuoCamera2D(1280, 720);
+
+    // Initial responsive sizing
+    this.resize();
+
+    // Listen for resize and orientation changes
+    window.addEventListener('resize', this.resize);
+    window.addEventListener('orientationchange', this.resize);
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => {
+        this.resize();
+      });
+      this.resizeObserver.observe(this.container);
+    }
 
     // Initialize Players (Solo mode = exactly 1 player, no second player)
     if (this.isSolo) {
@@ -126,6 +139,41 @@ export class Duo2DGameEngine {
     };
   }
 
+  public resize = () => {
+    if (!this.container || this.isDestroyed) return;
+    const rect = this.container.getBoundingClientRect();
+    const cw = rect.width || window.innerWidth || 1280;
+    const ch = rect.height || window.innerHeight || 720;
+    const aspect = Math.max(0.5, cw / Math.max(1, ch));
+
+    // Arcade framing: On mobile, target 580px view height so sprites are ~12.5% screen height
+    // (classic Metal Slug / Contra arcade framing instead of tiny 6% specks)
+    // On desktop, 720px gives a balanced cinematic widescreen battlefield
+    const isMobile = cw <= 1024 || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0);
+    const baseHeight = isMobile ? 580 : 720;
+
+    let viewHeight = baseHeight;
+    let viewWidth = Math.round(viewHeight * aspect);
+
+    // If screen is narrow (portrait or square-ish), guarantee at least 680px horizontal field of view
+    if (viewWidth < 680) {
+      viewWidth = 680;
+      viewHeight = Math.round(viewWidth / aspect);
+    }
+    // Cap vertical height to worldHeight (1080) so camera never sees beyond top or bottom bounds
+    if (viewHeight > 1080) {
+      viewHeight = 1080;
+      viewWidth = Math.round(viewHeight * aspect);
+    }
+
+    if (this.canvas.width !== viewWidth || this.canvas.height !== viewHeight) {
+      this.canvas.width = viewWidth;
+      this.canvas.height = viewHeight;
+    }
+    this.camera.width = viewWidth;
+    this.camera.height = viewHeight;
+  };
+
   public start() {
     this.lastTime = performance.now();
     this.loop();
@@ -136,6 +184,12 @@ export class Duo2DGameEngine {
     if (this.animFrameId) {
       cancelAnimationFrame(this.animFrameId);
       this.animFrameId = null;
+    }
+    window.removeEventListener('resize', this.resize);
+    window.removeEventListener('orientationchange', this.resize);
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
     }
   }
 

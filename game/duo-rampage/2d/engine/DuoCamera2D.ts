@@ -46,7 +46,7 @@ export class DuoCamera2D {
     const maxX = Math.max(0, worldWidth - this.width);
     const maxY = Math.max(0, worldHeight - this.height);
     this.x = Math.max(0, Math.min(maxX, this.x));
-    this.y = Math.max(-100, Math.min(maxY + 100, this.y));
+    this.y = Math.max(0, Math.min(maxY, this.y));
 
     // Screen Shake Decay
     if (this.shakeDuration > 0) {

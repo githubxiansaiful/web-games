@@ -269,9 +269,11 @@ export const GameWorldHome: React.FC = () => {
                 </span>
                 <span className="text-[10px] font-bold text-cyan-300 tracking-wider">3D CARTOON ACTION</span>
               </div>
-              <h3 className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-amber-200 to-orange-400 tracking-tight leading-none drop-shadow-md">
-                DUO RAMPAGE
-              </h3>
+              <img
+                src="/images/duo-rampage/duo_rampage_logo.png"
+                alt="DUO RAMPAGE"
+                className="h-10 sm:h-12 w-auto object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] -ml-1 my-0.5"
+              />
               <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-amber-300">
                 <span>2-Player Co-op Shooter</span>
                 <span className="text-slate-600">•</span>
