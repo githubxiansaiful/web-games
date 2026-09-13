@@ -97,9 +97,17 @@ export const DuoModeSelectionSlider: React.FC<DuoModeSelectionSliderProps> = ({
 
               {/* Bottom Gradient & Text Overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-transparent flex flex-col justify-end p-2 sm:p-3 pointer-events-none">
-                <span className="font-knight font-black text-sm xs:text-base sm:text-lg text-white tracking-wider uppercase leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                  {item.name}
-                </span>
+                {item.id === 'rampage' ? (
+                  <img
+                    src="/images/duo-rampage/duo_rampage_logo.png"
+                    alt="DUO RAMPAGE"
+                    className="h-6 xs:h-7 sm:h-8 w-auto object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] -ml-0.5"
+                  />
+                ) : (
+                  <span className="font-knight font-black text-sm xs:text-base sm:text-lg text-white tracking-wider uppercase leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                    {item.name}
+                  </span>
+                )}
                 <span
                   className={`font-knight font-bold text-[8.5px] xs:text-[9.5px] sm:text-[11px] tracking-wider uppercase mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,1)] ${
                     item.id === 'parkour' ? 'text-cyan-400' : 'text-amber-400'

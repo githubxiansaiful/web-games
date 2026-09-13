@@ -5,6 +5,7 @@ import { DuoRoomData } from '@/game/duo-rampage/types';
 import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
 import { duoNetwork } from '@/game/duo-rampage/network/DuoNetworkManager';
 import { useAuth } from '@/context/AuthContext';
+import { DuoMapSelection } from '../home/DuoMapSelection';
 
 interface DuoCreateRoomScreenProps {
   roomCode?: string;
@@ -33,6 +34,7 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   const [mode, setMode] = useState<'create' | 'join'>(initialMode);
   const [inputCode, setInputCode] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
+  const [selectedMapId, setSelectedMapId] = useState('abandoned_city');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -767,7 +769,24 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
           50% { transform: scale(1.35); opacity: 0.6; }
         }
 
+        .duo-map-slider-bottom {
+          position: absolute;
+          bottom: 12px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: min(840px, 96vw);
+          z-index: 20;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+
         /* Responsive Breakpoints */
+        @media (max-width: 1400px) {
+          .duo-tip-card { display: none; }
+          .duo-game-logo { display: none; }
+        }
+
         @media (max-width: 1100px) {
           .duo-hero-player { left: 4%; height: 68%; }
           .duo-hero-hologram { right: 4%; height: 54%; }
@@ -786,10 +805,16 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
           .duo-back-btn { left: 12px; }
         }
 
+        @media (max-height: 800px) {
+          .duo-room-panel { top: 12%; transform: translateX(-50%) scale(.88); transform-origin: top center; }
+          .duo-hero-heading { top: 10px; }
+          .duo-map-slider-bottom { bottom: 4px; }
+        }
+
         @media (max-height: 700px) {
-          .duo-room-panel { top: 15%; transform: translateX(-50%) scale(.9); transform-origin: top center; }
-          .duo-hero-heading { top: 14px; }
-          .duo-hero-heading h1 { font-size: 40px; }
+          .duo-room-panel { top: 11%; transform: translateX(-50%) scale(.82); transform-origin: top center; }
+          .duo-hero-heading { top: 8px; }
+          .duo-hero-heading h1 { font-size: 36px; }
         }
       `}</style>
 
@@ -972,6 +997,21 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
               </article>
             </div>
 
+            {/* Zone / Sector Info Pill */}
+            {effectiveGameMode === 'rampage' ? (
+              <div className="flex items-center justify-between px-3.5 py-1.5 bg-slate-950/70 border border-slate-700/60 rounded-xl mb-3 text-[11px] font-knight uppercase tracking-wider">
+                <span className="text-slate-400">ZONE:</span>
+                <span className="text-amber-400 font-bold">{selectedMapId.replace('_', ' ')}</span>
+                <span className="text-cyan-400 text-[10px] font-mono">SELECT BELOW ↓</span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between px-3.5 py-1.5 bg-slate-950/70 border border-slate-700/60 rounded-xl mb-3 text-[11px] font-knight uppercase tracking-wider">
+                <span className="text-slate-400">SECTOR:</span>
+                <span className="text-cyan-400 font-bold">#01 ROOFTOP INTRODUCTION</span>
+                <span className="text-amber-400 text-[10px] font-mono">SUMMER DAY</span>
+              </div>
+            )}
+
             <div className="duo-waiting-status">
               {isPlayer2Joined ? (
                 <>
@@ -1120,6 +1160,19 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
           </p>
         </div>
       </aside>
+
+      {/* 6.5. Bottom Deployment Zone Carousel (For Rampage Mode) */}
+      {effectiveGameMode === 'rampage' && isInLobby && (
+        <div className="duo-map-slider-bottom">
+          <div className="text-[10px] sm:text-xs font-knight font-bold uppercase tracking-widest text-cyan-300 drop-shadow mb-0.5">
+            SELECT DEPLOYMENT ZONE
+          </div>
+          <DuoMapSelection
+            selectedMapId={selectedMapId}
+            onSelectMap={(id) => setSelectedMapId(id)}
+          />
+        </div>
+      )}
 
       {/* 7. Toast Notification */}
       <div className={`duo-toast ${toastMessage ? 'show' : ''}`}>

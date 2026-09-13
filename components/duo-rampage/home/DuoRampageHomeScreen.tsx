@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
-import Image from 'next/image';
+import React, { useState, useEffect } from 'react';
 import { DuoPlayerProfile } from './DuoPlayerProfile';
 import { DuoTopRightMenu } from './DuoTopRightMenu';
 import { DuoSideMenu } from './DuoSideMenu';
 import { DuoPrimaryButtons } from './DuoPrimaryButtons';
-import { DuoMapSelection } from './DuoMapSelection';
+import { DuoModeSelectionSlider } from './DuoModeSelectionSlider';
 import { DuoModals, DuoModalType } from './DuoModals';
 import { DuoHomeAnimatedBackground } from './DuoHomeAnimatedBackground';
 import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
@@ -35,8 +34,13 @@ export const DuoRampageHomeScreen: React.FC<DuoRampageHomeScreenProps> = ({
 }) => {
   const { user } = useAuth();
   const [activeModal, setActiveModal] = useState<DuoModalType>(null);
-  const [selectedMapId, setSelectedMapId] = useState('abandoned_city');
   const [mode, setMode] = useState<'rampage' | 'parkour'>(activeGameMode);
+
+  useEffect(() => {
+    if (activeGameMode) {
+      setMode(activeGameMode);
+    }
+  }, [activeGameMode]);
 
   const userName = user?.name || 'RAMPAGE#001';
   const userAvatar = user?.avatar;
@@ -86,55 +90,16 @@ export const DuoRampageHomeScreen: React.FC<DuoRampageHomeScreenProps> = ({
         {/* Center Action Area: DUO RAMPAGE Logo & Primary 3D Action Buttons */}
         <div className="flex-1 flex flex-col items-center justify-center -mt-1 sm:-mt-2 md:-mt-3 w-full">
           {/* 3D Action Logo */}
-          <div className="relative w-44 xs:w-56 sm:w-72 md:w-[380px] h-12 xs:h-16 sm:h-22 md:h-28 flex flex-col items-center justify-center drop-shadow-[0_15px_30px_rgba(0,0,0,0.8)]">
-            <Image
+          <div className="relative flex items-center justify-center my-1 sm:my-1.5 select-none pointer-events-none">
+            <img
               src="/images/duo-rampage/duo_rampage_logo.png"
               alt="DUO RAMPAGE"
-              fill
-              className="object-contain filter drop-shadow-[0_8px_25px_rgba(245,158,11,0.5)]"
-              priority
+              className="w-56 xs:w-72 sm:w-88 md:w-[420px] lg:w-[460px] max-w-[85vw] max-h-[16vh] sm:max-h-[20vh] h-auto object-contain filter drop-shadow-[0_12px_32px_rgba(245,158,11,0.65)] hover:scale-105 transition-transform duration-300"
             />
           </div>
 
-          {/* Mode Selector Tabs: RAMPAGE ASSAULT vs DHAKA PARKOUR */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-950/85 border border-slate-700/80 rounded-2xl shadow-xl mb-2 sm:mb-2.5 backdrop-blur-xs">
-            <button
-              type="button"
-              onClick={() => {
-                duoAudio.playUiClick();
-                setMode('rampage');
-                onToggleGameMode?.('rampage');
-              }}
-              className={`px-3 sm:px-4 py-1.5 rounded-xl font-knight font-bold text-[10px] xs:text-[11px] sm:text-xs tracking-wider transition-all duration-150 cursor-pointer flex items-center gap-1.5 ${
-                mode === 'rampage'
-                  ? 'bg-gradient-to-r from-red-600 to-amber-500 text-slate-950 shadow-md font-black'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <span>💥</span>
-              <span>RAMPAGE CO-OP</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                duoAudio.playUiClick();
-                setMode('parkour');
-                onToggleGameMode?.('parkour');
-              }}
-              className={`px-3 sm:px-4 py-1.5 rounded-xl font-knight font-bold text-[10px] xs:text-[11px] sm:text-xs tracking-wider transition-all duration-150 cursor-pointer flex items-center gap-1.5 ${
-                mode === 'parkour'
-                  ? 'bg-gradient-to-r from-cyan-500 to-sky-400 text-slate-950 shadow-md font-black'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <span>🏃</span>
-              <span>DHAKA PARKOUR</span>
-              <span className="px-1 py-0.2 bg-cyan-900/80 text-cyan-200 text-[8px] font-mono rounded">NEW</span>
-            </button>
-          </div>
-
           {/* Action Tagline */}
-          <div className="text-[7.5px] xs:text-[8.5px] sm:text-xs md:text-sm font-knight text-cyan-200 tracking-wider uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,1)] -mt-0.5 mb-2 sm:mb-3 bg-slate-950/70 backdrop-blur-xs px-2.5 sm:px-3.5 py-0.5 rounded-full border border-cyan-500/40 text-center">
+          <div className="text-[7.5px] xs:text-[8.5px] sm:text-xs md:text-sm font-knight text-cyan-200 tracking-wider uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,1)] mt-1 mb-2 sm:mb-3 bg-slate-950/70 backdrop-blur-xs px-2.5 sm:px-3.5 py-0.5 rounded-full border border-cyan-500/40 text-center">
             {mode === 'parkour'
               ? 'DHAKA PARKOUR • 12 CAMPAIGN SECTORS • FAST URBAN FLOW'
               : 'TWO PLAYERS • ONE MISSION • ENDLESS ACTION'}
@@ -174,12 +139,15 @@ export const DuoRampageHomeScreen: React.FC<DuoRampageHomeScreenProps> = ({
         <div className="w-9 xs:w-10 sm:w-12 md:w-14 shrink-0 pointer-events-none hidden landscape:block sm:block" />
       </main>
 
-      {/* 4. Bottom Section: Map Carousel & Footer Information */}
+      {/* 4. Bottom Section: Game Mode Selection Carousel & Footer Information */}
       <footer className="relative w-full flex flex-col items-center gap-1 z-20 shrink-0">
-        {/* Map Selection Carousel - Clean touch/drag scroll, NO arrows */}
-        <DuoMapSelection
-          selectedMapId={selectedMapId}
-          onSelectMap={(id) => setSelectedMapId(id)}
+        {/* Game Mode Selection Slider */}
+        <DuoModeSelectionSlider
+          selectedMode={mode}
+          onSelectMode={(m) => {
+            setMode(m);
+            onToggleGameMode?.(m);
+          }}
         />
 
         {/* Footer Slogan & Game Version */}

@@ -272,7 +272,7 @@ export const GameWorldHome: React.FC = () => {
               <img
                 src="/images/duo-rampage/duo_rampage_logo.png"
                 alt="DUO RAMPAGE"
-                className="h-10 sm:h-12 w-auto object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] -ml-1 my-0.5"
+                className="h-12 sm:h-14 w-auto object-contain drop-shadow-[0_6px_16px_rgba(245,158,11,0.7)] -ml-1 my-0.5"
               />
               <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-amber-300">
                 <span>2-Player Co-op Shooter</span>
