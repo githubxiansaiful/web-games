@@ -12,6 +12,8 @@ interface DuoCreateRoomScreenProps {
   initialMode?: 'create' | 'join';
   onBack: () => void;
   onStartMission: () => void;
+  gameMode?: 'rampage' | 'parkour';
+  selectedLevel?: number;
   onJoinRoomSubmit?: (code: string) => Promise<void> | void;
   onOpenSettings?: () => void;
 }
@@ -20,6 +22,8 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   roomCode = '483921',
   room,
   initialMode = 'create',
+  gameMode = 'rampage',
+  selectedLevel = 1,
   onBack,
   onStartMission,
   onJoinRoomSubmit,
@@ -31,6 +35,9 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   const [isConnecting, setIsConnecting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const effectiveGameMode = room?.gameMode || gameMode;
+  const effectiveLevel = room?.selectedLevel || selectedLevel;
 
   // Real User Information
   const realUserName = user?.name || 'RAMPAGE#001';
@@ -841,21 +848,30 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
 
       {/* 3. Hero Heading with Mode Toggle */}
       <section className="duo-hero-heading">
+        {effectiveGameMode === 'parkour' && (
+          <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/50 text-cyan-300 font-mono text-[10px] font-black uppercase mb-1 tracking-widest">
+            <span>🏃 DHAKA PARKOUR CO-OP</span>
+            <span className="text-amber-400">• SECTOR #{effectiveLevel.toString().padStart(2, '0')}</span>
+          </div>
+        )}
         <h1>
           {isInLobby ? (
             <>
-              <span>MISSION</span> <em>LOBBY</em>
+              <span>{effectiveGameMode === 'parkour' ? 'PARKOUR' : 'MISSION'}</span>{' '}
+              <em>LOBBY</em>
             </>
           ) : (
             <>
-              <span>JOIN</span> <em>SQUAD</em>
+              <span>JOIN</span> <em>{effectiveGameMode === 'parkour' ? 'PARKOUR' : 'SQUAD'}</em>
             </>
           )}
         </h1>
         <p>
           {isInLobby
             ? isPlayer2Joined
-              ? 'SQUAD ASSEMBLED • STAND BY FOR COMBAT DROP'
+              ? effectiveGameMode === 'parkour'
+                ? 'SQUAD LINKED • READY FOR URBAN PARKOUR RUN'
+                : 'SQUAD ASSEMBLED • STAND BY FOR COMBAT DROP'
               : 'WAITING FOR SQUAD MATE TO JOIN'
             : 'ENTER THE 6-DIGIT ROOM PIN TO SQUAD UP'}
         </p>
@@ -984,9 +1000,13 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
               >
                 <span className="duo-play-triangle">▶</span>
                 <span>
-                  <strong>START MISSION</strong>
+                  <strong>{effectiveGameMode === 'parkour' ? 'START PARKOUR' : 'START MISSION'}</strong>
                   <small>
-                    {isPlayer2Joined ? 'LAUNCH 2-PLAYER SQUAD DROP' : 'Waiting for partner to join...'}
+                    {isPlayer2Joined
+                      ? effectiveGameMode === 'parkour'
+                        ? `LAUNCH SECTOR #${effectiveLevel} CO-OP RUN`
+                        : 'LAUNCH 2-PLAYER SQUAD DROP'
+                      : 'Waiting for partner to join...'}
                   </small>
                 </span>
               </button>

@@ -8,12 +8,14 @@ interface DuoPrimaryButtonsProps {
   onCreateRoom: () => void;
   onJoinRoom: () => void;
   onQuickPlay: () => void;
+  mode?: 'rampage' | 'parkour';
 }
 
 export const DuoPrimaryButtons: React.FC<DuoPrimaryButtonsProps> = ({
   onCreateRoom,
   onJoinRoom,
   onQuickPlay,
+  mode = 'rampage',
 }) => {
   return (
     <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 md:gap-4 select-none z-20 w-full max-w-2xl px-2">
@@ -30,7 +32,7 @@ export const DuoPrimaryButtons: React.FC<DuoPrimaryButtonsProps> = ({
           <div className="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-white/35 to-transparent pointer-events-none" />
           <DuoSquadIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:scale-105 transition-transform shrink-0 drop-shadow" />
           <span className="font-knight font-bold text-[11px] xs:text-xs sm:text-sm md:text-base tracking-wider uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] truncate">
-            JOIN ROOM
+            {mode === 'parkour' ? 'JOIN SQUAD' : 'JOIN ROOM'}
           </span>
         </button>
 
@@ -46,10 +48,10 @@ export const DuoPrimaryButtons: React.FC<DuoPrimaryButtonsProps> = ({
           <DuoGlobeIcon className="w-4 h-4 text-white group-hover:scale-105 transition-transform shrink-0 drop-shadow" />
           <div className="flex flex-col items-start leading-none truncate">
             <span className="font-knight font-bold text-[11px] xs:text-xs tracking-wider uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-              QUICK PLAY
+              {mode === 'parkour' ? 'CAMPAIGN' : 'QUICK PLAY'}
             </span>
             <span className="font-knight text-[7.5px] text-purple-200 uppercase tracking-widest mt-0.5">
-              (BETA)
+              {mode === 'parkour' ? '12 LEVELS' : '(BETA)'}
             </span>
           </div>
         </button>
@@ -73,10 +75,10 @@ export const DuoPrimaryButtons: React.FC<DuoPrimaryButtonsProps> = ({
 
         <div className="flex flex-col items-start leading-none">
           <span className="font-knight font-black text-xl sm:text-2xl md:text-3xl tracking-wide uppercase text-slate-950 drop-shadow-[0_1px_2px_rgba(255,255,255,0.6)]">
-            PLAY
+            {mode === 'parkour' ? 'PARKOUR' : 'PLAY'}
           </span>
           <span className="font-knight font-extrabold text-[9px] sm:text-[10px] md:text-[11px] tracking-widest uppercase text-[#78350f] mt-0.5">
-            CREATE ROOM
+            {mode === 'parkour' ? 'HOST SQUAD' : 'CREATE ROOM'}
           </span>
         </div>
       </button>
@@ -93,10 +95,10 @@ export const DuoPrimaryButtons: React.FC<DuoPrimaryButtonsProps> = ({
         <DuoGlobeIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:scale-105 transition-transform shrink-0 drop-shadow" />
         <div className="flex flex-col items-start leading-none truncate">
           <span className="font-knight font-bold text-xs sm:text-sm md:text-base tracking-wider uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-            QUICK PLAY
+            {mode === 'parkour' ? 'CAMPAIGN' : 'QUICK PLAY'}
           </span>
           <span className="font-knight text-[8px] sm:text-[9px] text-purple-200 uppercase tracking-widest mt-0.5">
-            (BETA)
+            {mode === 'parkour' ? '12 LEVELS' : '(BETA)'}
           </span>
         </div>
       </button>

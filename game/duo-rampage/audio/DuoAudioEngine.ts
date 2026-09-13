@@ -354,6 +354,102 @@ export class DuoAudioEngine {
     osc.start(t);
     osc.stop(t + 0.12);
   }
+
+  public playCoinPickup() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(987.77, t); // B5
+    osc.frequency.setValueAtTime(1318.51, t + 0.05); // E6
+    gain.gain.setValueAtTime(0.18, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.2);
+  }
+
+  public playCheckpoint() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 - E5 - G5 - C6
+    notes.forEach((freq, idx) => {
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const delay = idx * 0.05;
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, t + delay);
+      gain.gain.setValueAtTime(0.2, t + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.25);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t + delay);
+      osc.stop(t + delay + 0.25);
+    });
+  }
+
+  public playLevelComplete() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+
+    const fanfare = [
+      { f: 523.25, d: 0.1 },
+      { f: 659.25, d: 0.1 },
+      { f: 783.99, d: 0.12 },
+      { f: 1046.5, d: 0.4 },
+    ];
+    let timeAcc = 0;
+    fanfare.forEach((n) => {
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(n.f, t + timeAcc);
+      gain.gain.setValueAtTime(0.25, t + timeAcc);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + timeAcc + n.d);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t + timeAcc);
+      osc.stop(t + timeAcc + n.d);
+      timeAcc += 0.09;
+    });
+  }
+
+  public playRespawn() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(200, t);
+    osc.frequency.exponentialRampToValueAtTime(500, t + 0.15);
+    gain.gain.setValueAtTime(0.25, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.15);
+  }
 }
 
 export const duoAudio = DuoAudioEngine.getInstance();

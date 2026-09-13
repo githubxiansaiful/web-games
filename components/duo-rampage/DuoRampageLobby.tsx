@@ -86,6 +86,12 @@ export const DuoRampageLobby: React.FC<DuoRampageLobbyProps> = ({
           alt="DUO RAMPAGE"
           className="h-12 sm:h-16 w-auto object-contain drop-shadow-[0_8px_20px_rgba(0,0,0,0.8)] mb-1"
         />
+        {room.gameMode === 'parkour' && (
+          <div className="px-3 py-1 bg-cyan-500/20 border border-cyan-400/50 text-cyan-300 font-mono text-xs font-black uppercase rounded-full flex items-center gap-1.5 shadow-md">
+            <span>🏃 PARKOUR MODE</span>
+            <span className="text-amber-400">• LEVEL {room.selectedLevel || 1} / 12</span>
+          </div>
+        )}
         <span className="text-[11px] font-black tracking-widest text-slate-400 uppercase">ROOM CODE</span>
         <div className="px-8 py-3 bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border-2 border-amber-500/50 rounded-3xl shadow-[0_0_30px_rgba(245,158,11,0.2)] flex items-center gap-4">
           <span className="font-mono text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-amber-200 to-yellow-400 tracking-wider">

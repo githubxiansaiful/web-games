@@ -145,6 +145,8 @@ export interface GrenadeProjectile {
   damage: number;
 }
 
+export type DuoGameMode = 'rampage' | 'parkour';
+
 export interface DuoRoomData {
   code: string; // e.g. "#123456"
   hostId: string;
@@ -160,6 +162,8 @@ export interface DuoRoomData {
   }[];
   wave: number;
   comboCount: number;
+  gameMode?: DuoGameMode;
+  selectedLevel?: number;
 }
 
 export interface TouchControlsState {

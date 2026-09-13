@@ -9,14 +9,18 @@ import { DuoPrimaryButtons } from './DuoPrimaryButtons';
 import { DuoMapSelection } from './DuoMapSelection';
 import { DuoModals, DuoModalType } from './DuoModals';
 import { DuoHomeAnimatedBackground } from './DuoHomeAnimatedBackground';
+import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
 import { useAuth } from '@/context/AuthContext';
 
 interface DuoRampageHomeScreenProps {
-  onCreateRoom: () => void;
+  onCreateRoom: (mode?: 'rampage' | 'parkour') => void;
   onJoinRoom: (code: string) => Promise<void> | void;
   onOpenJoinRoom?: () => void;
-  onStartSolo: () => void;
+  onStartSolo: (mode?: 'rampage' | 'parkour') => void;
+  onOpenParkourLevels?: () => void;
   onExit?: () => void;
+  activeGameMode?: 'rampage' | 'parkour';
+  onToggleGameMode?: (mode: 'rampage' | 'parkour') => void;
 }
 
 export const DuoRampageHomeScreen: React.FC<DuoRampageHomeScreenProps> = ({
@@ -24,11 +28,15 @@ export const DuoRampageHomeScreen: React.FC<DuoRampageHomeScreenProps> = ({
   onJoinRoom,
   onOpenJoinRoom,
   onStartSolo,
+  onOpenParkourLevels,
   onExit,
+  activeGameMode = 'rampage',
+  onToggleGameMode,
 }) => {
   const { user } = useAuth();
   const [activeModal, setActiveModal] = useState<DuoModalType>(null);
   const [selectedMapId, setSelectedMapId] = useState('abandoned_city');
+  const [mode, setMode] = useState<'rampage' | 'parkour'>(activeGameMode);
 
   const userName = user?.name || 'RAMPAGE#001';
   const userAvatar = user?.avatar;
@@ -88,14 +96,54 @@ export const DuoRampageHomeScreen: React.FC<DuoRampageHomeScreenProps> = ({
             />
           </div>
 
+          {/* Mode Selector Tabs: RAMPAGE ASSAULT vs DHAKA PARKOUR */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-950/85 border border-slate-700/80 rounded-2xl shadow-xl mb-2 sm:mb-2.5 backdrop-blur-xs">
+            <button
+              type="button"
+              onClick={() => {
+                duoAudio.playUiClick();
+                setMode('rampage');
+                onToggleGameMode?.('rampage');
+              }}
+              className={`px-3 sm:px-4 py-1.5 rounded-xl font-knight font-bold text-[10px] xs:text-[11px] sm:text-xs tracking-wider transition-all duration-150 cursor-pointer flex items-center gap-1.5 ${
+                mode === 'rampage'
+                  ? 'bg-gradient-to-r from-red-600 to-amber-500 text-slate-950 shadow-md font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>💥</span>
+              <span>RAMPAGE CO-OP</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                duoAudio.playUiClick();
+                setMode('parkour');
+                onToggleGameMode?.('parkour');
+              }}
+              className={`px-3 sm:px-4 py-1.5 rounded-xl font-knight font-bold text-[10px] xs:text-[11px] sm:text-xs tracking-wider transition-all duration-150 cursor-pointer flex items-center gap-1.5 ${
+                mode === 'parkour'
+                  ? 'bg-gradient-to-r from-cyan-500 to-sky-400 text-slate-950 shadow-md font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>🏃</span>
+              <span>DHAKA PARKOUR</span>
+              <span className="px-1 py-0.2 bg-cyan-900/80 text-cyan-200 text-[8px] font-mono rounded">NEW</span>
+            </button>
+          </div>
+
           {/* Action Tagline */}
-          <div className="text-[7.5px] xs:text-[8.5px] sm:text-xs md:text-sm font-knight text-cyan-200 tracking-wider uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,1)] -mt-1 mb-2 sm:mb-3 bg-slate-950/70 backdrop-blur-xs px-2.5 sm:px-3.5 py-0.5 rounded-full border border-cyan-500/40 text-center">
-            TWO PLAYERS • ONE MISSION • ENDLESS ACTION
+          <div className="text-[7.5px] xs:text-[8.5px] sm:text-xs md:text-sm font-knight text-cyan-200 tracking-wider uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,1)] -mt-0.5 mb-2 sm:mb-3 bg-slate-950/70 backdrop-blur-xs px-2.5 sm:px-3.5 py-0.5 rounded-full border border-cyan-500/40 text-center">
+            {mode === 'parkour'
+              ? 'DHAKA PARKOUR • 12 CAMPAIGN SECTORS • FAST URBAN FLOW'
+              : 'TWO PLAYERS • ONE MISSION • ENDLESS ACTION'}
           </div>
 
           {/* 3 Large Action Buttons: JOIN ROOM / PLAY / QUICK PLAY */}
           <DuoPrimaryButtons
-            onCreateRoom={onCreateRoom}
+            mode={mode}
+            onCreateRoom={() => onCreateRoom(mode)}
             onJoinRoom={() => {
               if (onOpenJoinRoom) {
                 onOpenJoinRoom();
@@ -103,7 +151,14 @@ export const DuoRampageHomeScreen: React.FC<DuoRampageHomeScreenProps> = ({
                 handleOpenModal('join_room');
               }
             }}
-            onQuickPlay={onStartSolo}
+            onQuickPlay={() => {
+              if (mode === 'parkour') {
+                if (onOpenParkourLevels) onOpenParkourLevels();
+                else onStartSolo('parkour');
+              } else {
+                onStartSolo('rampage');
+              }
+            }}
           />
 
           {/* Mobile Portrait Only: Sleek Quick-Action Dock between Buttons and Map Carousel */}

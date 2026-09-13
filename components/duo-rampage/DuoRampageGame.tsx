@@ -8,6 +8,8 @@ import { DuoCreateRoomScreen } from './create-room/DuoCreateRoomScreen';
 import { DuoRampageLobby } from './DuoRampageLobby';
 import { DuoRampageHUD } from './DuoRampageHUD';
 import { DuoRampageGameOver } from './DuoRampageGameOver';
+import { DuoParkourLevelSelect } from './parkour/DuoParkourLevelSelect';
+import { ParkourGameView } from './parkour/ParkourGameView';
 import {
   PlayerRole,
   PlayerStats,
@@ -16,6 +18,7 @@ import {
   DamageNumber,
   TouchControlsState,
   DuoRoomData,
+  DuoGameMode,
 } from '@/game/duo-rampage/types';
 import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
 import { useAuth } from '@/context/AuthContext';
@@ -26,12 +29,14 @@ interface DuoRampageGameProps {
 
 export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
   const { user, openAuthModal } = useAuth();
-  const [screen, setScreen] = useState<'menu' | 'create_room' | 'lobby' | 'playing' | 'game_over'>('menu');
+  const [screen, setScreen] = useState<'menu' | 'parkour_levels' | 'create_room' | 'lobby' | 'playing' | 'game_over'>('menu');
   const [createRoomMode, setCreateRoomMode] = useState<'create' | 'join'>('create');
   const [room, setRoom] = useState<DuoRoomData | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [myRole, setMyRole] = useState<PlayerRole>('assault');
   const [isSolo, setIsSolo] = useState(true);
+  const [gameMode, setGameMode] = useState<DuoGameMode>('rampage');
+  const [selectedParkourLevel, setSelectedParkourLevel] = useState<number>(1);
 
   // Live HUD States
   const [player1Stats, setPlayer1Stats] = useState<PlayerStats | null>(null);
@@ -144,7 +149,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
 
   // 2. Stream local player state at 20Hz in multiplayer mode
   useEffect(() => {
-    if (screen !== 'playing' || isSolo) return;
+    if (screen !== 'playing' || isSolo || gameMode !== 'rampage') return;
 
     const interval = setInterval(() => {
       if (!engineRef.current) return;
@@ -164,11 +169,11 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
     }, 50);
 
     return () => clearInterval(interval);
-  }, [screen, isSolo, myRole]);
+  }, [screen, isSolo, myRole, gameMode]);
 
-  // 3. Initialize 2D Canvas Engine when entering 'playing' screen
+  // 3. Initialize 2D Canvas Engine when entering 'playing' screen for RAMPAGE mode
   useEffect(() => {
-    if (screen !== 'playing') {
+    if (screen !== 'playing' || gameMode !== 'rampage') {
       if (engineRef.current) {
         engineRef.current.destroy();
         engineRef.current = null;
@@ -210,23 +215,31 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
       engine.destroy();
       engineRef.current = null;
     };
-  }, [screen, myRole, isSolo]);
+  }, [screen, myRole, isSolo, gameMode]);
 
   // Handlers
-  const handleCreateRoom = async () => {
+  const handleCreateRoom = async (chosenMode?: DuoGameMode, level?: number) => {
     if (!user) {
       openAuthModal('login');
       return;
     }
     const myName = user.name || 'RAMPAGE#001';
     const myAvatar = user.avatar;
+    const effectiveMode = chosenMode || gameMode;
+    const effectiveLevel = level || selectedParkourLevel;
+    setGameMode(effectiveMode);
+    if (level) setSelectedParkourLevel(level);
 
     try {
       await duoNetwork.connect();
       const code = await duoNetwork.createRoom(myName, myAvatar);
       setIsSolo(false);
       setMyRole('assault');
-      if (duoNetwork.room) setRoom(duoNetwork.room);
+      if (duoNetwork.room) {
+        duoNetwork.room.gameMode = effectiveMode;
+        duoNetwork.room.selectedLevel = effectiveLevel;
+        setRoom(duoNetwork.room);
+      }
       setCreateRoomMode('create');
       setScreen('create_room');
     } catch (err) {
@@ -250,6 +263,8 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
         ],
         wave: 1,
         comboCount: 0,
+        gameMode: effectiveMode,
+        selectedLevel: effectiveLevel,
       });
       setCreateRoomMode('create');
       setScreen('create_room');
@@ -306,20 +321,51 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
 
   return (
     <div className={`relative w-full h-[100dvh] max-h-[100dvh] bg-black overflow-hidden select-none ${screen === 'playing' ? 'touch-none' : 'touch-auto'}`}>
-      {/* Three.js Canvas Container (Active when playing) */}
+      {/* Canvas Container (Active when playing Rampage) */}
       <div
         ref={canvasContainerRef}
-        className={`absolute inset-0 w-full h-full z-10 ${screen === 'playing' ? 'block' : 'hidden'}`}
+        className={`absolute inset-0 w-full h-full z-10 ${screen === 'playing' && gameMode === 'rampage' ? 'block' : 'hidden'}`}
       />
 
       {/* 1. Main Menu (Production Quality 3D Cartoon Home Screen) */}
       {screen === 'menu' && (
         <DuoRampageHomeScreen
-          onCreateRoom={handleCreateRoom}
+          onCreateRoom={(m) => handleCreateRoom(m)}
           onJoinRoom={handleJoinRoom}
           onOpenJoinRoom={handleOpenJoinRoom}
-          onStartSolo={handleStartSolo}
+          onStartSolo={(m) => {
+            if (m === 'parkour') {
+              setGameMode('parkour');
+              setScreen('parkour_levels');
+            } else {
+              setGameMode('rampage');
+              handleStartSolo();
+            }
+          }}
+          onOpenParkourLevels={() => {
+            setGameMode('parkour');
+            setScreen('parkour_levels');
+          }}
+          activeGameMode={gameMode}
+          onToggleGameMode={(m) => setGameMode(m)}
           onExit={onExit}
+        />
+      )}
+
+      {/* 1.5 Parkour Campaign Level Selection Screen */}
+      {screen === 'parkour_levels' && (
+        <DuoParkourLevelSelect
+          onBack={() => setScreen('menu')}
+          onSelectLevelSolo={(lvl) => {
+            setSelectedParkourLevel(lvl.levelNumber);
+            setGameMode('parkour');
+            handleStartSolo();
+          }}
+          onSelectLevelDuo={(lvl) => {
+            setSelectedParkourLevel(lvl.levelNumber);
+            setGameMode('parkour');
+            handleCreateRoom('parkour', lvl.levelNumber);
+          }}
         />
       )}
 
@@ -329,6 +375,8 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
           roomCode={room?.code || '483921'}
           room={room}
           initialMode={createRoomMode}
+          gameMode={gameMode}
+          selectedLevel={selectedParkourLevel}
           onBack={handleLeaveLobby}
           onJoinRoomSubmit={handleJoinRoom}
           onStartMission={() => {
@@ -354,8 +402,12 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
         />
       )}
 
-      {/* 3. In-Game HUD */}
-      {screen === 'playing' && (
+      {/* 3. In-Game View & HUD */}
+      {screen === 'playing' && gameMode === 'parkour' && (
+        <ParkourGameView onExit={() => setScreen('menu')} />
+      )}
+
+      {screen === 'playing' && gameMode === 'rampage' && (
         <DuoRampageHUD
           player1={player1Stats}
           player2={player2Stats}
