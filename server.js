@@ -21,6 +21,8 @@ function getOrCreateDuoRoom(code) {
       code,
       hostId: null,
       status: 'lobby',
+      gameMode: 'rampage',
+      selectedLevel: 1,
       players: new Map(),
       createdAt: Date.now(),
     });
@@ -33,6 +35,8 @@ function serializeDuoRoom(room) {
     code: room.code,
     hostId: room.hostId,
     status: room.status,
+    gameMode: room.gameMode || 'rampage',
+    selectedLevel: room.selectedLevel || 1,
     players: Array.from(room.players.values()),
     createdAt: room.createdAt,
   };
@@ -395,7 +399,7 @@ app.prepare().then(() => {
     // ============================================================
     let currentDuoRoomCode = null;
 
-    socket.on('duo:create_room', ({ playerName, avatar }, callback) => {
+    socket.on('duo:create_room', ({ playerName, avatar, gameMode, selectedLevel }, callback) => {
       let code;
       let attempts = 0;
       do {
@@ -404,6 +408,8 @@ app.prepare().then(() => {
       } while ((duoRooms.has(code) || duoRooms.has('#' + code)) && attempts < 10);
 
       const room = getOrCreateDuoRoom(code);
+      if (gameMode) room.gameMode = gameMode;
+      if (selectedLevel) room.selectedLevel = selectedLevel;
       currentDuoRoomCode = code;
       socket.join(code);
 
@@ -421,6 +427,16 @@ app.prepare().then(() => {
 
       if (callback) callback({ success: true, room: serializeDuoRoom(room) });
       io.to(code).emit('duo:room_updated', serializeDuoRoom(room));
+    });
+
+    socket.on('duo:update_room_settings', ({ code, gameMode, selectedLevel }) => {
+      const roomCode = code || currentDuoRoomCode;
+      if (!roomCode) return;
+      const room = duoRooms.get(roomCode);
+      if (!room) return;
+      if (gameMode) room.gameMode = gameMode;
+      if (selectedLevel) room.selectedLevel = selectedLevel;
+      io.to(roomCode).emit('duo:room_updated', serializeDuoRoom(room));
     });
 
     socket.on('duo:join_room', ({ code, playerName, avatar }, callback) => {

@@ -6,11 +6,25 @@ import { ParkourHUD } from './ParkourHUD';
 import { ParkourVictoryModal } from './ParkourVictoryModal';
 import { ParkourInput } from '@/game/duo-rampage/parkour/character/ParkourRunner2D';
 
+import { PlayerRole } from '@/game/duo-rampage/types';
+
 interface ParkourGameViewProps {
   onExit: () => void;
+  isMultiplayer?: boolean;
+  myRole?: PlayerRole;
+  localPlayerName?: string;
+  partnerPlayerName?: string;
+  onEngineReady?: (engine: Parkour2DGameEngine) => void;
 }
 
-export const ParkourGameView: React.FC<ParkourGameViewProps> = ({ onExit }) => {
+export const ParkourGameView: React.FC<ParkourGameViewProps> = ({
+  onExit,
+  isMultiplayer = false,
+  myRole = 'assault',
+  localPlayerName = 'Hero 1',
+  partnerPlayerName = 'Hero 2',
+  onEngineReady,
+}) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const engineRef = useRef<Parkour2DGameEngine | null>(null);
 
@@ -44,24 +58,45 @@ export const ParkourGameView: React.FC<ParkourGameViewProps> = ({ onExit }) => {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const engine = new Parkour2DGameEngine(containerRef.current, {
-      onUpdateTelemetry: (data) => {
-        setTelemetry({ ...data });
+    const engine = new Parkour2DGameEngine(
+      containerRef.current,
+      {
+        onUpdateTelemetry: (data) => {
+          setTelemetry({ ...data });
+        },
+        onLevelComplete: (stats) => {
+          setVictoryStats({ ...stats });
+        },
+        onExit,
       },
-      onLevelComplete: (stats) => {
-        setVictoryStats({ ...stats });
-      },
-      onExit,
-    });
+      {
+        isMultiplayer,
+        myRole,
+        localPlayerName,
+        partnerPlayerName,
+      }
+    );
 
     engineRef.current = engine;
+    if (onEngineReady) {
+      onEngineReady(engine);
+    }
     engine.start();
 
     return () => {
       engine.destroy();
       engineRef.current = null;
     };
-  }, [onExit]);
+  }, [onExit, isMultiplayer, myRole, localPlayerName, partnerPlayerName, onEngineReady]);
+
+  useEffect(() => {
+    if (engineRef.current) {
+      if (localPlayerName) engineRef.current.localPlayerName = localPlayerName;
+      if (partnerPlayerName) engineRef.current.partnerPlayerName = partnerPlayerName;
+      if (myRole) engineRef.current.myRole = myRole;
+      if (isMultiplayer !== undefined) engineRef.current.isMultiplayer = isMultiplayer;
+    }
+  }, [localPlayerName, partnerPlayerName, myRole, isMultiplayer]);
 
   const handleInputChange = (partial: Partial<ParkourInput>) => {
     if (!engineRef.current) return;

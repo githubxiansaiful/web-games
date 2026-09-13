@@ -5,7 +5,7 @@
  */
 
 import { io, Socket } from 'socket.io-client';
-import { DuoRoomData, PlayerRole, WeaponType } from '../types';
+import { DuoRoomData, PlayerRole, WeaponType, DuoGameMode } from '../types';
 
 export class DuoNetworkManager {
   private static instance: DuoNetworkManager;
@@ -86,23 +86,37 @@ export class DuoNetworkManager {
     });
   }
 
-  public createRoom(playerName: string, avatar?: string): Promise<string> {
+  public createRoom(
+    playerName: string,
+    avatar?: string,
+    gameMode?: DuoGameMode,
+    selectedLevel?: number
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       if (!this.socket) return reject('Socket not connected');
 
-      this.socket.emit('duo:create_room', { playerName, avatar }, (res: any) => {
-        if (res && res.success) {
-          this.room = res.room;
-          this.isHost = true;
-          this.myRole = 'assault';
-          resolve(res.room.code.replace(/^#/, ''));
-        } else {
-          const err = res?.error || 'Could not create room.';
-          this.onError?.(err);
-          reject(err);
+      this.socket.emit(
+        'duo:create_room',
+        { playerName, avatar, gameMode, selectedLevel },
+        (res: any) => {
+          if (res && res.success) {
+            this.room = res.room;
+            this.isHost = true;
+            this.myRole = 'assault';
+            resolve(res.room.code.replace(/^#/, ''));
+          } else {
+            const err = res?.error || 'Could not create room.';
+            this.onError?.(err);
+            reject(err);
+          }
         }
-      });
+      );
     });
+  }
+
+  public updateRoomSettings(gameMode: DuoGameMode, selectedLevel?: number) {
+    if (!this.socket || !this.room) return;
+    this.socket.emit('duo:update_room_settings', { code: this.room.code, gameMode, selectedLevel });
   }
 
   public joinRoom(code: string, playerName: string, avatar?: string): Promise<DuoRoomData> {

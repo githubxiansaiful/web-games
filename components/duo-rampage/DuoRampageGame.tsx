@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Duo2DGameEngine } from '@/game/duo-rampage/2d/engine/Duo2DGameEngine';
+import { Parkour2DGameEngine } from '@/game/duo-rampage/parkour/engine/Parkour2DGameEngine';
 import { duoNetwork } from '@/game/duo-rampage/network/DuoNetworkManager';
 import { DuoRampageHomeScreen } from './home/DuoRampageHomeScreen';
 import { DuoCreateRoomScreen } from './create-room/DuoCreateRoomScreen';
@@ -72,8 +73,10 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
 
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<Duo2DGameEngine | null>(null);
+  const parkourEngineRef = useRef<Parkour2DGameEngine | null>(null);
   const isSoloRef = useRef(isSolo);
   const myRoleRef = useRef(myRole);
+  const gameModeRef = useRef(gameMode);
 
   useEffect(() => {
     isSoloRef.current = isSolo;
@@ -83,6 +86,21 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
     myRoleRef.current = myRole;
   }, [myRole]);
 
+  useEffect(() => {
+    gameModeRef.current = gameMode;
+  }, [gameMode]);
+
+  const localPlayerName =
+    user?.name ||
+    (typeof window !== 'undefined' ? localStorage.getItem('runner_player_name') : null) ||
+    'RAMPAGE#001';
+
+  const partnerPlayer =
+    room?.players.find((p) => p.id !== duoNetwork.myId) ||
+    (room?.players && room.players.length > 1 ? room.players[1] : null);
+  const partnerPlayerName =
+    partnerPlayer?.name || (myRole === 'assault' ? 'Hero 2' : 'Squad Leader');
+
   // 1. Connect to Network Manager
   useEffect(() => {
     duoNetwork.connect().catch((err) => {
@@ -91,6 +109,12 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
 
     duoNetwork.onRoomUpdated = (updatedRoom) => {
       setRoom(updatedRoom);
+      if (updatedRoom.gameMode) {
+        setGameMode(updatedRoom.gameMode);
+      }
+      if (updatedRoom.selectedLevel) {
+        setSelectedParkourLevel(updatedRoom.selectedLevel);
+      }
     };
 
     duoNetwork.onGameStartCountdown = (num) => {
@@ -104,6 +128,13 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
     };
 
     duoNetwork.onRemotePlayerState = (state) => {
+      if (gameModeRef.current === 'parkour') {
+        if (parkourEngineRef.current) {
+          parkourEngineRef.current.updateRemotePlayer(state);
+        }
+        return;
+      }
+
       if (!engineRef.current || isSoloRef.current) return;
       const remote = myRoleRef.current === 'assault' ? engineRef.current.player2 : engineRef.current.player1;
       if (!remote) return;
@@ -148,29 +179,52 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
     };
   }, []);
 
-  // 2. Stream local player state at 20Hz in multiplayer mode
+  // 2. Stream local player state at 30Hz in multiplayer mode (both parkour & rampage)
   useEffect(() => {
-    if (screen !== 'playing' || isSolo || gameMode !== 'rampage') return;
+    if (screen !== 'playing' || isSolo) return;
 
     const interval = setInterval(() => {
-      if (!engineRef.current) return;
-      const me = myRole === 'assault' ? engineRef.current.player1 : engineRef.current.player2;
-      if (!me) return;
-      duoNetwork.sendPlayerState({
-        x: me.state.x,
-        z: me.state.y,
-        facing: me.state.facing,
-        health: me.state.health,
-        weapon: me.state.weapon,
-        ammo: me.state.ammo,
-        isDown: me.state.isDowned,
-        isReviving: me.state.reviveProgress > 0,
-        animState: me.state.animState,
-      });
-    }, 50);
+      if (gameMode === 'parkour') {
+        if (!parkourEngineRef.current) return;
+        const r = parkourEngineRef.current.runner;
+        duoNetwork.sendPlayerState({
+          x: Math.round(r.x),
+          y: Math.round(r.y),
+          vx: Math.round(r.vx),
+          vy: Math.round(r.vy),
+          facing: r.facing,
+          isSliding: r.isSliding,
+          isClimbing: r.isClimbing,
+          isLedgeGrabbing: r.isLedgeGrabbing,
+          isWallSliding: r.isWallSliding,
+          isVaulting: r.isVaulting,
+          hasDoubleJumped: r.hasDoubleJumped,
+          currentHeight: r.currentHeight,
+          name: localPlayerName,
+          role: myRole,
+        });
+      } else if (gameMode === 'rampage') {
+        if (!engineRef.current) return;
+        const me = myRole === 'assault' ? engineRef.current.player1 : engineRef.current.player2;
+        if (!me) return;
+        duoNetwork.sendPlayerState({
+          x: me.state.x,
+          z: me.state.y,
+          facing: me.state.facing,
+          health: me.state.health,
+          weapon: me.state.weapon,
+          ammo: me.state.ammo,
+          isDown: me.state.isDowned,
+          isReviving: me.state.reviveProgress > 0,
+          animState: me.state.animState,
+          name: localPlayerName,
+          role: myRole,
+        });
+      }
+    }, 33);
 
     return () => clearInterval(interval);
-  }, [screen, isSolo, myRole, gameMode]);
+  }, [screen, isSolo, myRole, gameMode, localPlayerName]);
 
   // 3. Initialize 2D Canvas Engine when entering 'playing' screen for RAMPAGE mode
   useEffect(() => {
@@ -229,7 +283,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
 
     try {
       await duoNetwork.connect();
-      const code = await duoNetwork.createRoom(myName, myAvatar);
+      const code = await duoNetwork.createRoom(myName, myAvatar, effectiveMode, effectiveLevel);
       setIsSolo(false);
       setMyRole('assault');
       if (duoNetwork.room) {
@@ -280,6 +334,12 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
     await duoNetwork.connect();
     const joinedRoom = await duoNetwork.joinRoom(code, myName, myAvatar);
     setRoom(joinedRoom);
+    if (joinedRoom.gameMode) {
+      setGameMode(joinedRoom.gameMode);
+    }
+    if (joinedRoom.selectedLevel) {
+      setSelectedParkourLevel(joinedRoom.selectedLevel);
+    }
     setIsSolo(false);
     setMyRole('heavy');
     setCreateRoomMode('create');
@@ -290,6 +350,30 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
     setIsSolo(true);
     setMyRole('assault');
     setScreen('playing');
+  };
+
+  const handleStartSoloWithCountdown = () => {
+    setIsSolo(true);
+    setMyRole('assault');
+    setCountdown(3);
+    duoAudio.playCountdown(3);
+
+    let count = 2;
+    const timer = setInterval(() => {
+      if (count > 0) {
+        setCountdown(count);
+        duoAudio.playCountdown(count);
+        count--;
+      } else if (count === 0) {
+        setCountdown(0);
+        duoAudio.playCountdown(0);
+        count--;
+      } else {
+        clearInterval(timer);
+        setCountdown(null);
+        setScreen('playing');
+      }
+    }, 900);
   };
 
   const handleStartMultiplayerGame = () => {
@@ -328,7 +412,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
               setScreen('parkour_levels');
             } else {
               setGameMode('rampage');
-              handleStartSolo();
+              handleStartSoloWithCountdown();
             }
           }}
           onOpenParkourLevels={() => {
@@ -348,7 +432,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
           onSelectLevelSolo={(lvl) => {
             setSelectedParkourLevel(lvl.levelNumber);
             setGameMode('parkour');
-            handleStartSolo();
+            handleStartSoloWithCountdown();
           }}
           onSelectLevelDuo={(lvl) => {
             setSelectedParkourLevel(lvl.levelNumber);
@@ -372,7 +456,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
             if (room && room.players.length > 1 && !isSolo) {
               handleStartMultiplayerGame();
             } else {
-              handleStartSolo();
+              handleStartSoloWithCountdown();
             }
           }}
         />
@@ -393,7 +477,19 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
 
       {/* 3. In-Game View & HUD */}
       {screen === 'playing' && gameMode === 'parkour' && (
-        <ParkourGameView onExit={() => setScreen('menu')} />
+        <ParkourGameView
+          onExit={() => {
+            if (!isSolo) duoNetwork.leaveRoom();
+            setScreen('menu');
+          }}
+          isMultiplayer={!isSolo}
+          myRole={myRole}
+          localPlayerName={localPlayerName}
+          partnerPlayerName={partnerPlayerName}
+          onEngineReady={(eng) => {
+            parkourEngineRef.current = eng;
+          }}
+        />
       )}
 
       {screen === 'playing' && gameMode === 'rampage' && (
@@ -422,13 +518,51 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
           stats={gameOverResult.stats}
           onPlayAgain={() => {
             if (isSolo) {
-              handleStartSolo();
+              handleStartSoloWithCountdown();
             } else {
               setScreen('lobby');
             }
           }}
           onExit={() => setScreen('menu')}
         />
+      )}
+
+      {/* GLOBAL 3-2-1 MISSION LAUNCH COUNTDOWN OVERLAY */}
+      {countdown !== null && (
+        <div
+          className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-slate-950/85 backdrop-blur-md select-none pointer-events-auto"
+        >
+          <div className="relative flex flex-col items-center px-6 text-center max-w-lg">
+            {/* Animated Pulse Halo */}
+            <div className="absolute -inset-16 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none animate-pulse" />
+
+            {/* Launch Status Pill */}
+            <div className="relative flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-950/90 border border-cyan-400/50 text-cyan-300 font-mono text-xs font-bold tracking-widest uppercase mb-6 shadow-[0_0_20px_rgba(6,182,212,0.4)]">
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
+              SQUAD LAUNCH SEQUENCE ENGAGED
+            </div>
+
+            {/* Giant 3 - 2 - 1 - GO! */}
+            <div
+              key={countdown}
+              className="relative text-8xl sm:text-9xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-cyan-100 to-cyan-400 drop-shadow-[0_0_40px_rgba(6,182,212,0.85)] transform transition-transform duration-200"
+            >
+              {countdown > 0 ? countdown : 'GO!'}
+            </div>
+
+            {/* Tactical Subtitle */}
+            <p className="relative mt-6 text-sm sm:text-base font-mono uppercase tracking-[0.25em] text-slate-200 font-bold">
+              {countdown > 0 ? 'SYNCHRONIZING RUNNERS • GET READY' : 'MISSION STARTED!'}
+            </p>
+
+            {/* Mission Mode Badge */}
+            <div className="relative mt-3 px-3 py-1 rounded-md bg-slate-900/80 border border-slate-700 text-xs font-mono text-cyan-400 uppercase">
+              {gameMode === 'parkour'
+                ? `🏃 DHAKA PARKOUR • SECTOR #${selectedParkourLevel.toString().padStart(2, '0')}`
+                : '⚔ DUO RAMPAGE • URBAN COMBAT DROP'}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 5. Auth Modal (If user clicks Login in profile/menus) */}

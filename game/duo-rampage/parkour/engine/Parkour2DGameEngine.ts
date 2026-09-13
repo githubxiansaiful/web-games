@@ -51,6 +51,13 @@ export interface ParkourEngineCallbacks {
   onExit: () => void;
 }
 
+export interface ParkourEngineOptions {
+  isMultiplayer?: boolean;
+  myRole?: 'assault' | 'heavy';
+  localPlayerName?: string;
+  partnerPlayerName?: string;
+}
+
 interface Particle {
   x: number;
   y: number;
@@ -74,6 +81,11 @@ export class Parkour2DGameEngine {
   // Level & World State
   public levelData: DhakaParkourLevelData;
   public runner: ParkourRunner2D;
+  public partnerRunner: ParkourRunner2D | null = null;
+  public isMultiplayer: boolean = false;
+  public myRole: 'assault' | 'heavy' = 'assault';
+  public localPlayerName: string = 'RAMPAGE#001';
+  public partnerPlayerName: string = 'PARTNER';
   public camera: ParkourCamera2D;
   public particles: Particle[] = [];
 
@@ -101,9 +113,20 @@ export class Parkour2DGameEngine {
   // Visual Atmosphere Dust motes
   private dustMotes: Array<{ x: number; y: number; size: number; speed: number; alpha: number }> = [];
 
-  constructor(container: HTMLDivElement, callbacks: ParkourEngineCallbacks) {
+  constructor(
+    container: HTMLDivElement,
+    callbacks: ParkourEngineCallbacks,
+    options?: ParkourEngineOptions
+  ) {
     this.container = container;
     this.callbacks = callbacks;
+
+    if (options) {
+      this.isMultiplayer = !!options.isMultiplayer;
+      if (options.myRole) this.myRole = options.myRole;
+      if (options.localPlayerName) this.localPlayerName = options.localPlayerName;
+      if (options.partnerPlayerName) this.partnerPlayerName = options.partnerPlayerName;
+    }
 
     // 1. Setup Canvas
     this.canvas = document.createElement('canvas');
@@ -192,6 +215,46 @@ export class Parkour2DGameEngine {
     this.isLevelFinished = false;
     this.bannerNotification = 'RUNNER DISPATCHED';
     this.bannerTimer = 2.0;
+  }
+
+  public updateRemotePlayer(state: any) {
+    if (!state) return;
+    if (!this.partnerRunner) {
+      this.partnerRunner = new ParkourRunner2D(
+        state.x ?? this.levelData.spawnPoint.x,
+        state.y ?? this.levelData.spawnPoint.y
+      );
+    }
+    const pr = this.partnerRunner;
+
+    if (state.x !== undefined && state.y !== undefined) {
+      const dx = state.x - pr.x;
+      const dy = state.y - pr.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist > 300) {
+        pr.x = state.x;
+        pr.y = state.y;
+      } else {
+        pr.x += dx * 0.55;
+        pr.y += dy * 0.55;
+      }
+    }
+
+    if (state.vx !== undefined) pr.vx = state.vx;
+    if (state.vy !== undefined) pr.vy = state.vy;
+    if (state.facing !== undefined) pr.facing = state.facing;
+    if (state.isSliding !== undefined) pr.isSliding = !!state.isSliding;
+    if (state.isClimbing !== undefined) pr.isClimbing = !!state.isClimbing;
+    if (state.isLedgeGrabbing !== undefined) pr.isLedgeGrabbing = !!state.isLedgeGrabbing;
+    if (state.isWallSliding !== undefined) pr.isWallSliding = !!state.isWallSliding;
+    if (state.isVaulting !== undefined) pr.isVaulting = !!state.isVaulting;
+    if (state.hasDoubleJumped !== undefined) pr.hasDoubleJumped = !!state.hasDoubleJumped;
+    if (state.currentHeight !== undefined) pr.currentHeight = state.currentHeight;
+
+    if (state.name && state.name !== this.partnerPlayerName) {
+      this.partnerPlayerName = state.name;
+    }
   }
 
   public destroy() {
@@ -511,6 +574,29 @@ export class Parkour2DGameEngine {
       }
     }
 
+    // 6.5. Update Partner Runner Dead Reckoning & Motion Trails
+    if (this.partnerRunner) {
+      this.partnerRunner.x += this.partnerRunner.vx * dt;
+      this.partnerRunner.y += this.partnerRunner.vy * dt;
+      for (let i = this.partnerRunner.trail.length - 1; i >= 0; i--) {
+        const t = this.partnerRunner.trail[i];
+        t.alpha -= dt * 3.5;
+        if (t.alpha <= 0) {
+          this.partnerRunner.trail.splice(i, 1);
+        }
+      }
+      if (Math.abs(this.partnerRunner.vx) > 300 || this.partnerRunner.isSliding) {
+        this.partnerRunner.trail.push({
+          x: this.partnerRunner.x,
+          y: this.partnerRunner.y,
+          h: this.partnerRunner.currentHeight,
+          facing: this.partnerRunner.facing,
+          alpha: 0.4,
+          color: this.myRole === 'assault' ? '#06b6d4' : '#ef4444',
+        });
+      }
+    }
+
     // 7. Update Camera Lookahead
     this.camera.update(
       dt,
@@ -664,9 +750,31 @@ export class Parkour2DGameEngine {
     // F. Render Collectibles (Coins & Secret Emblem)
     this.renderCollectibles(ctx);
 
-    // G. Render Runner Trails & Silhouette
-    this.renderRunnerTrails(ctx);
-    this.renderRunner(ctx);
+    // G. Render Runner Trails & Silhouettes (Both Remote Partner & Local Hero)
+    if (this.partnerRunner) {
+      this.renderRunnerTrails(ctx, this.partnerRunner);
+      this.renderRunner(
+        ctx,
+        this.partnerRunner,
+        false,
+        this.myRole === 'assault' ? 'heavy' : 'assault',
+        this.partnerPlayerName
+      );
+    }
+
+    this.renderRunnerTrails(ctx, this.runner);
+    this.renderRunner(
+      ctx,
+      this.runner,
+      true,
+      this.myRole,
+      this.localPlayerName
+    );
+
+    // Off-screen partner radar indicator
+    if (this.partnerRunner) {
+      this.renderPartnerOffscreenIndicator(ctx);
+    }
 
     // H. Render Particles
     for (const p of this.particles) {
@@ -994,31 +1102,144 @@ export class Parkour2DGameEngine {
     }
   }
 
-  private renderRunnerTrails(ctx: CanvasRenderingContext2D) {
-    for (const t of this.runner.trail) {
+  private renderRunnerTrails(ctx: CanvasRenderingContext2D, r: ParkourRunner2D = this.runner) {
+    for (const t of r.trail) {
       ctx.save();
       ctx.globalAlpha = t.alpha;
       ctx.fillStyle = t.color || '#ef4444';
-      ctx.fillRect(t.x, t.y, this.runner.width, t.h);
+      ctx.fillRect(t.x, t.y, r.width, t.h);
       ctx.restore();
     }
   }
 
-  private renderRunner(ctx: CanvasRenderingContext2D) {
-    const r = this.runner;
+  private renderPlayerTag(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    name: string,
+    isLocal: boolean,
+    role: 'assault' | 'heavy'
+  ) {
+    if (!name) return;
+    ctx.save();
+
+    const centerX = x + width * 0.5;
+    const tagY = y - 14;
+
+    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+    const roleBadge = isLocal ? 'YOU' : (role === 'assault' ? 'LEADER' : 'P2');
+    const label = `${roleBadge} • ${name}`;
+    const metrics = ctx.measureText(label);
+    const pillW = Math.max(54, metrics.width + 16);
+    const pillH = 18;
+    const pillX = centerX - pillW * 0.5;
+    const pillY = tagY - pillH;
+
+    const accentColor = role === 'assault' ? '#ef4444' : '#06b6d4';
+
+    // Backing capsule
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+    ctx.beginPath();
+    ctx.roundRect(pillX, pillY, pillW, pillH, 9);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Downward arrow pointer
+    ctx.fillStyle = accentColor;
+    ctx.beginPath();
+    ctx.moveTo(centerX - 4, tagY);
+    ctx.lineTo(centerX + 4, tagY);
+    ctx.lineTo(centerX, tagY + 4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Text
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, centerX, pillY + pillH * 0.5);
+
+    ctx.restore();
+  }
+
+  private renderPartnerOffscreenIndicator(ctx: CanvasRenderingContext2D) {
+    if (!this.partnerRunner) return;
+    const pr = this.partnerRunner;
+    const cam = this.camera;
+
+    const screenX = pr.x - cam.x;
+    const screenY = pr.y - cam.y;
+
+    const margin = 36;
+    const isOffscreen =
+      screenX < margin ||
+      screenX > cam.width - margin ||
+      screenY < margin ||
+      screenY > cam.height - margin;
+
+    if (!isOffscreen) return;
+
+    ctx.save();
+    // Clamp coordinates to screen boundaries
+    const clampedX = Math.max(margin, Math.min(cam.width - margin, screenX));
+    const clampedY = Math.max(margin, Math.min(cam.height - margin, screenY));
+
+    // Distance in meters (rough 30px = 1m)
+    const distM = Math.round(Math.hypot(pr.x - this.runner.x, pr.y - this.runner.y) / 30);
+    const label = `${screenX < margin ? '◀ ' : ''}${this.partnerPlayerName} (${distM}m)${screenX > cam.width - margin ? ' ▶' : ''}`;
+
+    ctx.font = 'bold 11px monospace';
+    const metrics = ctx.measureText(label);
+    const boxW = metrics.width + 16;
+    const boxH = 22;
+
+    ctx.translate(cam.x, cam.y); // Bring back to screen coordinate space
+    ctx.fillStyle = 'rgba(6, 17, 31, 0.92)';
+    ctx.beginPath();
+    ctx.roundRect(clampedX - boxW * 0.5, clampedY - boxH * 0.5, boxW, boxH, 6);
+    ctx.fill();
+
+    ctx.strokeStyle = '#06b6d4';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, clampedX, clampedY);
+
+    ctx.restore();
+  }
+
+  private renderRunner(
+    ctx: CanvasRenderingContext2D,
+    r: ParkourRunner2D = this.runner,
+    isLocal: boolean = true,
+    role: 'assault' | 'heavy' = this.myRole,
+    playerName: string = this.localPlayerName
+  ) {
     const x = r.x;
     const y = r.y;
     const w = r.width;
     const h = r.currentHeight;
 
+    const mainColor = role === 'assault' ? '#dc2626' : '#0284c7';
+    const accentColor = role === 'assault' ? '#ef4444' : '#06b6d4';
+    const bandanaColor = role === 'assault' ? '#f87171' : '#38bdf8';
+
     ctx.save();
 
     if (r.isClimbing) {
       // Climbing Pose
-      ctx.fillStyle = '#dc2626';
+      ctx.fillStyle = mainColor;
       ctx.fillRect(x + 6, y + 16, w - 12, h - 30);
 
-      ctx.fillStyle = '#ef4444';
+      ctx.fillStyle = accentColor;
       ctx.fillRect(x - 4, y + 14, 10, 6);
       ctx.fillRect(x + w - 6, y + 14, 10, 6);
 
@@ -1027,7 +1248,7 @@ export class Parkour2DGameEngine {
       ctx.arc(x + w * 0.5, y + 10, 10, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#ef4444';
+      ctx.fillStyle = bandanaColor;
       ctx.fillRect(x + w * 0.5 - 8, y + 7, 16, 4);
 
       ctx.fillStyle = '#0f172a';
@@ -1035,10 +1256,10 @@ export class Parkour2DGameEngine {
       ctx.fillRect(x + w - 16, y + h - 22, 12, 16);
     } else if (r.isLedgeGrabbing) {
       // Ledge Hanging Pose
-      ctx.fillStyle = '#ef4444';
+      ctx.fillStyle = accentColor;
       ctx.fillRect(r.facing > 0 ? x + w - 6 : x - 4, y - 2, 10, 6);
 
-      ctx.fillStyle = '#dc2626';
+      ctx.fillStyle = mainColor;
       ctx.fillRect(r.facing > 0 ? x + w - 12 : x + 2, y + 4, 10, 20);
 
       ctx.fillStyle = '#020617';
@@ -1046,14 +1267,14 @@ export class Parkour2DGameEngine {
       ctx.arc(x + w * 0.5, y + 18, 10, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#dc2626';
+      ctx.fillStyle = mainColor;
       ctx.fillRect(x + 6, y + 26, w - 12, h - 42);
 
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(x + 8, y + h - 18, w - 16, 18);
     } else if (r.isWallSliding) {
       // Wall Slide Pose
-      ctx.fillStyle = '#dc2626';
+      ctx.fillStyle = mainColor;
       ctx.fillRect(x + 4, y + 18, w - 8, h - 32);
 
       ctx.fillStyle = '#020617';
@@ -1071,7 +1292,7 @@ export class Parkour2DGameEngine {
       ctx.fillRect(wallContactX, y + h - 10, 8, 6);
     } else if (r.isVaulting) {
       // Vaulting Pose
-      ctx.fillStyle = '#dc2626';
+      ctx.fillStyle = mainColor;
       ctx.fillRect(x, y + 10, w, h - 20);
 
       ctx.fillStyle = '#fbbf24';
@@ -1083,7 +1304,7 @@ export class Parkour2DGameEngine {
       ctx.fill();
     } else if (r.isSliding) {
       // Sliding Runner (Low Profile 38px)
-      ctx.fillStyle = '#dc2626';
+      ctx.fillStyle = mainColor;
       ctx.fillRect(x, y + 8, w + 12, h - 8);
 
       ctx.fillStyle = '#0f172a';
@@ -1095,7 +1316,7 @@ export class Parkour2DGameEngine {
       ctx.fillRect(r.facing > 0 ? x - 8 : x + w + 4, y + h - 4, 12, 4);
     } else {
       // Standard Running / Jumping Runner
-      ctx.fillStyle = '#dc2626';
+      ctx.fillStyle = mainColor;
       ctx.fillRect(x + 4, y + 20, w - 8, h - 34);
 
       ctx.fillStyle = '#0f172a';
@@ -1106,15 +1327,18 @@ export class Parkour2DGameEngine {
       ctx.arc(x + w * 0.5 + r.facing * 2, y + 12, 12, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#ef4444';
+      ctx.fillStyle = bandanaColor;
       ctx.fillRect(x + w * 0.5 - 10, y + 8, 20, 4);
 
       if (r.hasDoubleJumped) {
-        ctx.strokeStyle = '#38bdf8';
+        ctx.strokeStyle = accentColor;
         ctx.lineWidth = 3;
         ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
       }
     }
+
+    // Render floating player name tag above character's head
+    this.renderPlayerTag(ctx, x, y, w, playerName, isLocal, role);
 
     ctx.restore();
   }

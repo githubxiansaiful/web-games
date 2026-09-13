@@ -780,27 +780,209 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
         }
 
         @media (max-width: 900px) {
+          .duo-create-room-shell {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding-bottom: 24px;
+          }
           .duo-hero-player { display: none; }
           .duo-hero-hologram { display: none; }
-          .duo-room-panel { width: min(94vw, 440px); min-width: 0; top: 16%; padding: 16px; }
-          .duo-hero-heading { width: 90vw; }
-          .duo-hero-heading h1 { font-size: 42px; }
           .duo-game-logo { display: none; }
           .duo-tip-card { display: none; }
-          .duo-top-right { right: 12px; }
-          .duo-back-btn { left: 12px; }
-        }
 
-        @media (max-height: 800px) {
-          .duo-room-panel { top: 12%; transform: translateX(-50%) scale(.88); transform-origin: top center; }
-          .duo-hero-heading { top: 10px; }
-          .duo-map-slider-bottom { bottom: 4px; }
-        }
+          /* Compact Mobile Navigation Bar */
+          .duo-back-btn {
+            top: 10px;
+            left: 10px;
+            height: 38px;
+            min-width: 0;
+            padding: 0 10px;
+            font-size: 12px;
+            gap: 4px;
+            clip-path: none;
+            border-radius: 8px;
+          }
+          .duo-back-arrow { font-size: 24px; }
+          .duo-back-btn strong { font-size: 13px; }
+          .duo-back-btn small { display: none; }
 
-        @media (max-height: 700px) {
-          .duo-room-panel { top: 11%; transform: translateX(-50%) scale(.82); transform-origin: top center; }
-          .duo-hero-heading { top: 8px; }
-          .duo-hero-heading h1 { font-size: 36px; }
+          .duo-top-right {
+            top: 10px;
+            right: 10px;
+            gap: 6px;
+          }
+          .duo-user-pill {
+            height: 38px;
+            padding: 0 8px;
+            border-radius: 8px;
+            gap: 6px;
+          }
+          .duo-settings-btn {
+            height: 38px;
+            padding: 0 10px;
+            border-radius: 8px;
+          }
+
+          /* Fluid Heading that does not collide with header */
+          .duo-hero-heading {
+            position: relative;
+            top: auto;
+            left: auto;
+            transform: none;
+            width: 92vw;
+            margin-top: 56px;
+            margin-bottom: 8px;
+          }
+          .duo-hero-heading h1 {
+            font-size: clamp(24px, 6.5vw, 36px);
+            letter-spacing: -0.5px;
+          }
+          .duo-hero-heading p {
+            font-size: 11px;
+            margin-top: 2px;
+            letter-spacing: 0.5px;
+          }
+
+          /* Naturally Flowing Mobile Terminal Panel */
+          .duo-room-panel {
+            position: relative;
+            top: auto;
+            left: auto;
+            transform: none;
+            width: min(94vw, 440px);
+            min-width: 0;
+            margin: 4px auto 16px;
+            padding: 12px 10px 16px;
+            clip-path: none;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.7);
+          }
+
+          /* PIN Box */
+          .duo-room-id-box {
+            padding: 8px 10px;
+            margin-bottom: 10px;
+          }
+          .duo-eyebrow {
+            font-size: 11px;
+            letter-spacing: 1px;
+          }
+          .duo-room-id-text {
+            font-size: clamp(32px, 8.5vw, 44px);
+            letter-spacing: 4px;
+          }
+          .duo-room-id-input {
+            font-size: clamp(22px, 6.5vw, 34px);
+            letter-spacing: 4px;
+            padding: 6px 10px;
+            max-width: 100%;
+          }
+          .duo-room-id-box p {
+            font-size: 11px;
+            margin-top: 4px;
+          }
+
+          /* Player Cards */
+          .duo-player-row {
+            gap: 8px;
+          }
+          .duo-player-card {
+            height: auto;
+            min-height: 130px;
+            padding: 10px 4px;
+            border-radius: 8px;
+          }
+          .duo-portrait-wrap {
+            width: 44px;
+            height: 44px;
+          }
+          .duo-player-name {
+            font-size: 12px;
+            margin-top: 4px;
+            padding: 0 4px;
+          }
+          .duo-level {
+            font-size: 10px;
+          }
+          .duo-ready {
+            font-size: 12px;
+            margin-top: 4px;
+          }
+          .duo-ready span {
+            width: 18px;
+            height: 18px;
+            font-size: 11px;
+          }
+          .duo-waiting {
+            padding-top: 14px;
+          }
+          .duo-waiting-person {
+            height: 40px;
+            font-size: 36px;
+          }
+          .duo-waiting-person span {
+            font-size: 18px;
+          }
+          .duo-waiting-label {
+            font-size: 11px;
+            margin-top: 2px;
+          }
+
+          /* Status */
+          .duo-waiting-status {
+            margin: 10px 0 12px;
+          }
+          .duo-waiting-status strong {
+            font-size: 14px;
+          }
+          .duo-waiting-status p {
+            font-size: 11px;
+          }
+
+          /* Start / Join Button */
+          .duo-start-btn {
+            height: 52px;
+            clip-path: none;
+            border-radius: 10px;
+            gap: 10px;
+            padding: 0 12px;
+          }
+          .duo-start-btn strong {
+            font-size: 17px;
+          }
+          .duo-start-btn small {
+            font-size: 10px;
+          }
+          .duo-play-triangle {
+            font-size: 20px;
+          }
+
+          /* Partner Status Pill */
+          .duo-partner-status-pill {
+            height: 50px;
+            border-radius: 10px;
+          }
+          .duo-partner-status-pill strong {
+            font-size: 15px;
+          }
+          .duo-partner-status-pill small {
+            font-size: 10px;
+          }
+
+          /* Map Carousel */
+          .duo-map-slider-bottom {
+            position: relative;
+            bottom: auto;
+            left: auto;
+            transform: none;
+            width: 94vw;
+            margin-top: 8px;
+            margin-bottom: 16px;
+          }
         }
       `}</style>
 
