@@ -14,6 +14,7 @@ interface ParkourGameViewProps {
   myRole?: PlayerRole;
   localPlayerName?: string;
   partnerPlayerName?: string;
+  characterId?: string;
   onEngineReady?: (engine: Parkour2DGameEngine) => void;
 }
 
@@ -23,6 +24,7 @@ export const ParkourGameView: React.FC<ParkourGameViewProps> = ({
   myRole = 'assault',
   localPlayerName = 'Hero 1',
   partnerPlayerName = 'Hero 2',
+  characterId = 'char_1',
   onEngineReady,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -74,6 +76,7 @@ export const ParkourGameView: React.FC<ParkourGameViewProps> = ({
         myRole,
         localPlayerName,
         partnerPlayerName,
+        localCharacterId: characterId,
       }
     );
 
@@ -87,7 +90,7 @@ export const ParkourGameView: React.FC<ParkourGameViewProps> = ({
       engine.destroy();
       engineRef.current = null;
     };
-  }, [onExit, isMultiplayer, myRole, localPlayerName, partnerPlayerName, onEngineReady]);
+  }, [onExit, isMultiplayer, myRole, localPlayerName, partnerPlayerName, characterId, onEngineReady]);
 
   useEffect(() => {
     if (engineRef.current) {
@@ -95,8 +98,9 @@ export const ParkourGameView: React.FC<ParkourGameViewProps> = ({
       if (partnerPlayerName) engineRef.current.partnerPlayerName = partnerPlayerName;
       if (myRole) engineRef.current.myRole = myRole;
       if (isMultiplayer !== undefined) engineRef.current.isMultiplayer = isMultiplayer;
+      if (characterId) engineRef.current.localCharacterId = characterId;
     }
-  }, [localPlayerName, partnerPlayerName, myRole, isMultiplayer]);
+  }, [localPlayerName, partnerPlayerName, myRole, isMultiplayer, characterId]);
 
   const handleInputChange = (partial: Partial<ParkourInput>) => {
     if (!engineRef.current) return;

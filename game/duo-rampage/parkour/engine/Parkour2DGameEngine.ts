@@ -21,6 +21,8 @@ import {
   LevelCheckpoint,
 } from '../levels/Level01RooftopIntro';
 import { duoAudio } from '../../audio/DuoAudioEngine';
+import { parkourAnimator } from '../character/ParkourSpriteAnimator';
+import { getCharacterDef } from '../character/ParkourCharacters';
 
 export interface ParkourEngineCallbacks {
   onUpdateTelemetry: (data: {
@@ -56,6 +58,8 @@ export interface ParkourEngineOptions {
   myRole?: 'assault' | 'heavy';
   localPlayerName?: string;
   partnerPlayerName?: string;
+  localCharacterId?: string;
+  partnerCharacterId?: string;
 }
 
 interface Particle {
@@ -86,6 +90,8 @@ export class Parkour2DGameEngine {
   public myRole: 'assault' | 'heavy' = 'assault';
   public localPlayerName: string = 'RAMPAGE#001';
   public partnerPlayerName: string = 'PARTNER';
+  public localCharacterId: string = 'char_1';
+  public partnerCharacterId: string = 'char_2';
   public camera: ParkourCamera2D;
   public particles: Particle[] = [];
 
@@ -126,6 +132,14 @@ export class Parkour2DGameEngine {
       if (options.myRole) this.myRole = options.myRole;
       if (options.localPlayerName) this.localPlayerName = options.localPlayerName;
       if (options.partnerPlayerName) this.partnerPlayerName = options.partnerPlayerName;
+      if (options.localCharacterId) this.localCharacterId = options.localCharacterId;
+      if (options.partnerCharacterId) this.partnerCharacterId = options.partnerCharacterId;
+    }
+
+    // Preload character animations
+    parkourAnimator.preloadCharacter(this.localCharacterId);
+    if (this.isMultiplayer) {
+      parkourAnimator.preloadCharacter(this.partnerCharacterId);
     }
 
     // 1. Setup Canvas
@@ -251,6 +265,11 @@ export class Parkour2DGameEngine {
     if (state.isVaulting !== undefined) pr.isVaulting = !!state.isVaulting;
     if (state.hasDoubleJumped !== undefined) pr.hasDoubleJumped = !!state.hasDoubleJumped;
     if (state.currentHeight !== undefined) pr.currentHeight = state.currentHeight;
+
+    if (state.characterId && state.characterId !== this.partnerCharacterId) {
+      this.partnerCharacterId = state.characterId;
+      parkourAnimator.preloadCharacter(state.characterId);
+    }
 
     if (state.name && state.name !== this.partnerPlayerName) {
       this.partnerPlayerName = state.name;
@@ -750,7 +769,7 @@ export class Parkour2DGameEngine {
     // F. Render Collectibles (Coins & Secret Emblem)
     this.renderCollectibles(ctx);
 
-    // G. Render Runner Trails & Silhouettes (Both Remote Partner & Local Hero)
+    // G. Render Runner Trails & High-Definition 2D Animated Sprites
     if (this.partnerRunner) {
       this.renderRunnerTrails(ctx, this.partnerRunner);
       this.renderRunner(
@@ -758,7 +777,8 @@ export class Parkour2DGameEngine {
         this.partnerRunner,
         false,
         this.myRole === 'assault' ? 'heavy' : 'assault',
-        this.partnerPlayerName
+        this.partnerPlayerName,
+        this.partnerCharacterId
       );
     }
 
@@ -768,13 +788,9 @@ export class Parkour2DGameEngine {
       this.runner,
       true,
       this.myRole,
-      this.localPlayerName
+      this.localPlayerName,
+      this.localCharacterId
     );
-
-    // Off-screen partner radar indicator
-    if (this.partnerRunner) {
-      this.renderPartnerOffscreenIndicator(ctx);
-    }
 
     // H. Render Particles
     for (const p of this.particles) {
@@ -1118,100 +1134,48 @@ export class Parkour2DGameEngine {
     y: number,
     width: number,
     name: string,
-    isLocal: boolean,
-    role: 'assault' | 'heavy'
+    accentColor: string
   ) {
-    if (!name) return;
-    ctx.save();
+    const cleanName = (name || '').trim();
+    if (!cleanName) return;
 
+    ctx.save();
     const centerX = x + width * 0.5;
     const tagY = y - 14;
 
+    // Clean, modern, high-graphic typography (Name only)
     ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
-    const roleBadge = isLocal ? 'YOU' : (role === 'assault' ? 'LEADER' : 'P2');
-    const label = `${roleBadge} • ${name}`;
-    const metrics = ctx.measureText(label);
-    const pillW = Math.max(54, metrics.width + 16);
+    const metrics = ctx.measureText(cleanName);
+    const pillW = Math.max(46, metrics.width + 16);
     const pillH = 18;
     const pillX = centerX - pillW * 0.5;
     const pillY = tagY - pillH;
 
-    const accentColor = role === 'assault' ? '#ef4444' : '#06b6d4';
-
-    // Backing capsule
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+    // Sleek frosted translucent capsule
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
     ctx.beginPath();
     ctx.roundRect(pillX, pillY, pillW, pillH, 9);
     ctx.fill();
 
-    // Border
+    // Subtle neon border
     ctx.strokeStyle = accentColor;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.25;
     ctx.stroke();
 
-    // Downward arrow pointer
+    // Clean mini pointer arrow
     ctx.fillStyle = accentColor;
     ctx.beginPath();
-    ctx.moveTo(centerX - 4, tagY);
-    ctx.lineTo(centerX + 4, tagY);
-    ctx.lineTo(centerX, tagY + 4);
+    ctx.moveTo(centerX - 3.5, tagY);
+    ctx.lineTo(centerX + 3.5, tagY);
+    ctx.lineTo(centerX, tagY + 3.5);
     ctx.closePath();
     ctx.fill();
 
-    // Text
+    // Player name text only
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(label, centerX, pillY + pillH * 0.5);
-
-    ctx.restore();
-  }
-
-  private renderPartnerOffscreenIndicator(ctx: CanvasRenderingContext2D) {
-    if (!this.partnerRunner) return;
-    const pr = this.partnerRunner;
-    const cam = this.camera;
-
-    const screenX = pr.x - cam.x;
-    const screenY = pr.y - cam.y;
-
-    const margin = 36;
-    const isOffscreen =
-      screenX < margin ||
-      screenX > cam.width - margin ||
-      screenY < margin ||
-      screenY > cam.height - margin;
-
-    if (!isOffscreen) return;
-
-    ctx.save();
-    // Clamp coordinates to screen boundaries
-    const clampedX = Math.max(margin, Math.min(cam.width - margin, screenX));
-    const clampedY = Math.max(margin, Math.min(cam.height - margin, screenY));
-
-    // Distance in meters (rough 30px = 1m)
-    const distM = Math.round(Math.hypot(pr.x - this.runner.x, pr.y - this.runner.y) / 30);
-    const label = `${screenX < margin ? '◀ ' : ''}${this.partnerPlayerName} (${distM}m)${screenX > cam.width - margin ? ' ▶' : ''}`;
-
-    ctx.font = 'bold 11px monospace';
-    const metrics = ctx.measureText(label);
-    const boxW = metrics.width + 16;
-    const boxH = 22;
-
-    ctx.translate(cam.x, cam.y); // Bring back to screen coordinate space
-    ctx.fillStyle = 'rgba(6, 17, 31, 0.92)';
-    ctx.beginPath();
-    ctx.roundRect(clampedX - boxW * 0.5, clampedY - boxH * 0.5, boxW, boxH, 6);
-    ctx.fill();
-
-    ctx.strokeStyle = '#06b6d4';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    ctx.fillStyle = '#38bdf8';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(label, clampedX, clampedY);
+    ctx.fillText(cleanName, centerX, pillY + pillH * 0.5);
 
     ctx.restore();
   }
@@ -1221,125 +1185,100 @@ export class Parkour2DGameEngine {
     r: ParkourRunner2D = this.runner,
     isLocal: boolean = true,
     role: 'assault' | 'heavy' = this.myRole,
-    playerName: string = this.localPlayerName
+    playerName: string = this.localPlayerName,
+    characterId: string = this.localCharacterId
   ) {
     const x = r.x;
     const y = r.y;
     const w = r.width;
     const h = r.currentHeight;
 
-    const mainColor = role === 'assault' ? '#dc2626' : '#0284c7';
-    const accentColor = role === 'assault' ? '#ef4444' : '#06b6d4';
-    const bandanaColor = role === 'assault' ? '#f87171' : '#38bdf8';
+    const charDef = getCharacterDef(characterId);
+    const accentColor = charDef.accentColor;
 
-    ctx.save();
+    // 1. Render High-Definition 2D Animated Sprite
+    const spriteDrawn = parkourAnimator.drawRunnerSprite(
+      ctx,
+      r,
+      characterId,
+      this.levelTimer
+    );
 
-    if (r.isClimbing) {
-      // Climbing Pose
-      ctx.fillStyle = mainColor;
-      ctx.fillRect(x + 6, y + 16, w - 12, h - 30);
+    // 2. Vector Fallback Silhouette (active while sprites are loading)
+    if (!spriteDrawn) {
+      const mainColor = role === 'assault' ? '#dc2626' : '#0284c7';
+      const bandanaColor = role === 'assault' ? '#f87171' : '#38bdf8';
 
-      ctx.fillStyle = accentColor;
-      ctx.fillRect(x - 4, y + 14, 10, 6);
-      ctx.fillRect(x + w - 6, y + 14, 10, 6);
-
-      ctx.fillStyle = '#020617';
-      ctx.beginPath();
-      ctx.arc(x + w * 0.5, y + 10, 10, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = bandanaColor;
-      ctx.fillRect(x + w * 0.5 - 8, y + 7, 16, 4);
-
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(x + 4, y + h - 16, 12, 16);
-      ctx.fillRect(x + w - 16, y + h - 22, 12, 16);
-    } else if (r.isLedgeGrabbing) {
-      // Ledge Hanging Pose
-      ctx.fillStyle = accentColor;
-      ctx.fillRect(r.facing > 0 ? x + w - 6 : x - 4, y - 2, 10, 6);
-
-      ctx.fillStyle = mainColor;
-      ctx.fillRect(r.facing > 0 ? x + w - 12 : x + 2, y + 4, 10, 20);
-
-      ctx.fillStyle = '#020617';
-      ctx.beginPath();
-      ctx.arc(x + w * 0.5, y + 18, 10, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = mainColor;
-      ctx.fillRect(x + 6, y + 26, w - 12, h - 42);
-
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(x + 8, y + h - 18, w - 16, 18);
-    } else if (r.isWallSliding) {
-      // Wall Slide Pose
-      ctx.fillStyle = mainColor;
-      ctx.fillRect(x + 4, y + 18, w - 8, h - 32);
-
-      ctx.fillStyle = '#020617';
-      ctx.beginPath();
-      ctx.arc(x + w * 0.5 + (r.wallDir * 6), y + 12, 11, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#38bdf8';
-      const wallContactX = r.wallDir > 0 ? x + w - 2 : x - 6;
-      ctx.fillRect(wallContactX, y + 22, 8, 8);
-
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(x + 6, y + h - 16, w - 12, 16);
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillRect(wallContactX, y + h - 10, 8, 6);
-    } else if (r.isVaulting) {
-      // Vaulting Pose
-      ctx.fillStyle = mainColor;
-      ctx.fillRect(x, y + 10, w, h - 20);
-
-      ctx.fillStyle = '#fbbf24';
-      ctx.fillRect(x + w * 0.5 - 4, y + h - 14, 8, 14);
-
-      ctx.fillStyle = '#020617';
-      ctx.beginPath();
-      ctx.arc(x + (r.facing > 0 ? w : 0), y + 8, 10, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (r.isSliding) {
-      // Sliding Runner (Low Profile 38px)
-      ctx.fillStyle = mainColor;
-      ctx.fillRect(x, y + 8, w + 12, h - 8);
-
-      ctx.fillStyle = '#0f172a';
-      ctx.beginPath();
-      ctx.arc(r.facing > 0 ? x + w + 4 : x - 4, y + 16, 10, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#fbbf24';
-      ctx.fillRect(r.facing > 0 ? x - 8 : x + w + 4, y + h - 4, 12, 4);
-    } else {
-      // Standard Running / Jumping Runner
-      ctx.fillStyle = mainColor;
-      ctx.fillRect(x + 4, y + 20, w - 8, h - 34);
-
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(x + 6, y + h - 18, w - 12, 18);
-
-      ctx.fillStyle = '#020617';
-      ctx.beginPath();
-      ctx.arc(x + w * 0.5 + r.facing * 2, y + 12, 12, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = bandanaColor;
-      ctx.fillRect(x + w * 0.5 - 10, y + 8, 20, 4);
+      ctx.save();
+      if (r.isClimbing) {
+        ctx.fillStyle = mainColor;
+        ctx.fillRect(x + 6, y + 16, w - 12, h - 30);
+        ctx.fillStyle = accentColor;
+        ctx.fillRect(x - 4, y + 14, 10, 6);
+        ctx.fillRect(x + w - 6, y + 14, 10, 6);
+        ctx.fillStyle = '#020617';
+        ctx.beginPath();
+        ctx.arc(x + w * 0.5, y + 10, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = bandanaColor;
+        ctx.fillRect(x + w * 0.5 - 8, y + 7, 16, 4);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(x + 4, y + h - 16, 12, 16);
+        ctx.fillRect(x + w - 16, y + h - 22, 12, 16);
+      } else if (r.isLedgeGrabbing) {
+        ctx.fillStyle = accentColor;
+        ctx.fillRect(r.facing > 0 ? x + w - 6 : x - 4, y - 2, 10, 6);
+        ctx.fillStyle = mainColor;
+        ctx.fillRect(r.facing > 0 ? x + w - 12 : x + 2, y + 4, 10, 20);
+        ctx.fillStyle = '#020617';
+        ctx.beginPath();
+        ctx.arc(x + w * 0.5, y + 18, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = mainColor;
+        ctx.fillRect(x + 6, y + 26, w - 12, h - 42);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(x + 8, y + h - 18, w - 16, 18);
+      } else if (r.isWallSliding) {
+        ctx.fillStyle = mainColor;
+        ctx.fillRect(x + 4, y + 18, w - 8, h - 32);
+        ctx.fillStyle = '#020617';
+        ctx.beginPath();
+        ctx.arc(x + w * 0.5 + (r.wallDir * 6), y + 12, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#38bdf8';
+        const wallContactX = r.wallDir > 0 ? x + w - 2 : x - 6;
+        ctx.fillRect(wallContactX, y + 22, 8, 8);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(x + 6, y + h - 16, w - 12, 16);
+      } else if (r.isVaulting || r.isSliding) {
+        ctx.fillStyle = mainColor;
+        ctx.fillRect(x, y + 8, w + 12, h - 8);
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(r.facing > 0 ? x + w + 4 : x - 4, y + 16, 10, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = mainColor;
+        ctx.fillRect(x + 4, y + 20, w - 8, h - 34);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(x + 6, y + h - 18, w - 12, 18);
+        ctx.fillStyle = '#020617';
+        ctx.beginPath();
+        ctx.arc(x + w * 0.5 + r.facing * 2, y + 12, 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = bandanaColor;
+        ctx.fillRect(x + w * 0.5 - 10, y + 8, 20, 4);
+      }
 
       if (r.hasDoubleJumped) {
         ctx.strokeStyle = accentColor;
         ctx.lineWidth = 3;
         ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
       }
+      ctx.restore();
     }
 
-    // Render floating player name tag above character's head
-    this.renderPlayerTag(ctx, x, y, w, playerName, isLocal, role);
-
-    ctx.restore();
+    // 3. Render clean floating player nameplate (ONLY the name, sleek & minimal)
+    this.renderPlayerTag(ctx, x, y, w, playerName, accentColor);
   }
 }

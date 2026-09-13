@@ -39,6 +39,19 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
   const [isSolo, setIsSolo] = useState(true);
   const [gameMode, setGameMode] = useState<DuoGameMode>('rampage');
   const [selectedParkourLevel, setSelectedParkourLevel] = useState<number>(1);
+  const [selectedCharacterId, setSelectedCharacterId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('parkour_selected_character') || 'char_1';
+    }
+    return 'char_1';
+  });
+
+  const handleSelectCharacter = (id: string) => {
+    setSelectedCharacterId(id);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('parkour_selected_character', id);
+    }
+  };
 
   // Live HUD States
   const [player1Stats, setPlayer1Stats] = useState<PlayerStats | null>(null);
@@ -202,6 +215,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
           currentHeight: r.currentHeight,
           name: localPlayerName,
           role: myRole,
+          characterId: selectedCharacterId,
         });
       } else if (gameMode === 'rampage') {
         if (!engineRef.current) return;
@@ -224,7 +238,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
     }, 33);
 
     return () => clearInterval(interval);
-  }, [screen, isSolo, myRole, gameMode, localPlayerName]);
+  }, [screen, isSolo, myRole, gameMode, localPlayerName, selectedCharacterId]);
 
   // 3. Initialize 2D Canvas Engine when entering 'playing' screen for RAMPAGE mode
   useEffect(() => {
@@ -429,6 +443,8 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
       {screen === 'parkour_levels' && (
         <DuoParkourLevelSelect
           onBack={() => setScreen('menu')}
+          selectedCharacterId={selectedCharacterId}
+          onSelectCharacter={handleSelectCharacter}
           onSelectLevelSolo={(lvl) => {
             setSelectedParkourLevel(lvl.levelNumber);
             setGameMode('parkour');
@@ -450,6 +466,8 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
           initialMode={createRoomMode}
           gameMode={gameMode}
           selectedLevel={selectedParkourLevel}
+          selectedCharacterId={selectedCharacterId}
+          onSelectCharacter={handleSelectCharacter}
           onBack={handleLeaveLobby}
           onJoinRoomSubmit={handleJoinRoom}
           onStartMission={() => {
@@ -486,6 +504,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
           myRole={myRole}
           localPlayerName={localPlayerName}
           partnerPlayerName={partnerPlayerName}
+          characterId={selectedCharacterId}
           onEngineReady={(eng) => {
             parkourEngineRef.current = eng;
           }}

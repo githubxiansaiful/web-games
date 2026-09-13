@@ -5,20 +5,28 @@ import { ArrowLeft, Play, Users, Clock, Star, Coins, Lock, CheckCircle, Sparkles
 import { PARKOUR_CAMPAIGN_LEVELS, ParkourLevelMeta } from '@/game/duo-rampage/parkour/ParkourLevelData';
 import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
 import { useAuth } from '@/context/AuthContext';
+import { getCharacterDef } from '@/game/duo-rampage/parkour/character/ParkourCharacters';
+import { ParkourCharacterSelectModal } from './ParkourCharacterSelectModal';
 
 interface DuoParkourLevelSelectProps {
   onBack: () => void;
   onSelectLevelSolo: (level: ParkourLevelMeta) => void;
   onSelectLevelDuo: (level: ParkourLevelMeta) => void;
+  selectedCharacterId?: string;
+  onSelectCharacter?: (id: string) => void;
 }
 
 export const DuoParkourLevelSelect: React.FC<DuoParkourLevelSelectProps> = ({
   onBack,
   onSelectLevelSolo,
   onSelectLevelDuo,
+  selectedCharacterId = 'char_1',
+  onSelectCharacter,
 }) => {
   const { user } = useAuth();
   const [selectedLevelId, setSelectedLevelId] = useState<string>('parkour_01');
+  const [isCharModalOpen, setIsCharModalOpen] = useState(false);
+  const activeCharacter = getCharacterDef(selectedCharacterId);
 
   // Load unlocked progress from localStorage if available (Level 1 unlocked by default)
   const [unlockedLevels, setUnlockedLevels] = useState<Record<string, boolean>>(() => {
@@ -187,6 +195,46 @@ export const DuoParkourLevelSelect: React.FC<DuoParkourLevelSelectProps> = ({
             </div>
           </div>
 
+          {/* Selected Runner Operative Bar */}
+          <div
+            onClick={() => {
+              duoAudio.playUiClick();
+              setIsCharModalOpen(true);
+            }}
+            className="p-2.5 bg-gradient-to-r from-slate-900/95 via-slate-850/90 to-slate-900/95 border border-cyan-500/40 hover:border-cyan-400 rounded-2xl flex items-center justify-between cursor-pointer transition-all group shadow-md"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div
+                className="w-10 h-10 rounded-xl overflow-hidden border flex items-center justify-center bg-slate-950/80 shrink-0 relative"
+                style={{ borderColor: activeCharacter.accentColor }}
+              >
+                <img
+                  src={activeCharacter.avatarUrl || activeCharacter.thumbnailUrl}
+                  alt={activeCharacter.name}
+                  className="w-full h-full object-contain p-0.5 group-hover:scale-110 transition-transform"
+                />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase">RUNNER:</span>
+                  <span
+                    className="text-xs font-black tracking-wider uppercase truncate"
+                    style={{ color: activeCharacter.accentColor }}
+                  >
+                    {activeCharacter.name}
+                  </span>
+                </div>
+                <div className="text-[10px] font-mono text-slate-400 truncate">
+                  {activeCharacter.codename}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-2.5 py-1 rounded-lg bg-cyan-500/20 group-hover:bg-cyan-500/30 text-cyan-300 text-[10px] font-black tracking-wider uppercase border border-cyan-400/40 shrink-0 transition">
+              CHANGE
+            </div>
+          </div>
+
           {/* Action Buttons: Solo Run or Duo Co-op */}
           <div className="space-y-2 pt-2 border-t border-slate-800/80">
             {/* Solo Runner Button */}
@@ -220,6 +268,17 @@ export const DuoParkourLevelSelect: React.FC<DuoParkourLevelSelectProps> = ({
           </div>
         </div>
       </main>
+
+      {/* Character Selection Modal */}
+      {isCharModalOpen && (
+        <ParkourCharacterSelectModal
+          selectedCharacterId={selectedCharacterId}
+          onSelectCharacter={(id) => {
+            if (onSelectCharacter) onSelectCharacter(id);
+          }}
+          onClose={() => setIsCharModalOpen(false)}
+        />
+      )}
 
       {/* Footer Slogan */}
       <footer className="relative w-full flex items-center justify-between text-[10px] font-mono text-slate-500 pt-2 z-10 shrink-0 border-t border-slate-900">

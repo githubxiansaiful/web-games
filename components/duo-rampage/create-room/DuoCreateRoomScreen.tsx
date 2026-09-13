@@ -6,6 +6,8 @@ import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
 import { duoNetwork } from '@/game/duo-rampage/network/DuoNetworkManager';
 import { useAuth } from '@/context/AuthContext';
 import { DuoMapSelection } from '../home/DuoMapSelection';
+import { getCharacterDef } from '@/game/duo-rampage/parkour/character/ParkourCharacters';
+import { ParkourCharacterSelectModal } from '../parkour/ParkourCharacterSelectModal';
 
 interface DuoCreateRoomScreenProps {
   roomCode?: string;
@@ -17,6 +19,8 @@ interface DuoCreateRoomScreenProps {
   selectedLevel?: number;
   onJoinRoomSubmit?: (code: string) => Promise<void> | void;
   onOpenSettings?: () => void;
+  selectedCharacterId?: string;
+  onSelectCharacter?: (id: string) => void;
 }
 
 export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
@@ -29,17 +33,21 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   onStartMission,
   onJoinRoomSubmit,
   onOpenSettings,
+  selectedCharacterId = 'char_1',
+  onSelectCharacter,
 }) => {
   const { user, openAuthModal } = useAuth();
   const [mode, setMode] = useState<'create' | 'join'>(initialMode);
   const [inputCode, setInputCode] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [selectedMapId, setSelectedMapId] = useState('abandoned_city');
+  const [isCharModalOpen, setIsCharModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const effectiveGameMode = room?.gameMode || gameMode;
   const effectiveLevel = room?.selectedLevel || selectedLevel;
+  const activeRunnerChar = getCharacterDef(selectedCharacterId);
 
   // Real User Information
   const realUserName = user?.name || 'RAMPAGE#001';
@@ -1126,13 +1134,36 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
             </div>
 
             <div className="duo-player-row">
-              {/* Player 1 Card (Squad Leader / Assault) */}
-              <article className="duo-player-card">
-                <div className="duo-portrait-wrap">
-                  {renderAvatar(player1.avatar || realUserAvatar, '/images/duo-rampage/player1.png', 'Squad Leader')}
+              {/* Player 1 Card (Squad Leader / Assault or Parkour Runner) */}
+              <article
+                className={`duo-player-card ${effectiveGameMode === 'parkour' ? 'cursor-pointer hover:border-cyan-400 transition-colors' : ''}`}
+                onClick={() => {
+                  if (effectiveGameMode === 'parkour') {
+                    duoAudio.playUiClick();
+                    setIsCharModalOpen(true);
+                  }
+                }}
+              >
+                <div
+                  className="duo-portrait-wrap"
+                  style={{
+                    borderColor: effectiveGameMode === 'parkour' ? activeRunnerChar.accentColor : undefined,
+                  }}
+                >
+                  {effectiveGameMode === 'parkour' ? (
+                    <img
+                      src={activeRunnerChar.avatarUrl || activeRunnerChar.thumbnailUrl}
+                      alt={activeRunnerChar.name}
+                      className="w-full h-full object-contain p-0.5"
+                    />
+                  ) : (
+                    renderAvatar(player1.avatar || realUserAvatar, '/images/duo-rampage/player1.png', 'Squad Leader')
+                  )}
                 </div>
                 <div className="duo-player-name">{player1.name || realUserName}</div>
-                <div className="duo-level">LV. {realUserLevel} • SQUAD LEADER</div>
+                <div className="duo-level" style={{ color: effectiveGameMode === 'parkour' ? activeRunnerChar.accentColor : undefined }}>
+                  {effectiveGameMode === 'parkour' ? `RUNNER: ${activeRunnerChar.name}` : `LV. ${realUserLevel} • SQUAD LEADER`}
+                </div>
                 <div className="duo-ready">
                   <span>✓</span> READY
                 </div>
@@ -1199,6 +1230,43 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
                 </>
               )}
             </div>
+
+            {/* Runner Selector Banner for Parkour Mode */}
+            {effectiveGameMode === 'parkour' && (
+              <button
+                type="button"
+                onClick={() => {
+                  duoAudio.playUiClick();
+                  setIsCharModalOpen(true);
+                }}
+                className="w-full mb-3 py-2 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-cyan-500/40 hover:border-cyan-400 flex items-center justify-between transition cursor-pointer shadow-md group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="w-8 h-8 rounded-lg overflow-hidden border flex items-center justify-center bg-slate-950 shrink-0"
+                    style={{ borderColor: activeRunnerChar.accentColor }}
+                  >
+                    <img
+                      src={activeRunnerChar.avatarUrl || activeRunnerChar.thumbnailUrl}
+                      alt={activeRunnerChar.name}
+                      className="w-full h-full object-contain p-0.5 group-hover:scale-110 transition-transform"
+                    />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-[10px] font-mono text-slate-400 leading-none">OPERATIVE RUNNER</div>
+                    <div
+                      className="text-xs font-black uppercase font-knight tracking-wider"
+                      style={{ color: activeRunnerChar.accentColor }}
+                    >
+                      {activeRunnerChar.name} • {activeRunnerChar.codename}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 uppercase border border-cyan-400/40 group-hover:bg-cyan-500/30 transition">
+                  CHANGE RUNNER
+                </span>
+              </button>
+            )}
 
             {isHost ? (
               <button
@@ -1346,6 +1414,17 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
       <div className={`duo-toast ${toastMessage ? 'show' : ''}`}>
         {toastMessage}
       </div>
+
+      {/* 8. Parkour Character Selection Modal */}
+      {isCharModalOpen && (
+        <ParkourCharacterSelectModal
+          selectedCharacterId={selectedCharacterId}
+          onSelectCharacter={(id) => {
+            if (onSelectCharacter) onSelectCharacter(id);
+          }}
+          onClose={() => setIsCharModalOpen(false)}
+        />
+      )}
     </main>
   );
 };
