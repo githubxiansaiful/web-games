@@ -468,6 +468,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
           selectedLevel={selectedParkourLevel}
           selectedCharacterId={selectedCharacterId}
           onSelectCharacter={handleSelectCharacter}
+          onSelectLevel={(lvl) => setSelectedParkourLevel(lvl)}
           onBack={handleLeaveLobby}
           onJoinRoomSubmit={handleJoinRoom}
           onStartMission={() => {
@@ -500,6 +501,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
             if (!isSolo) duoNetwork.leaveRoom();
             setScreen('menu');
           }}
+          selectedLevel={selectedParkourLevel}
           isMultiplayer={!isSolo}
           myRole={myRole}
           localPlayerName={localPlayerName}

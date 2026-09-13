@@ -83,13 +83,52 @@ export const DuoParkourLevelSelect: React.FC<DuoParkourLevelSelectProps> = ({
       <main className="relative flex-1 grid grid-cols-1 landscape:grid-cols-12 sm:grid-cols-12 gap-3 sm:gap-6 items-start z-10 min-h-0">
         {/* Left: 12 Levels Grid */}
         <div className="landscape:col-span-7 sm:col-span-7 bg-slate-950/80 backdrop-blur-md p-3 sm:p-4 rounded-3xl border border-slate-800 flex flex-col h-full max-h-[58dvh] landscape:max-h-[76dvh] sm:max-h-[76dvh] overflow-y-auto">
+          {/* Featured Special Mode: Mega Ramp Parkour */}
+          <div
+            onClick={() => {
+              duoAudio.playUiClick();
+              setSelectedLevelId('parkour_mega_ramp');
+            }}
+            className={`mb-3 p-3 rounded-2xl border transition-all cursor-pointer relative overflow-hidden ${
+              selectedLevelId === 'parkour_mega_ramp'
+                ? 'bg-gradient-to-r from-amber-950/90 via-slate-900 to-cyan-950/80 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.4)] scale-[1.01]'
+                : 'bg-gradient-to-r from-slate-900 via-slate-900 to-amber-950/40 border-amber-500/40 hover:border-amber-400 opacity-90 hover:opacity-100'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🚀</span>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-amber-400 uppercase tracking-wider font-knight">
+                      MEGA RAMP PARKOUR
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[9px] font-bold border border-amber-400/40">
+                      🔥 ENEMIES & RAMPS
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-300 font-mono">
+                    Supersonic Ski Ramps • Sentinel Drones • Cyborg Enforcers
+                  </div>
+                </div>
+              </div>
+              <span className={`px-2.5 py-1 rounded-xl font-mono text-xs font-bold border ${
+                selectedLevelId === 'parkour_mega_ramp'
+                  ? 'bg-amber-400 text-slate-950 border-amber-300'
+                  : 'bg-amber-500/20 border-amber-400 text-amber-300'
+              }`}>
+                {selectedLevelId === 'parkour_mega_ramp' ? 'SELECTED' : 'PLAY'}
+              </span>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-[11px] font-black tracking-widest text-slate-400 uppercase">
             <span>SELECT SECTOR (12 CAMPAIGN LEVELS)</span>
             <span className="text-cyan-400 font-mono">1–12 PROGRESSION</span>
           </div>
 
           <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 gap-2 xs:gap-2.5 overflow-y-auto pr-1">
-            {PARKOUR_CAMPAIGN_LEVELS.map((level) => {
+            {PARKOUR_CAMPAIGN_LEVELS.filter((l) => l.levelNumber <= 12).map((level) => {
               const isUnlocked = !!unlockedLevels[level.id] || level.unlockedByDefault;
               const isSelected = selectedLevelId === level.id;
 

@@ -18,7 +18,8 @@ export interface ParkourInput {
   jumpPressed: boolean; // Just pressed this frame
   jumpHeld: boolean;    // Currently holding jump (for variable jump height)
   sprintHeld: boolean;  // Holding sprint/shift
-  slidePressed: boolean;// Pressed slide/down
+  slidePressed: boolean;// Pressed crouch/down
+  crouchHeld?: boolean; // Holding crouch/sit
   resetPressed?: boolean;
 }
 
@@ -28,7 +29,9 @@ export interface PlatformRect {
   y: number;
   w: number;
   h: number;
-  type: 'solid' | 'low_gap_barrier' | 'vault_obstacle' | 'ladder' | 'pipe' | 'scaffold';
+  type: 'solid' | 'low_gap_barrier' | 'vault_obstacle' | 'ladder' | 'pipe' | 'scaffold' | 'boost_pad';
+  boostVx?: number;
+  boostVy?: number;
 }
 
 export type ParkourVfxType =
@@ -62,6 +65,7 @@ export class ParkourRunner2D {
   // State flags
   public onGround: boolean = false;
   public isSprinting: boolean = false;
+  public isCrouching: boolean = false;
   public isSliding: boolean = false;
   public canDoubleJump: boolean = true;
   public hasDoubleJumped: boolean = false;
@@ -94,7 +98,11 @@ export class ParkourRunner2D {
   public isClimbing: boolean = false;
   public climbPlat: PlatformRect | null = null;
 
-  // Motion Trail history for sprint/slide/walljump VFX
+  // Supersonic Boost Pad & Combat Timers
+  public boostPadTimer: number = 0;
+  public invincibleTimer: number = 0;
+
+  // Motion Trail history for sprint/walljump VFX
   public trail: Array<{ x: number; y: number; h: number; facing: number; alpha: number; color?: string }> = [];
 
   // Spawn Point
@@ -103,6 +111,7 @@ export class ParkourRunner2D {
 
   // Movement Constants
   private readonly walkSpeed = 390;
+  private readonly crouchSpeed = 230;
   private readonly sprintSpeed = 590;
   private readonly accel = 3200;
   private readonly friction = 2600;
@@ -129,6 +138,7 @@ export class ParkourRunner2D {
     this.facing = 1;
     this.onGround = false;
     this.isSprinting = false;
+    this.isCrouching = false;
     this.isSliding = false;
     this.canDoubleJump = true;
     this.hasDoubleJumped = false;
@@ -169,6 +179,12 @@ export class ParkourRunner2D {
     }
     if (this.wallCoyoteTimer > 0) {
       this.wallCoyoteTimer = Math.max(0, this.wallCoyoteTimer - dt);
+    }
+    if (this.boostPadTimer > 0) {
+      this.boostPadTimer = Math.max(0, this.boostPadTimer - dt);
+    }
+    if (this.invincibleTimer > 0) {
+      this.invincibleTimer = Math.max(0, this.invincibleTimer - dt);
     }
 
     if (input.jumpPressed) {
@@ -399,81 +415,84 @@ export class ParkourRunner2D {
       this.coyoteTimer = Math.max(0, this.coyoteTimer - dt);
     }
 
-    // Sprint handling
-    this.isSprinting = input.sprintHeld && Math.abs(input.moveX) > 0.05 && !this.isSliding;
+    // Sprint handling (disabled while crouching)
+    this.isSprinting = Boolean(input.sprintHeld && Math.abs(input.moveX) > 0.05 && !this.isCrouching);
 
     // =========================================================================
-    // 5. SLIDE MECHANIC (100% Guaranteed Forward Slide)
+    // 5. CROUCH / SIT DOWN MECHANIC (Replaces slide with smooth sit/duck)
     // =========================================================================
-    const wantsSlide = input.slidePressed || moveY > 0.6;
-    if (wantsSlide && this.onGround && !this.isSliding) {
-      this.isSliding = true;
-      this.slideTimer = this.maxSlideDuration;
-      this.currentHeight = this.slidingHeight;
-      // Guaranteed slide boost in facing direction (at least 580 px/s)
-      const slideBoost = Math.max(Math.abs(this.vx), 580);
-      this.vx = this.facing * slideBoost;
-      onVfx?.('slide_sparks', this.x + this.width * 0.5, this.y + this.currentHeight);
-    }
+    const wantsCrouch = Boolean(input.slidePressed || input.crouchHeld || (moveY && moveY > 0.4));
 
-    if (this.isSliding) {
-      this.slideTimer -= dt;
-      if (Math.abs(this.vx) > 0) {
-        const dec = this.slideFriction * dt;
-        if (Math.abs(this.vx) <= dec) {
-          this.vx = 0;
+    if (this.onGround) {
+      if (wantsCrouch) {
+        this.isCrouching = true;
+        this.isSliding = false;
+        this.currentHeight = this.slidingHeight;
+      } else {
+        const canStand = !this.hasCeilingCollision(platforms);
+        if (canStand) {
+          this.isCrouching = false;
+          this.isSliding = false;
+          this.currentHeight = this.standingHeight;
         } else {
-          this.vx -= Math.sign(this.vx) * dec;
+          // Keep crouching under low overhead clearance
+          this.isCrouching = true;
+          this.isSliding = false;
+          this.currentHeight = this.slidingHeight;
         }
       }
-
-      const canStand = !this.hasCeilingCollision(platforms);
-      if ((this.slideTimer <= 0 || Math.abs(this.vx) < 70 || !this.onGround) && canStand) {
-        this.isSliding = false;
-        this.currentHeight = this.standingHeight;
-      }
     } else {
+      // In mid-air: holding down triggers fast drop / air dive
+      if (wantsCrouch && this.vy > -100) {
+        this.vy += 850 * dt;
+        if (this.vy > 950) this.vy = 950;
+      }
+      this.isCrouching = false;
+      this.isSliding = false;
       this.currentHeight = this.standingHeight;
     }
 
     // =========================================================================
-    // 6. HORIZONTAL RUN & ACCELERATION (Left & Right)
+    // 6. HORIZONTAL RUN, CROUCH-WALK & ACCELERATION
     // =========================================================================
-    if (!this.isSliding) {
-      const targetMaxSpeed = this.isSprinting ? this.sprintSpeed : this.walkSpeed;
-      if (Math.abs(input.moveX) > 0.05) {
-        const dir = Math.sign(input.moveX);
-        this.facing = dir;
-        const targetVx = dir * targetMaxSpeed;
+    const targetMaxSpeed = this.isCrouching
+      ? this.crouchSpeed
+      : this.isSprinting
+      ? this.sprintSpeed
+      : this.walkSpeed;
 
-        if (dir > 0) {
-          // Moving Right (D / ArrowRight / Right button)
-          if (this.vx < targetVx) {
-            this.vx += this.accel * dt;
-            if (this.vx > targetVx) this.vx = targetVx;
-          } else if (this.vx > targetVx) {
-            this.vx -= this.friction * dt;
-            if (this.vx < targetVx) this.vx = targetVx;
-          }
-        } else {
-          // Moving Left (A / ArrowLeft / Left button)
-          if (this.vx > targetVx) {
-            this.vx -= this.accel * dt;
-            if (this.vx < targetVx) this.vx = targetVx;
-          } else if (this.vx < targetVx) {
-            this.vx += this.friction * dt;
-            if (this.vx > targetVx) this.vx = targetVx;
-          }
+    if (Math.abs(input.moveX) > 0.05) {
+      const dir = Math.sign(input.moveX);
+      this.facing = dir;
+      const targetVx = dir * targetMaxSpeed;
+
+      if (dir > 0) {
+        // Moving Right (D / ArrowRight / Right button)
+        if (this.vx < targetVx) {
+          this.vx += this.accel * dt;
+          if (this.vx > targetVx) this.vx = targetVx;
+        } else if (this.vx > targetVx && this.boostPadTimer <= 0) {
+          this.vx -= this.friction * dt;
+          if (this.vx < targetVx) this.vx = targetVx;
         }
       } else {
-        // Natural deceleration when no movement input
-        if (Math.abs(this.vx) > 0) {
-          const dec = this.friction * dt;
-          if (Math.abs(this.vx) <= dec) {
-            this.vx = 0;
-          } else {
-            this.vx -= Math.sign(this.vx) * dec;
-          }
+        // Moving Left (A / ArrowLeft / Left button)
+        if (this.vx > targetVx) {
+          this.vx -= this.accel * dt;
+          if (this.vx < targetVx) this.vx = targetVx;
+        } else if (this.vx < targetVx && this.boostPadTimer <= 0) {
+          this.vx += this.friction * dt;
+          if (this.vx > targetVx) this.vx = targetVx;
+        }
+      }
+    } else {
+      // Natural deceleration when no movement input (or sitting down in place)
+      if (Math.abs(this.vx) > 0 && this.boostPadTimer <= 0) {
+        const dec = (this.isCrouching ? this.friction * 1.5 : this.friction) * dt;
+        if (Math.abs(this.vx) <= dec) {
+          this.vx = 0;
+        } else {
+          this.vx -= Math.sign(this.vx) * dec;
         }
       }
     }
@@ -500,7 +519,8 @@ export class ParkourRunner2D {
         this.onGround = false;
         this.coyoteTimer = 0;
         this.jumpBufferTimer = 0;
-        if (this.isSliding && !this.hasCeilingCollision(platforms)) {
+        if ((this.isCrouching || this.isSliding) && !this.hasCeilingCollision(platforms)) {
+          this.isCrouching = false;
           this.isSliding = false;
           this.currentHeight = this.standingHeight;
         }
@@ -524,7 +544,7 @@ export class ParkourRunner2D {
     // 8. WALL SLIDE & GRAVITY (Only engages when actively pushing into wall)
     // =========================================================================
     let foundWallDir = 0;
-    if (!this.onGround && this.vy > 80 && !this.isSliding) {
+    if (!this.onGround && this.vy > 80 && !this.isCrouching && !this.isSliding) {
       for (const plat of platforms) {
         if (plat.type !== 'solid') continue;
 
@@ -571,14 +591,14 @@ export class ParkourRunner2D {
     // =========================================================================
     // 9. MOTION TRAILS
     // =========================================================================
-    if (this.isSprinting || this.isSliding || this.hasDoubleJumped || this.isWallSliding) {
+    if (this.isSprinting || this.hasDoubleJumped || this.isWallSliding || this.boostPadTimer > 0) {
       this.trail.push({
         x: this.x,
         y: this.y,
         h: this.currentHeight,
         facing: this.facing,
-        alpha: 0.45,
-        color: this.isWallSliding ? '#38bdf8' : this.hasDoubleJumped ? '#60a5fa' : '#ef4444',
+        alpha: this.boostPadTimer > 0 ? 0.75 : 0.45,
+        color: this.boostPadTimer > 0 ? '#f59e0b' : this.isWallSliding ? '#38bdf8' : this.hasDoubleJumped ? '#60a5fa' : '#ef4444',
       });
     }
 
@@ -600,12 +620,38 @@ export class ParkourRunner2D {
     platforms: PlatformRect[],
     onVfx?: (type: ParkourVfxType, x: number, y: number) => void
   ) {
-    // Horizontal Movement
     const nextX = this.x + this.vx * dt;
+    const nextY = this.y + this.vy * dt;
+
+    // Supersonic Boost Pad Trigger Check
+    for (const plat of platforms) {
+      if (plat.type === 'boost_pad') {
+        if (
+          this.checkAABB(nextX, nextY, this.width, this.currentHeight, plat.x, plat.y, plat.w, plat.h) ||
+          this.checkAABB(this.x, this.y, this.width, this.currentHeight + 10, plat.x, plat.y, plat.w, plat.h)
+        ) {
+          const bvx = plat.boostVx !== undefined ? plat.boostVx : (this.facing !== 0 ? this.facing : 1) * 1250;
+          const bvy = plat.boostVy !== undefined ? plat.boostVy : -760;
+          this.vx = bvx;
+          this.vy = bvy;
+          this.onGround = false;
+          this.isCrouching = false;
+          this.isSliding = false;
+          this.canDoubleJump = true;
+          this.hasDoubleJumped = false;
+          this.boostPadTimer = 0.9;
+          this.currentHeight = this.standingHeight;
+          onVfx?.('double_jump', this.x + this.width * 0.5, this.y);
+          break;
+        }
+      }
+    }
+
+    // Horizontal Movement
     let resolvedX = nextX;
 
     for (const plat of platforms) {
-      if (plat.type === 'ladder' || plat.type === 'pipe' || plat.type === 'scaffold') continue;
+      if (plat.type === 'ladder' || plat.type === 'pipe' || plat.type === 'scaffold' || plat.type === 'boost_pad') continue;
 
       if (this.checkAABB(resolvedX, this.y, this.width, this.currentHeight, plat.x, plat.y, plat.w, plat.h)) {
         // Auto-Vault Check: low obstacles
@@ -613,7 +659,7 @@ export class ParkourRunner2D {
           plat.type === 'vault_obstacle' ||
           (plat.h <= 48 && plat.w <= 80 && plat.y >= this.y + 24 && plat.y <= this.y + this.standingHeight - 8);
 
-        if (isVaultCandidate && !this.isSliding && !this.isVaulting && Math.abs(this.vx) > 100) {
+        if (isVaultCandidate && !this.isCrouching && !this.isSliding && !this.isVaulting && Math.abs(this.vx) > 100) {
           this.isVaulting = true;
           this.vaultTimer = 0;
           this.vaultStartX = this.x;
@@ -643,13 +689,12 @@ export class ParkourRunner2D {
     }
 
     // Vertical Movement
-    const nextY = this.y + this.vy * dt;
     let resolvedY = nextY;
     const wasOnGround = this.onGround;
     this.onGround = false;
 
     for (const plat of platforms) {
-      if (plat.type === 'ladder' || plat.type === 'pipe' || plat.type === 'scaffold') continue;
+      if (plat.type === 'ladder' || plat.type === 'pipe' || plat.type === 'scaffold' || plat.type === 'boost_pad') continue;
 
       if (this.checkAABB(this.x, resolvedY, this.width, this.currentHeight, plat.x, plat.y, plat.w, plat.h)) {
         if (this.vy > 0) {
@@ -669,7 +714,7 @@ export class ParkourRunner2D {
     this.y = resolvedY;
 
     // Pit fall safety respawn
-    if (this.y > 1500) {
+    if (this.y > 2200) {
       this.reset();
     }
   }
@@ -697,7 +742,7 @@ export class ParkourRunner2D {
     if (this.isLedgeGrabbing) return 'LEDGE GRAB';
     if (this.isVaulting) return 'VAULTING';
     if (this.isWallSliding) return 'WALL SLIDE';
-    if (this.isSliding) return 'SLIDING';
+    if (this.isCrouching) return Math.abs(this.vx) > 20 ? 'CROUCH WALK' : 'SIT DOWN';
     if (!this.onGround) return this.hasDoubleJumped ? 'DOUBLE JUMP' : this.vy < 0 ? 'JUMPING' : 'FALLING';
     if (this.isSprinting) return 'SPRINTING';
     if (Math.abs(this.vx) > 20) return 'RUNNING';
