@@ -213,8 +213,9 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
 
   // Global safety release if pointerup happened outside captured element
   useEffect(() => {
-    const handleGlobalEnd = () => {
-      if (activeRef.current) {
+    const handleGlobalEnd = (e: PointerEvent) => {
+      // Only release if the pointerup matches THIS joystick's active pointer
+      if (activeRef.current && (pointerIdRef.current === null || e.pointerId === pointerIdRef.current)) {
         activeRef.current = false;
         pointerIdRef.current = null;
         if (joystickRef.current) {

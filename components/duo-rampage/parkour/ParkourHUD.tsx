@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
 import { ParkourInput } from '@/game/duo-rampage/parkour/character/ParkourRunner2D';
-import { VirtualJoystick } from '@/components/ui/VirtualJoystick';
+import { ParkourMobileJoystick } from './ParkourMobileJoystick';
 
 interface ParkourHUDProps {
   telemetry: {
@@ -155,27 +155,32 @@ export const ParkourHUD: React.FC<ParkourHUDProps> = ({
 
   const handleJumpDown = (e: React.PointerEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     jumpPressed.current = true;
     onInputChange({ jumpPressed: true, jumpHeld: true, moveY: -1 });
     duoAudio.playUiClick();
   };
   const handleJumpUp = (e: React.PointerEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     jumpPressed.current = false;
-    onInputChange({ jumpHeld: false, moveY: 0 });
+    onInputChange({ jumpHeld: false });
   };
 
   const handleSlideDown = (e: React.PointerEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     onInputChange({ slidePressed: true, moveY: 1 });
   };
   const handleSlideUp = (e: React.PointerEvent) => {
     e.preventDefault();
-    onInputChange({ moveY: 0 });
+    e.stopPropagation();
+    onInputChange({ slidePressed: false });
   };
 
   const handleSprintDown = (e: React.PointerEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     sprintPressed.current = !sprintPressed.current;
     onInputChange({ sprintHeld: sprintPressed.current });
   };
@@ -227,7 +232,7 @@ export const ParkourHUD: React.FC<ParkourHUDProps> = ({
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <div className="flex flex-col leading-none">
                 <span className="text-[10px] text-cyan-400 font-black tracking-wider uppercase">
-                  LEVEL 01 • SUMMER DAY
+                  LEVEL 01 • DHAKA ROOFTOPS
                 </span>
                 <span className="text-xs font-black text-white font-mono mt-0.5">
                   {telemetry.speedKmh} KM/H • {telemetry.state}
@@ -353,28 +358,29 @@ export const ParkourHUD: React.FC<ParkourHUDProps> = ({
            (NO desktop keyboard details shown)
            =================================================================== */
         <div className="w-full flex items-end justify-between pointer-events-none pb-1.5 px-1">
-          {/* Left Side: Global Mobile Virtual Joystick */}
+          {/* Left Side: Dedicated Custom Parkour Mobile Joystick */}
           <div className="pointer-events-auto select-none touch-none ml-1 sm:ml-2 mb-1">
-            <VirtualJoystick
-              size={125}
-              onMove={({ x, y }) => {
-                onInputChange({
-                  moveX: x,
-                  sprintHeld: Math.abs(x) > 0.75,
-                });
-                if (y < -0.6) {
-                  onInputChange({ jumpPressed: true, jumpHeld: true, moveY: -1 });
-                } else if (y > 0.6) {
-                  onInputChange({ slidePressed: true, moveY: 1 });
+            <ParkourMobileJoystick
+              size={132}
+              onJoystickChange={({ moveX, moveY, isSprinting, isUpPressed, isDownPressed, active }) => {
+                if (!active) {
+                  onInputChange({
+                    moveX: 0,
+                    moveY: 0,
+                    sprintHeld: sprintPressed.current,
+                  });
+                  return;
                 }
-              }}
-              onEnd={() => {
+
                 onInputChange({
-                  moveX: 0,
-                  moveY: 0,
-                  jumpHeld: false,
-                  sprintHeld: false,
+                  moveX,
+                  sprintHeld: isSprinting || sprintPressed.current,
+                  ...(isUpPressed ? { moveY: -1 } : isDownPressed ? { moveY: 1 } : { moveY: 0 }),
                 });
+
+                if (isDownPressed) {
+                  onInputChange({ slidePressed: true });
+                }
               }}
             />
           </div>

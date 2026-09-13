@@ -1,15 +1,18 @@
 /**
- * DUO RAMPAGE: DHAKA PARKOUR - 2D Canvas Engine & Level 01 Experience
- * Based on Dhaka-Parkour.md Sections 6, 7, 11, 24-26, 52 (Task 05)
+ * DUO RAMPAGE: DHAKA PARKOUR - 2D Canvas Engine & Visual Experience
+ * Commercial-Grade Anime-Inspired Cinematic Platformer
  *
  * Implements:
- * - Full 5-minute Level 01: Rooftop Introduction
- * - Layered Cinematic 2D Parallax (Sky, Far Skyline, Midground Apartments, Gameplay, Atmosphere)
- * - Collectible Gold Coins & Secret Emblem with audio/particle juice
- * - 3 Strategic Checkpoints with instant under-2s respawn
- * - Tutorial Movement Signs (Run, Sprint, Jump, Slide, Ledge Grab, Vault)
- * - Bifurcation Route: Safe Lower Path vs High-Speed Shortcut
- * - Finish Gate with 3-Star Rating System & Level Complete Fanfare
+ * - 7-Layer Parallax Background & Foreground (Sky, Clouds, Megacity, Midground, Near-Midground, World, Foreground 2.5D, Screen Effects)
+ * - Golden Hour / Sunset Volumetric Lighting & Atmospheric Haze
+ * - Authentic Dhaka Rooftop Architecture & Props (Gazi/Sintex water tanks, AC compressors with spinning fans,
+ *   swaying colorful clotheslines, satellite dishes, antennas, puddles with sky reflections, tin sheds, Bengali neon signs)
+ * - 3D Rotating Gold Coins & Celestial Secret Emblem
+ * - Non-Intrusive Contextual Holographic Movement Glyphs
+ * - Cinematic Responsive Camera with Dynamic Sprint/Dash Zoom, Micro-Shake on Hard Landing, and Dual-Player Framing
+ * - 2D High-Definition Anime Runner Sprites with dynamic rim lighting and ghost motion trails
+ * - 3 Strategic Checkpoints with instant respawn
+ * - Finish Gate with sweeping searchlights & fireworks
  */
 
 import { ParkourRunner2D, ParkourInput, PlatformRect, ParkourVfxType } from '../character/ParkourRunner2D';
@@ -23,6 +26,7 @@ import {
 import { duoAudio } from '../../audio/DuoAudioEngine';
 import { parkourAnimator } from '../character/ParkourSpriteAnimator';
 import { getCharacterDef } from '../character/ParkourCharacters';
+import { parkourRenderer, AtmosphericDustMote } from '../render/ParkourCinematicRenderer';
 
 export interface ParkourEngineCallbacks {
   onUpdateTelemetry: (data: {
@@ -117,7 +121,7 @@ export class Parkour2DGameEngine {
   private callbacks: ParkourEngineCallbacks;
 
   // Visual Atmosphere Dust motes
-  private dustMotes: Array<{ x: number; y: number; size: number; speed: number; alpha: number }> = [];
+  private dustMotes: AtmosphericDustMote[] = [];
 
   constructor(
     container: HTMLDivElement,
@@ -161,14 +165,15 @@ export class Parkour2DGameEngine {
     this.runner = new ParkourRunner2D(this.levelData.spawnPoint.x, this.levelData.spawnPoint.y);
     this.camera = new ParkourCamera2D(1280, 720);
 
-    // Initialize atmospheric sunset dust
-    for (let i = 0; i < 40; i++) {
+    // Initialize atmospheric sunset dust motes & golden embers
+    for (let i = 0; i < 48; i++) {
       this.dustMotes.push({
         x: Math.random() * 2000,
-        y: Math.random() * 800,
-        size: 1.5 + Math.random() * 2,
-        speed: 15 + Math.random() * 25,
-        alpha: 0.2 + Math.random() * 0.5,
+        y: Math.random() * 1000,
+        size: 1.5 + Math.random() * 2.5,
+        speed: 18 + Math.random() * 28,
+        alpha: 0.25 + Math.random() * 0.55,
+        wobbleSpeed: 1.5 + Math.random() * 2.5,
       });
     }
 
@@ -182,25 +187,27 @@ export class Parkour2DGameEngine {
     }
   }
 
-  public resize = () => {
+  private resize = () => {
     if (!this.container || this.isDestroyed) return;
     const rect = this.container.getBoundingClientRect();
-    const cw = rect.width || window.innerWidth || 1280;
-    const ch = rect.height || window.innerHeight || 720;
-    const aspect = Math.max(0.5, cw / Math.max(1, ch));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.0);
 
-    const isMobile = cw <= 1024 || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0);
-    const baseHeight = isMobile ? 580 : 720;
+    let viewWidth = Math.round(rect.width * dpr);
+    let viewHeight = Math.round(rect.height * dpr);
 
-    let viewHeight = baseHeight;
-    let viewWidth = Math.round(viewHeight * aspect);
+    if (viewWidth <= 0 || viewHeight <= 0) {
+      viewWidth = 1280;
+      viewHeight = 720;
+    }
 
-    if (viewWidth < 680) {
-      viewWidth = 680;
+    // Lock standard 16:9 or ultra-wide aspect floor
+    const aspect = viewWidth / viewHeight;
+    if (viewWidth > 2200) {
+      viewWidth = 2200;
       viewHeight = Math.round(viewWidth / aspect);
     }
-    if (viewHeight > 1100) {
-      viewHeight = 1100;
+    if (viewHeight > 1200) {
+      viewHeight = 1200;
       viewWidth = Math.round(viewHeight * aspect);
     }
 
@@ -208,8 +215,7 @@ export class Parkour2DGameEngine {
       this.canvas.width = viewWidth;
       this.canvas.height = viewHeight;
     }
-    this.camera.width = viewWidth;
-    this.camera.height = viewHeight;
+    this.camera.setViewport(viewWidth, viewHeight);
   };
 
   public start() {
@@ -286,7 +292,6 @@ export class Parkour2DGameEngine {
     window.removeEventListener('orientationchange', this.resize);
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
-      this.resizeObserver = null;
     }
   }
 
@@ -294,8 +299,12 @@ export class Parkour2DGameEngine {
     if (this.isDestroyed) return;
 
     const now = performance.now();
-    const dt = Math.min(0.05, (now - this.lastTime) / 1000);
+    let dt = (now - this.lastTime) / 1000;
     this.lastTime = now;
+
+    // Clamp dt to avoid physics tunnelling during frame hitches
+    if (dt > 0.08) dt = 0.08;
+    if (dt <= 0) dt = 0.001;
 
     this.update(dt);
     this.render();
@@ -307,20 +316,20 @@ export class Parkour2DGameEngine {
     if (type === 'jump') {
       for (let i = 0; i < 7; i++) {
         this.particles.push({
-          x,
+          x: x + (Math.random() - 0.5) * 20,
           y,
-          vx: (Math.random() - 0.5) * 160,
-          vy: Math.random() * -100 - 30,
-          color: '#cbd5e1',
-          size: 3 + Math.random() * 3,
+          vx: (Math.random() - 0.5) * 120,
+          vy: Math.random() * -60 - 20,
+          color: '#fbbf24',
+          size: 3 + Math.random() * 2.5,
           life: 0.25,
           maxLife: 0.25,
         });
       }
     } else if (type === 'double_jump') {
-      for (let i = 0; i < 12; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 120 + Math.random() * 140;
+      for (let i = 0; i < 14; i++) {
+        const angle = (i / 14) * Math.PI * 2;
+        const speed = 110 + Math.random() * 70;
         this.particles.push({
           x,
           y: y - 10,
@@ -346,16 +355,18 @@ export class Parkour2DGameEngine {
         });
       }
     } else if (type === 'land') {
-      for (let i = 0; i < 8; i++) {
+      // Trigger subtle cinematic camera landing micro-shake
+      this.camera.triggerShake(4.5, 0.12);
+      for (let i = 0; i < 10; i++) {
         this.particles.push({
-          x: x + (Math.random() - 0.5) * 30,
+          x: x + (Math.random() - 0.5) * 36,
           y,
-          vx: (Math.random() - 0.5) * 180,
-          vy: -30 - Math.random() * 50,
-          color: '#94a3b8',
-          size: 3 + Math.random() * 3,
-          life: 0.25,
-          maxLife: 0.25,
+          vx: (Math.random() - 0.5) * 190,
+          vy: -25 - Math.random() * 55,
+          color: '#cbd5e1',
+          size: 3.5 + Math.random() * 3,
+          life: 0.28,
+          maxLife: 0.28,
         });
       }
     } else if (type === 'wall_slide') {
@@ -426,9 +437,9 @@ export class Parkour2DGameEngine {
 
   private triggerCelebrationFireworks(x: number, y: number) {
     const colors = ['#f59e0b', '#38bdf8', '#ef4444', '#22c55e', '#a855f7', '#facc15'];
-    for (let i = 0; i < 45; i++) {
+    for (let i = 0; i < 50; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 160 + Math.random() * 260;
+      const speed = 160 + Math.random() * 280;
       this.particles.push({
         x,
         y,
@@ -436,8 +447,8 @@ export class Parkour2DGameEngine {
         vy: Math.sin(angle) * speed,
         color: colors[Math.floor(Math.random() * colors.length)],
         size: 4 + Math.random() * 4,
-        life: 0.8 + Math.random() * 0.4,
-        maxLife: 1.2,
+        life: 0.8 + Math.random() * 0.5,
+        maxLife: 1.3,
       });
     }
   }
@@ -479,16 +490,16 @@ export class Parkour2DGameEngine {
           this.coinsCollected++;
           duoAudio.playCoinPickup();
           // Coin sparkle burst
-          for (let p = 0; p < 6; p++) {
+          for (let p = 0; p < 7; p++) {
             this.particles.push({
               x: c.x,
               y: c.y,
-              vx: (Math.random() - 0.5) * 120,
-              vy: (Math.random() - 0.5) * 120,
+              vx: (Math.random() - 0.5) * 140,
+              vy: (Math.random() - 0.5) * 140,
               color: '#facc15',
-              size: 3,
-              life: 0.3,
-              maxLife: 0.3,
+              size: 3.5,
+              life: 0.32,
+              maxLife: 0.32,
             });
           }
         } else if (c.type === 'secret_emblem') {
@@ -496,33 +507,37 @@ export class Parkour2DGameEngine {
           duoAudio.playReviveSuccess();
           this.bannerNotification = `SECRET EMBLEM: ${c.name || 'UNLOCKED'}!`;
           this.bannerTimer = 3.5;
+          this.camera.triggerShake(6, 0.2);
           this.triggerCelebrationFireworks(c.x, c.y);
         }
       }
     }
 
-    // 3. Check Checkpoint Triggers (Under-2s respawn anchors)
+    // 3. Check Checkpoint Beacons
     for (let idx = 0; idx < this.levelData.checkpoints.length; idx++) {
       const cp = this.levelData.checkpoints[idx];
-      const dist = Math.abs((this.runner.x + this.runner.width * 0.5) - cp.x);
-      if (dist < 40 && Math.abs(this.runner.y - (cp.y - this.runner.standingHeight)) < 120) {
-        if (!cp.activated) {
+      if (!cp.activated) {
+        const dx = Math.abs(this.runner.x - cp.x);
+        const dy = Math.abs(this.runner.y - cp.y);
+        if (dx < 60 && dy < 120) {
           cp.activated = true;
           this.activeCheckpoint = cp;
           duoAudio.playCheckpoint();
           this.bannerNotification = `CHECKPOINT ${idx + 1}: ${cp.name.toUpperCase()}`;
           this.bannerTimer = 3.0;
+          this.camera.triggerShake(4, 0.12);
+
           // Checkpoint beacon flare
-          for (let p = 0; p < 18; p++) {
+          for (let p = 0; p < 22; p++) {
             this.particles.push({
               x: cp.x,
               y: cp.y - 20,
-              vx: (Math.random() - 0.5) * 140,
-              vy: -Math.random() * 180 - 40,
+              vx: (Math.random() - 0.5) * 160,
+              vy: -Math.random() * 200 - 40,
               color: '#38bdf8',
-              size: 4,
-              life: 0.6,
-              maxLife: 0.6,
+              size: 4.5,
+              life: 0.65,
+              maxLife: 0.65,
             });
           }
         }
@@ -546,6 +561,7 @@ export class Parkour2DGameEngine {
       this.runner.onGround = true;
 
       duoAudio.playRespawn();
+      this.camera.triggerShake(6, 0.18);
       this.spawnParticles('land', respawnX, respawnY);
       this.bannerNotification = 'RESPAWNED AT CHECKPOINT';
       this.bannerTimer = 1.5;
@@ -562,6 +578,7 @@ export class Parkour2DGameEngine {
     ) {
       this.isLevelFinished = true;
       duoAudio.playLevelComplete();
+      this.camera.triggerShake(8, 0.35);
       this.triggerCelebrationFireworks(fg.x + fg.w * 0.5, fg.y + 40);
 
       // Star calculation:
@@ -616,23 +633,52 @@ export class Parkour2DGameEngine {
       }
     }
 
-    // 7. Update Camera Lookahead
-    this.camera.update(
-      dt,
-      this.runner.x,
-      this.runner.y,
-      this.runner.vx,
-      this.runner.facing,
-      this.levelData.worldWidth,
-      this.levelData.worldHeight
-    );
+    // 7. Update Responsive Cinematic Camera (Single or Dual Player Framing)
+    if (this.partnerRunner && this.isMultiplayer) {
+      this.camera.updateDuo(
+        dt,
+        {
+          x: this.runner.x,
+          y: this.runner.y,
+          vx: this.runner.vx,
+          vy: this.runner.vy,
+          facing: this.runner.facing,
+          isSprinting: this.runner.isSprinting,
+          isDashing: this.runner.isSliding,
+        },
+        {
+          x: this.partnerRunner.x,
+          y: this.partnerRunner.y,
+          vx: this.partnerRunner.vx,
+          vy: this.partnerRunner.vy,
+          facing: this.partnerRunner.facing,
+          isSprinting: this.partnerRunner.isSprinting,
+          isDashing: this.partnerRunner.isSliding,
+        },
+        this.levelData.worldWidth,
+        this.levelData.worldHeight
+      );
+    } else {
+      this.camera.update(
+        dt,
+        this.runner.x,
+        this.runner.y,
+        this.runner.vx,
+        this.runner.vy,
+        this.runner.facing,
+        this.runner.isSliding,
+        this.runner.isSprinting,
+        this.levelData.worldWidth,
+        this.levelData.worldHeight
+      );
+    }
 
-    // 8. Update Dust Motes
+    // 8. Update Dust Motes & Embers
     for (const d of this.dustMotes) {
       d.x += d.speed * dt;
-      if (d.x > this.camera.x + this.camera.width + 100) {
-        d.x = this.camera.x - 100;
-        d.y = Math.random() * 800;
+      if (d.x > this.canvas.width + 100) {
+        d.x = -60;
+        d.y = Math.random() * this.canvas.height;
       }
     }
 
@@ -662,7 +708,7 @@ export class Parkour2DGameEngine {
   }
 
   // ===========================================================================
-  // CINEMATIC 2D PARALLAX RENDERING
+  // CINEMATIC 2D / 2.5D PARALLAX RENDERING
   // ===========================================================================
   private render() {
     const ctx = this.ctx;
@@ -670,108 +716,40 @@ export class Parkour2DGameEngine {
     const h = this.canvas.height;
     const cam = this.camera;
 
-    // LAYER 0: Sky (Full Summer Daylight Azure Blue Gradient)
-    const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
-    skyGrad.addColorStop(0, '#0284c7'); // Deep radiant summer sky blue
-    skyGrad.addColorStop(0.35, '#38bdf8'); // Daylight tropical cyan
-    skyGrad.addColorStop(0.7, '#7dd3fc'); // Soft sky blue
-    skyGrad.addColorStop(0.9, '#bae6fd'); // Warm summer horizon haze
-    skyGrad.addColorStop(1, '#e0f2fe'); // Crisp sunny horizon
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, w, h);
+    // 1. LAYERS 0 to 4: Cinematic Parallax Background (Sky, Clouds, Megacity, Midground, Near-Midground)
+    parkourRenderer.renderParallaxBackground(ctx, w, h, cam, this.levelTimer);
 
-    // Blazing Summer Sun (White-hot core with golden summer corona)
-    const sunX = w * 0.7 - cam.x * 0.01;
-    const sunY = h * 0.28;
-    const sunGrad = ctx.createRadialGradient(sunX, sunY, 15, sunX, sunY, 160);
-    sunGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)'); // Blazing white core
-    sunGrad.addColorStop(0.2, 'rgba(254, 240, 138, 0.9)'); // Warm yellow glow
-    sunGrad.addColorStop(0.55, 'rgba(253, 224, 71, 0.35)'); // Summer sun aura
-    sunGrad.addColorStop(1, 'rgba(253, 224, 71, 0)');
-    ctx.fillStyle = sunGrad;
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, 160, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Summer Cumulus Clouds (Parallax 0.03)
+    // 2. LAYER 5: World Space (Platforms, Props, Collectibles, Checkpoints, Runners, Particles)
     ctx.save();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
-    const cloudOffset = -cam.x * 0.03 + (this.levelTimer * 12);
-    for (let cx = -300; cx < w + 600; cx += 320) {
-      const cy = 60 + Math.sin(cx * 0.01) * 35;
-      const cPos = (cx + cloudOffset) % (w + 600) - 200;
-      ctx.beginPath();
-      ctx.arc(cPos, cy, 32, 0, Math.PI * 2);
-      ctx.arc(cPos + 24, cy - 14, 38, 0, Math.PI * 2);
-      ctx.arc(cPos + 54, cy - 8, 30, 0, Math.PI * 2);
-      ctx.arc(cPos + 74, cy, 26, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
+    // Smooth cinematic zoom centered on viewport
+    ctx.translate(w * 0.5, h * 0.5);
+    ctx.scale(cam.zoom, cam.zoom);
+    ctx.translate(-w * 0.5, -h * 0.5);
 
-    // LAYER 1: Far Dhaka Skyline (Sunny Atmospheric Blue-Slate, Parallax 0.05)
-    ctx.save();
-    ctx.fillStyle = '#94a3b8'; // Light sunny atmospheric building silhouettes
-    const farOffset = -cam.x * 0.05;
-    for (let bx = -200; bx < w + 600; bx += 90) {
-      const bh = 150 + Math.sin(bx * 0.015) * 70 + (bx % 3 === 0 ? 80 : 0);
-      ctx.fillRect(bx + (farOffset % 90), h - bh, 80, bh);
+    ctx.translate(-cam.x + cam.shakeOffsetX, -cam.y + cam.shakeOffsetY);
 
-      // Sunlit rooftop edges
-      ctx.fillStyle = '#cbd5e1';
-      ctx.fillRect(bx + (farOffset % 90), h - bh, 80, 4);
-      ctx.fillStyle = '#94a3b8';
-    }
-    ctx.restore();
+    // A. Render Rooftop Environment Props (Water Tanks, Clotheslines, Antennas, Neon Signs)
+    parkourRenderer.renderRooftopDoodads(ctx, this.levelData.skylineDoodads, this.levelTimer);
 
-    // LAYER 2: Midground Dhaka Buildings (Warm Terracotta Brick & Concrete, Parallax 0.18)
-    ctx.save();
-    ctx.fillStyle = '#64748b'; // Midground slate-brick silhouettes
-    const midOffset = -cam.x * 0.18;
-    for (let mx = -300; mx < w + 800; mx += 140) {
-      const mh = 230 + Math.cos(mx * 0.01) * 80 + (mx % 5 === 0 ? 90 : 0);
-      ctx.fillRect(mx + (midOffset % 140), h - mh, 125, mh);
+    // B. Render Architectural Platforms (Rooftop slabs, brick masonry, ladders, slide ducts)
+    parkourRenderer.renderWorldPlatforms(ctx, this.levelData.platforms);
 
-      // Sunlit rooftop coping & warm brick accent
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillRect(mx + (midOffset % 140), h - mh, 125, 5);
-
-      // Midground windows reflecting blue sky
-      ctx.fillStyle = '#bae6fd';
-      for (let wy = h - mh + 25; wy < h - 40; wy += 35) {
-        ctx.fillRect(mx + (midOffset % 140) + 18, wy, 16, 20);
-        ctx.fillRect(mx + (midOffset % 140) + 48, wy, 16, 20);
-        ctx.fillRect(mx + (midOffset % 140) + 78, wy, 16, 20);
-      }
-      ctx.fillStyle = '#64748b';
-    }
-    ctx.restore();
-
-    // LAYER 3: World Space (Parallax 1.0)
-    ctx.save();
-    ctx.translate(-cam.x, -cam.y);
-
-    // A. Render Skyline Doodads (Water Tanks, Clotheslines, Antennas, Neon Signs)
-    this.renderDoodads(ctx);
-
-    // B. Render Platforms (Rooftops, tin sheds, ladders, slide ducts)
-    this.renderPlatforms(ctx);
-
-    // C. Render Tutorial Signs (In-world holographic prompt boards)
-    this.renderTutorialSigns(ctx);
+    // C. Render In-World Contextual Holographic Movement Glyphs (Non-intrusive)
+    parkourRenderer.renderTutorialGlyphs(ctx, this.levelData.tutorialSigns, this.runner.x);
 
     // D. Render Checkpoints
-    this.renderCheckpoints(ctx);
+    parkourRenderer.renderCheckpoints(ctx, this.levelData.checkpoints, this.levelTimer);
 
     // E. Render Finish Gate
-    this.renderFinishGate(ctx);
+    parkourRenderer.renderFinishGate(ctx, this.levelData.finishGate, this.levelTimer);
 
-    // F. Render Collectibles (Coins & Secret Emblem)
-    this.renderCollectibles(ctx);
+    // F. Render Collectibles (3D Gold Coins & Secret Emblem)
+    parkourRenderer.renderCollectibles(ctx, this.levelData.collectibles, this.levelTimer);
 
-    // G. Render Runner Trails & High-Definition 2D Animated Sprites
-    if (this.partnerRunner) {
-      this.renderRunnerTrails(ctx, this.partnerRunner);
+    // G. Render Partner Runner (if multiplayer active)
+    if (this.partnerRunner && this.isMultiplayer) {
+      const partnerDef = getCharacterDef(this.partnerCharacterId);
+      this.renderRunnerTrails(ctx, this.partnerRunner, partnerDef.accentColor);
       this.renderRunner(
         ctx,
         this.partnerRunner,
@@ -782,7 +760,9 @@ export class Parkour2DGameEngine {
       );
     }
 
-    this.renderRunnerTrails(ctx, this.runner);
+    // H. Render Local Runner
+    const localDef = getCharacterDef(this.localCharacterId);
+    this.renderRunnerTrails(ctx, this.runner, localDef.accentColor);
     this.renderRunner(
       ctx,
       this.runner,
@@ -792,7 +772,19 @@ export class Parkour2DGameEngine {
       this.localCharacterId
     );
 
-    // H. Render Particles
+    // I. Render Particles
+    this.renderParticles(ctx);
+
+    ctx.restore();
+
+    // 3. LAYER 6: Foreground Silhouettes & 2.5D Depth (Parallax 1.45)
+    parkourRenderer.renderForegroundSilhouettes(ctx, w, h, cam);
+
+    // 4. LAYER 7: Screen-Space Atmosphere (Dust motes, speed lines, vignette)
+    parkourRenderer.renderScreenAtmosphere(ctx, w, h, this.runner, this.dustMotes, this.levelTimer);
+  }
+
+  private renderParticles(ctx: CanvasRenderingContext2D) {
     for (const p of this.particles) {
       ctx.save();
       ctx.globalAlpha = p.life / p.maxLife;
@@ -802,328 +794,21 @@ export class Parkour2DGameEngine {
       ctx.fill();
       ctx.restore();
     }
-
-      // Atmosphere: Floating Summer Sun Glints / Dust Motes
-    for (const d of this.dustMotes) {
-      ctx.save();
-      ctx.globalAlpha = d.alpha * (0.6 + 0.4 * Math.sin(this.levelTimer * 2 + d.x));
-      ctx.fillStyle = '#fef08a'; // Radiant golden summer sun glints
-      ctx.beginPath();
-      ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    ctx.restore();
   }
 
-  private renderDoodads(ctx: CanvasRenderingContext2D) {
-    for (const d of this.levelData.skylineDoodads) {
-      if (d.type === 'water_tank') {
-        const w = d.w || 80;
-        const h = d.h || 100;
-        // Classic Dhaka Blue Water Tank on Sturdy Steel Legs
-        ctx.fillStyle = '#475569';
-        ctx.fillRect(d.x + 10, d.y + h - 18, 10, 18);
-        ctx.fillRect(d.x + w - 20, d.y + h - 18, 10, 18);
-
-        // Cylinder body in bright Dhaka sky blue
-        ctx.fillStyle = '#0284c7';
-        ctx.beginPath();
-        ctx.roundRect(d.x, d.y, w, h - 18, 8);
-        ctx.fill();
-
-        // Metallic bands & sun highlight
-        ctx.fillStyle = '#38bdf8';
-        ctx.fillRect(d.x, d.y + 16, w, 4);
-        ctx.fillRect(d.x, d.y + (h - 18) * 0.5, w, 4);
-        ctx.fillRect(d.x, d.y + h - 34, w, 4);
-
-        // Sunlit specular reflection
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.fillRect(d.x + 8, d.y + 4, 12, h - 26);
-      } else if (d.type === 'clothesline') {
-        const w = d.w || 160;
-        // Cable
-        ctx.strokeStyle = '#64748b';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(d.x, d.y);
-        ctx.quadraticCurveTo(d.x + w * 0.5, d.y + 14, d.x + w, d.y);
-        ctx.stroke();
-
-        // Hanging clothes
-        const colors = ['#ef4444', '#38bdf8', '#fbbf24', '#f8fafc', '#a855f7'];
-        for (let cx = d.x + 20; cx < d.x + w - 20; cx += 26) {
-          ctx.fillStyle = colors[(cx / 26) % colors.length];
-          const clothH = 22 + Math.sin(cx) * 6;
-          ctx.fillRect(cx, d.y + 6, 16, clothH);
-        }
-      } else if (d.type === 'antenna') {
-        // TV Antenna mast
-        ctx.strokeStyle = '#64748b';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(d.x, d.y + 100);
-        ctx.lineTo(d.x, d.y);
-        ctx.moveTo(d.x - 14, d.y + 20);
-        ctx.lineTo(d.x + 14, d.y + 20);
-        ctx.moveTo(d.x - 10, d.y + 40);
-        ctx.lineTo(d.x + 10, d.y + 40);
-        ctx.stroke();
-      } else if (d.type === 'neon_sign') {
-        // Glowing Bengali Neon Sign
-        const w = d.w || 200;
-        const h = d.h || 60;
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-        ctx.fillRect(d.x, d.y, w, h);
-        ctx.strokeStyle = d.color || '#38bdf8';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(d.x, d.y, w, h);
-
-        ctx.fillStyle = d.color || '#38bdf8';
-        ctx.font = 'bold 13px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(d.text || '', d.x + w * 0.5, d.y + h * 0.5 + 4);
-        ctx.textAlign = 'left';
-      }
-    }
-  }
-
-  private renderPlatforms(ctx: CanvasRenderingContext2D) {
-    for (const plat of this.levelData.platforms) {
-      if (plat.type === 'low_gap_barrier') {
-        // Slide duct (Hazard orange/red)
-        ctx.fillStyle = '#dc2626';
-        ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
-
-        // Yellow warning stripe
-        ctx.fillStyle = '#f59e0b';
-        ctx.fillRect(plat.x, plat.y + plat.h - 6, plat.w, 6);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 11px monospace';
-        ctx.fillText('▼ LOW DUCT (SLIDE)', plat.x + 16, plat.y - 8);
-      } else if (plat.type === 'vault_obstacle') {
-        // Vault Crate / Railing
-        ctx.fillStyle = '#b45309';
-        ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
-        ctx.fillStyle = '#fbbf24';
-        ctx.fillRect(plat.x, plat.y, plat.w, 4);
-
-        ctx.fillStyle = '#fef08a';
-        ctx.font = 'bold 10px monospace';
-        ctx.fillText('↷ VAULT', plat.x - 2, plat.y - 6);
-      } else if (plat.type === 'ladder') {
-        // Vertical ladder
-        ctx.fillStyle = '#e2e8f0';
-        ctx.fillRect(plat.x, plat.y, 6, plat.h);
-        ctx.fillRect(plat.x + plat.w - 6, plat.y, 6, plat.h);
-
-        ctx.fillStyle = '#38bdf8';
-        for (let ry = plat.y + 16; ry < plat.y + plat.h; ry += 24) {
-          ctx.fillRect(plat.x + 4, ry, plat.w - 8, 4);
-        }
-
-        ctx.fillStyle = '#38bdf8';
-        ctx.font = 'bold 10px monospace';
-        ctx.fillText('▲ CLIMB', plat.x - 6, plat.y - 8);
-      } else {
-        // Solid Dhaka Rooftop / Platform
-        ctx.fillStyle = '#1e293b'; // Slate concrete
-        ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
-
-        // Top edge neon turquoise trim
-        ctx.fillStyle = '#38bdf8';
-        ctx.fillRect(plat.x, plat.y, plat.w, 4);
-
-        // Brick mortar pattern for realism
-        ctx.strokeStyle = '#334155';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(plat.x, plat.y, plat.w, plat.h);
-
-        for (let by = plat.y + 24; by < plat.y + plat.h; by += 32) {
-          ctx.beginPath();
-          ctx.moveTo(plat.x, by);
-          ctx.lineTo(plat.x + plat.w, by);
-          ctx.stroke();
-        }
-      }
-    }
-  }
-
-  private renderTutorialSigns(ctx: CanvasRenderingContext2D) {
-    for (const tut of this.levelData.tutorialSigns) {
-      ctx.save();
-      const pw = 240;
-      const ph = 52;
-      const px = tut.x - pw * 0.5;
-      const py = tut.y - ph;
-
-      // Holographic board background
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-      ctx.beginPath();
-      ctx.roundRect(px, py, pw, ph, 8);
-      ctx.fill();
-
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      // Icon & Action
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 11px monospace';
-      ctx.fillText(`${tut.icon} ${tut.action}`, px + 10, py + 18);
-
-      // Desktop / Mobile Instruction
-      ctx.fillStyle = '#e2e8f0';
-      ctx.font = '10px monospace';
-      ctx.fillText(tut.instruction, px + 10, py + 34);
-
-      // Desktop Key Badge
-      ctx.fillStyle = '#f59e0b';
-      ctx.font = 'bold 9px monospace';
-      ctx.fillText(`[${tut.desktopKey}]`, px + 10, py + 46);
-
-      ctx.restore();
-    }
-  }
-
-  private renderCheckpoints(ctx: CanvasRenderingContext2D) {
-    for (let i = 0; i < this.levelData.checkpoints.length; i++) {
-      const cp = this.levelData.checkpoints[i];
-      ctx.save();
-
-      // Checkpoint Base
-      ctx.fillStyle = cp.activated ? '#22c55e' : '#64748b';
-      ctx.fillRect(cp.x - 16, cp.y - 8, 32, 8);
-
-      // Holographic Light Pillar
-      const grad = ctx.createLinearGradient(0, cp.y - 120, 0, cp.y);
-      grad.addColorStop(0, cp.activated ? 'rgba(34, 197, 94, 0)' : 'rgba(56, 189, 248, 0)');
-      grad.addColorStop(1, cp.activated ? 'rgba(34, 197, 94, 0.45)' : 'rgba(56, 189, 248, 0.25)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(cp.x - 12, cp.y - 120, 24, 120);
-
-      // Checkpoint Beacon Ring
-      ctx.fillStyle = cp.activated ? '#4ade80' : '#38bdf8';
-      ctx.beginPath();
-      ctx.arc(cp.x, cp.y - 70, 8, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Label
-      ctx.fillStyle = cp.activated ? '#86efac' : '#94a3b8';
-      ctx.font = 'bold 10px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(cp.activated ? `✓ CP ${i + 1} SAVED` : `CP ${i + 1}`, cp.x, cp.y - 86);
-
-      ctx.restore();
-    }
-  }
-
-  private renderFinishGate(ctx: CanvasRenderingContext2D) {
-    const fg = this.levelData.finishGate;
-    ctx.save();
-
-    // Twin Neon Gate Towers
-    ctx.fillStyle = '#f59e0b';
-    ctx.fillRect(fg.x, fg.y, 14, fg.h);
-    ctx.fillRect(fg.x + fg.w - 14, fg.y, 14, fg.h);
-
-    // Arch Overhead Banner
-    ctx.fillStyle = '#dc2626';
-    ctx.fillRect(fg.x, fg.y, fg.w, 36);
-
-    // Chequered Finish Line Pattern
-    for (let bx = fg.x; bx < fg.x + fg.w; bx += 10) {
-      for (let by = fg.y; by < fg.y + 36; by += 10) {
-        if ((bx + by) % 20 === 0) {
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(bx, by, 10, 10);
-        }
-      }
-    }
-
-    // Finish Text
-    ctx.fillStyle = '#fef08a';
-    ctx.font = 'bold 14px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('★ FINISH ★', fg.x + fg.w * 0.5, fg.y + 24);
-
-    ctx.restore();
-  }
-
-  private renderCollectibles(ctx: CanvasRenderingContext2D) {
-    const time = this.levelTimer;
-
-    for (const c of this.levelData.collectibles) {
-      if (c.collected) continue;
-
-      if (c.type === 'coin') {
-        // Rotating Gold Coin with 3D elliptical oscillation
-        const scaleX = Math.abs(Math.cos(time * 4 + c.x * 0.1));
-        const floatY = c.y + Math.sin(time * 3 + c.x) * 4;
-
-        ctx.save();
-        ctx.translate(c.x, floatY);
-
-        // Gold outer ring
-        ctx.fillStyle = '#f59e0b';
-        ctx.beginPath();
-        ctx.ellipse(0, 0, Math.max(3, 11 * scaleX), 11, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Specular inner shine
-        ctx.fillStyle = '#fef08a';
-        ctx.beginPath();
-        ctx.ellipse(0, 0, Math.max(1.5, 7 * scaleX), 7, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
-      } else if (c.type === 'secret_emblem') {
-        // Secret Emblem: Radiant Star Crest
-        const floatY = c.y + Math.sin(time * 2.5) * 6;
-        ctx.save();
-        ctx.translate(c.x, floatY);
-
-        // Glowing outer aura
-        ctx.fillStyle = 'rgba(234, 179, 8, 0.35)';
-        ctx.beginPath();
-        ctx.arc(0, 0, 24, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Golden Diamond Crest
-        ctx.fillStyle = '#eab308';
-        ctx.beginPath();
-        ctx.moveTo(0, -18);
-        ctx.lineTo(16, 0);
-        ctx.lineTo(0, 18);
-        ctx.lineTo(-16, 0);
-        ctx.closePath();
-        ctx.fill();
-
-        // Core star
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(0, 0, 6, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#fef08a';
-        ctx.font = 'bold 9px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('SECRET EMBLEM', 0, -26);
-
-        ctx.restore();
-      }
-    }
-  }
-
-  private renderRunnerTrails(ctx: CanvasRenderingContext2D, r: ParkourRunner2D = this.runner) {
+  private renderRunnerTrails(
+    ctx: CanvasRenderingContext2D,
+    r: ParkourRunner2D = this.runner,
+    accentColor: string = '#38bdf8'
+  ) {
     for (const t of r.trail) {
       ctx.save();
-      ctx.globalAlpha = t.alpha;
-      ctx.fillStyle = t.color || '#ef4444';
-      ctx.fillRect(t.x, t.y, r.width, t.h);
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = t.alpha * 0.5;
+      ctx.fillStyle = t.color || accentColor;
+      ctx.beginPath();
+      ctx.roundRect(t.x, t.y + 4, r.width, t.h - 8, 8);
+      ctx.fill();
       ctx.restore();
     }
   }
@@ -1152,7 +837,7 @@ export class Parkour2DGameEngine {
     const pillY = tagY - pillH;
 
     // Sleek frosted translucent capsule
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.82)';
     ctx.beginPath();
     ctx.roundRect(pillX, pillY, pillW, pillH, 9);
     ctx.fill();
@@ -1195,6 +880,16 @@ export class Parkour2DGameEngine {
 
     const charDef = getCharacterDef(characterId);
     const accentColor = charDef.accentColor;
+
+    // 0. Soft Ground Contact Drop Shadow
+    if (r.onGround) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(7, 10, 20, 0.45)';
+      ctx.beginPath();
+      ctx.ellipse(x + w * 0.5, y + r.standingHeight - 1, 18, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
 
     // 1. Render High-Definition 2D Animated Sprite
     const spriteDrawn = parkourAnimator.drawRunnerSprite(
