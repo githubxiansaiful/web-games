@@ -82,9 +82,13 @@ export class ParkourSpriteAnimator {
     let frameIndex = 0;
 
     // Action State Machine Mapping
-    if (runner.isSliding || runner.isVaulting) {
+    if (runner.isVaulting) {
       clipName = 'roll';
       frameIndex = Math.floor(animTime * 14) % 5;
+    } else if (runner.isCrouching) {
+      // Sitting down / crouching low pose (jumpEnd landing squat)
+      clipName = 'jumpEnd';
+      frameIndex = Math.abs(runner.vx) > 20 ? (Math.floor(animTime * 8) % 2 + 1) : 1;
     } else if (runner.isClimbing) {
       clipName = 'jumpStart';
       frameIndex = 1;

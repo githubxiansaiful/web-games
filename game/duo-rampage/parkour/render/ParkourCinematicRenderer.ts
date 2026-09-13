@@ -21,6 +21,7 @@ import {
   LevelCheckpoint,
   LevelTutorialSign,
   LevelFinishGate,
+  ParkourEnemy,
 } from '../levels/Level01RooftopIntro';
 import { ParkourRunner2D, PlatformRect } from '../character/ParkourRunner2D';
 import { parkourAnimator } from '../character/ParkourSpriteAnimator';
@@ -359,7 +360,7 @@ export class ParkourCinematicRenderer {
   // 2. GAMEPLAY WORLD RENDERING (Layer 5: Rooftops, Props, Hazards, Vfx)
   // ===========================================================================
 
-  public renderWorldPlatforms(ctx: CanvasRenderingContext2D, platforms: PlatformRect[]) {
+  public renderWorldPlatforms(ctx: CanvasRenderingContext2D, platforms: PlatformRect[], time: number = 0) {
     for (const plat of platforms) {
       if (plat.type === 'low_gap_barrier') {
         this.renderIndustrialSlideDuct(ctx, plat);
@@ -367,10 +368,289 @@ export class ParkourCinematicRenderer {
         this.renderVaultObstacle(ctx, plat);
       } else if (plat.type === 'ladder') {
         this.renderIndustrialLadder(ctx, plat);
+      } else if (plat.type === 'boost_pad') {
+        this.renderBoostPad(ctx, plat, time);
       } else {
         this.renderDhakaRooftopPlatform(ctx, plat);
       }
     }
+  }
+
+  /**
+   * Supersonic Mega Ramp Boost Accelerator Pad
+   */
+  public renderBoostPad(ctx: CanvasRenderingContext2D, plat: PlatformRect, time: number) {
+    const x = plat.x;
+    const y = plat.y;
+    const w = plat.w;
+    const h = plat.h;
+
+    ctx.save();
+
+    // 1. Heavy Carbon Foundation / Launch Bed
+    const padGrad = ctx.createLinearGradient(x, y, x, y + h);
+    padGrad.addColorStop(0, '#0f172a');
+    padGrad.addColorStop(1, '#020617');
+    ctx.fillStyle = padGrad;
+    ctx.fillRect(x, y, w, h);
+
+    // Hazard warning stripes on sides
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(x, y, 6, h);
+    ctx.fillRect(x + w - 6, y, 6, h);
+
+    // 2. Glowing accelerator grid / neon floor
+    ctx.fillStyle = 'rgba(6, 182, 212, 0.18)';
+    ctx.fillRect(x + 6, y + 2, w - 12, h - 4);
+
+    // 3. Animated Holographic Speed Chevrons (>>>)
+    const offset = (time * 90) % 32;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x + 8, y, w - 16, h);
+    ctx.clip();
+
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#38bdf8';
+    ctx.shadowColor = '#06b6d4';
+    ctx.shadowBlur = 10;
+
+    for (let cx = x + 8 - offset; cx < x + w + 35; cx += 32) {
+      ctx.beginPath();
+      ctx.moveTo(cx, y + 6);
+      ctx.lineTo(cx + 14, y + h * 0.5);
+      ctx.lineTo(cx, y + h - 6);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // 4. Supersonic Ledge Glow / Energy Edge
+    const pulse = 0.65 + Math.sin(time * 8) * 0.35;
+    ctx.fillStyle = `rgba(245, 158, 11, ${pulse})`;
+    ctx.fillRect(x, y, w, 3.5);
+
+    // Upward micro booster sparks
+    for (let s = 0; s < 4; s++) {
+      const sparkX = x + 15 + ((time * 140 + s * 55) % Math.max(10, w - 30));
+      const sparkY = y - 4 - ((time * 90 + s * 28) % 20);
+      ctx.fillStyle = s % 2 === 0 ? '#38bdf8' : '#fbbf24';
+      ctx.fillRect(sparkX, sparkY, 2.5, 3.5);
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * Render Interactive Parkour Enemies (Sentinel Drones & Cyborg Enforcers)
+   */
+  public renderEnemies(ctx: CanvasRenderingContext2D, enemies?: ParkourEnemy[], time: number = 0) {
+    if (!enemies || enemies.length === 0) return;
+    for (const enemy of enemies) {
+      if (enemy.type === 'drone') {
+        this.renderSentinelDrone(ctx, enemy, time);
+      } else {
+        this.renderCyborgEnforcer(ctx, enemy, time);
+      }
+    }
+  }
+
+  private renderSentinelDrone(ctx: CanvasRenderingContext2D, drone: ParkourEnemy, time: number) {
+    ctx.save();
+
+    if (!drone.alive) {
+      // Defeated explosion / spark wreck animation
+      const defT = drone.defeatedTimer || 0;
+      if (defT < 1.2) {
+        const pCount = 12;
+        for (let i = 0; i < pCount; i++) {
+          const angle = (i / pCount) * Math.PI * 2 + defT * 3;
+          const dist = defT * 140 + i * 2;
+          const px = drone.x + drone.w * 0.5 + Math.cos(angle) * dist;
+          const py = drone.y + drone.h * 0.5 + Math.sin(angle) * dist + defT * defT * 90;
+          const alpha = Math.max(0, 1 - defT / 1.2);
+          ctx.fillStyle = i % 2 === 0 ? `rgba(239, 68, 68, ${alpha})` : `rgba(245, 158, 11, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+      return;
+    }
+
+    const centerX = drone.x + drone.w * 0.5;
+    const centerY = drone.y + drone.h * 0.5;
+
+    // 1. Translucent Warning Scanning Beam pointing downward
+    const scanPulse = 0.2 + Math.sin(time * 4) * 0.08;
+    const beamGrad = ctx.createLinearGradient(centerX, centerY, centerX, centerY + 140);
+    beamGrad.addColorStop(0, `rgba(239, 68, 68, ${scanPulse * 1.5})`);
+    beamGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+    ctx.fillStyle = beamGrad;
+    ctx.beginPath();
+    ctx.moveTo(centerX - 8, centerY + 10);
+    ctx.lineTo(centerX + 8, centerY + 10);
+    ctx.lineTo(centerX + 45, centerY + 140);
+    ctx.lineTo(centerX - 45, centerY + 140);
+    ctx.closePath();
+    ctx.fill();
+
+    // 2. Drone Stealth Chassis
+    ctx.translate(centerX, centerY);
+    const tilt = drone.facing * 0.12;
+    ctx.rotate(tilt);
+
+    // Twin Anti-Grav Thruster Pods
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(-24, -6, 8, 12);
+    ctx.fillRect(16, -6, 8, 12);
+
+    // Blue/cyan ion exhaust flames under thrusters
+    const flameH = 6 + Math.sin(time * 20) * 4;
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillRect(-22, 6, 4, flameH);
+    ctx.fillRect(18, 6, 4, flameH);
+
+    // Main Armor Plating Body (Hexagonal stealth drone)
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-18, -10);
+    ctx.lineTo(18, -10);
+    ctx.lineTo(24, 2);
+    ctx.lineTo(14, 12);
+    ctx.lineTo(-14, 12);
+    ctx.lineTo(-24, 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Central Glowing Optical Eye / Sensor Visor
+    ctx.fillStyle = '#ef4444';
+    ctx.shadowColor = '#ef4444';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(drone.facing * 3, 1, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Pupil glare
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(drone.facing * 3 + 1, 0, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Top Warning Strobe
+    if (Math.floor(time * 5) % 2 === 0) {
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.arc(0, -11, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  private renderCyborgEnforcer(ctx: CanvasRenderingContext2D, cyborg: ParkourEnemy, time: number) {
+    ctx.save();
+
+    if (!cyborg.alive) {
+      // Defeated sparks & smoke
+      const defT = cyborg.defeatedTimer || 0;
+      if (defT < 1.2) {
+        const alpha = Math.max(0, 1 - defT / 1.2);
+        ctx.fillStyle = `rgba(148, 163, 184, ${alpha})`;
+        ctx.fillRect(cyborg.x, cyborg.y + cyborg.h - 18, cyborg.w, 18);
+        for (let i = 0; i < 8; i++) {
+          const sx = cyborg.x + Math.sin(defT * 10 + i) * 20;
+          const sy = cyborg.y + 20 + Math.cos(defT * 8 + i) * 20;
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(sx, sy, 3, 3);
+        }
+      }
+      ctx.restore();
+      return;
+    }
+
+    const centerX = cyborg.x + cyborg.w * 0.5;
+    const feetY = cyborg.y + cyborg.h;
+
+    ctx.save();
+    ctx.translate(centerX, feetY);
+    ctx.scale(cyborg.facing, 1);
+
+    // Walking animation cycle
+    const walkPhase = time * (cyborg.speed * 0.08);
+    const legL = Math.sin(walkPhase) * 12;
+    const legR = Math.sin(walkPhase + Math.PI) * 12;
+
+    // 1. Armored Cybernetic Legs
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#1e293b';
+
+    // Left Leg
+    ctx.beginPath();
+    ctx.moveTo(-5, -28);
+    ctx.lineTo(-5 + legL * 0.5, -14);
+    ctx.lineTo(-5 + legL, 0);
+    ctx.stroke();
+
+    // Right Leg
+    ctx.beginPath();
+    ctx.moveTo(5, -28);
+    ctx.lineTo(5 + legR * 0.5, -14);
+    ctx.lineTo(5 + legR, 0);
+    ctx.stroke();
+
+    // 2. Heavy Armored Torso / Exoskeleton
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(-11, -56, 22, 28);
+    ctx.strokeRect(-11, -56, 22, 28);
+
+    // Cybernetic Chest Reactor Core
+    ctx.fillStyle = '#06b6d4';
+    ctx.shadowColor = '#06b6d4';
+    ctx.shadowBlur = 6;
+    ctx.fillRect(-3, -48, 6, 8);
+    ctx.shadowBlur = 0;
+
+    // 3. Helmet & Glowing Crimson Tactical Visor
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.arc(0, -64, 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tactical Visor Strip
+    ctx.fillStyle = '#ef4444';
+    ctx.shadowColor = '#ef4444';
+    ctx.shadowBlur = 8;
+    ctx.fillRect(1, -66, 8, 3.5);
+    ctx.shadowBlur = 0;
+
+    // 4. Stun Baton / Cyber Weapon in hand
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = '#475569';
+    ctx.beginPath();
+    ctx.moveTo(6, -42);
+    ctx.lineTo(16, -30);
+    ctx.stroke();
+
+    // Stun Baton Plasma Blade with crackles
+    ctx.strokeStyle = '#38bdf8';
+    ctx.shadowColor = '#38bdf8';
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(16, -30);
+    ctx.lineTo(26, -20);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.restore();
+    ctx.restore();
   }
 
   /**
@@ -487,7 +767,7 @@ export class ParkourCinematicRenderer {
     // Neon Warning Tag
     ctx.fillStyle = '#f59e0b';
     ctx.font = 'black 10px monospace';
-    ctx.fillText('▼ LOW CLEARANCE • SLIDE [S]', x + 20, y - 6);
+    ctx.fillText('▼ LOW CLEARANCE • CROUCH [S]', x + 20, y - 6);
 
     ctx.restore();
   }

@@ -21,6 +21,7 @@ interface DuoCreateRoomScreenProps {
   onOpenSettings?: () => void;
   selectedCharacterId?: string;
   onSelectCharacter?: (id: string) => void;
+  onSelectLevel?: (level: number) => void;
 }
 
 export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
@@ -35,6 +36,7 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   onOpenSettings,
   selectedCharacterId = 'char_1',
   onSelectCharacter,
+  onSelectLevel,
 }) => {
   const { user, openAuthModal } = useAuth();
   const [mode, setMode] = useState<'create' | 'join'>(initialMode);
@@ -48,6 +50,16 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   const effectiveGameMode = room?.gameMode || gameMode;
   const effectiveLevel = room?.selectedLevel || selectedLevel;
   const activeRunnerChar = getCharacterDef(selectedCharacterId);
+
+  const handleSelectTrack = (levelNum: number) => {
+    duoAudio.playUiClick();
+    if (onSelectLevel) {
+      onSelectLevel(levelNum);
+    }
+    if (room?.code && isHost) {
+      duoNetwork.updateRoomSettings('parkour', levelNum);
+    }
+  };
 
   // Real User Information
   const realUserName = user?.name || 'RAMPAGE#001';
@@ -1052,7 +1064,11 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
         {effectiveGameMode === 'parkour' && (
           <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/50 text-cyan-300 font-mono text-[10px] font-black uppercase mb-1 tracking-widest">
             <span>🏃 DHAKA PARKOUR CO-OP</span>
-            <span className="text-amber-400">• SECTOR #{effectiveLevel.toString().padStart(2, '0')}</span>
+            {effectiveLevel === 99 ? (
+              <span className="text-amber-400 font-black">🔥 MEGA RAMP (ENEMIES & BOOSTS)</span>
+            ) : (
+              <span className="text-amber-400">• SECTOR #{effectiveLevel.toString().padStart(2, '0')}</span>
+            )}
           </div>
         )}
         <h1>
@@ -1231,6 +1247,80 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
               )}
             </div>
 
+            {/* Parkour Track Selector (Host chooses, synced to guest) */}
+            {effectiveGameMode === 'parkour' && (
+              <div className="w-full mb-3 p-2.5 rounded-2xl bg-slate-900/95 border border-slate-700/80 shadow-lg">
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <div className="flex items-center gap-1.5 text-[11px] font-mono font-black text-slate-300 tracking-wider uppercase">
+                    <span>🏁 PARKOUR TRACK</span>
+                  </div>
+                  {isHost ? (
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">
+                      LEADER CHOOSES
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                      HOST SELECTED
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Option 1: Sector 01 Intro */}
+                  <button
+                    type="button"
+                    disabled={!isHost}
+                    onClick={() => handleSelectTrack(1)}
+                    className={`p-2 rounded-xl border text-left transition-all relative ${
+                      effectiveLevel !== 99
+                        ? 'bg-cyan-950/80 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
+                        : 'bg-slate-950/60 border-slate-800 opacity-70 hover:opacity-100 hover:border-slate-700'
+                    } ${isHost ? 'cursor-pointer' : 'cursor-default'}`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs">🏢</span>
+                      {effectiveLevel !== 99 && (
+                        <span className="text-[9px] font-mono font-bold text-cyan-300 bg-cyan-500/20 px-1.5 py-0.5 rounded">
+                          ACTIVE
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs font-black text-white leading-tight font-knight uppercase">
+                      Sector 01 Rooftops
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                      Urban Flow • Dhaka Skyline
+                    </div>
+                  </button>
+
+                  {/* Option 2: Mega Ramp Parkour (Level 99) */}
+                  <button
+                    type="button"
+                    disabled={!isHost}
+                    onClick={() => handleSelectTrack(99)}
+                    className={`p-2 rounded-xl border text-left transition-all relative ${
+                      effectiveLevel === 99
+                        ? 'bg-gradient-to-tr from-amber-950/90 to-slate-900 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.5)]'
+                        : 'bg-slate-950/60 border-slate-800 opacity-70 hover:opacity-100 hover:border-slate-700'
+                    } ${isHost ? 'cursor-pointer' : 'cursor-default'}`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs">🚀</span>
+                      <span className="text-[9px] font-mono font-bold text-amber-300 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-400/40">
+                        🔥 ENEMIES & RAMPS
+                      </span>
+                    </div>
+                    <div className="text-xs font-black text-amber-300 leading-tight font-knight uppercase">
+                      Mega Ramp Parkour
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                      Supersonic Boosts • Drones • Cyborgs
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Runner Selector Banner for Parkour Mode */}
             {effectiveGameMode === 'parkour' && (
               <button
@@ -1280,8 +1370,12 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
                   <small>
                     {isPlayer2Joined
                       ? effectiveGameMode === 'parkour'
-                        ? `LAUNCH SECTOR #${effectiveLevel} CO-OP RUN`
+                        ? effectiveLevel === 99
+                          ? 'LAUNCH MEGA RAMP CO-OP RUN'
+                          : `LAUNCH SECTOR #${effectiveLevel} CO-OP RUN`
                         : 'LAUNCH 2-PLAYER SQUAD DROP'
+                      : effectiveGameMode === 'parkour' && effectiveLevel === 99
+                      ? 'LAUNCH MEGA RAMP (OR WAIT FOR SQUAD MATE)'
                       : 'LAUNCH MISSION (OR WAIT FOR SQUAD MATE)'}
                   </small>
                 </span>

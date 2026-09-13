@@ -22,7 +22,9 @@ import {
   DhakaParkourLevelData,
   LevelCollectible,
   LevelCheckpoint,
+  ParkourEnemy,
 } from '../levels/Level01RooftopIntro';
+import { buildLevelMegaRamp } from '../levels/LevelMegaRamp';
 import { duoAudio } from '../../audio/DuoAudioEngine';
 import { parkourAnimator } from '../character/ParkourSpriteAnimator';
 import { getCharacterDef } from '../character/ParkourCharacters';
@@ -58,6 +60,7 @@ export interface ParkourEngineCallbacks {
 }
 
 export interface ParkourEngineOptions {
+  selectedLevel?: number;
   isMultiplayer?: boolean;
   myRole?: 'assault' | 'heavy';
   localPlayerName?: string;
@@ -99,6 +102,8 @@ export class Parkour2DGameEngine {
   public camera: ParkourCamera2D;
   public particles: Particle[] = [];
 
+  public selectedLevel: number = 1;
+  public enemies: ParkourEnemy[] = [];
   public levelTimer: number = 0;
   public coinsCollected: number = 0;
   public secretEmblemFound: boolean = false;
@@ -132,6 +137,7 @@ export class Parkour2DGameEngine {
     this.callbacks = callbacks;
 
     if (options) {
+      if (options.selectedLevel) this.selectedLevel = options.selectedLevel;
       this.isMultiplayer = !!options.isMultiplayer;
       if (options.myRole) this.myRole = options.myRole;
       if (options.localPlayerName) this.localPlayerName = options.localPlayerName;
@@ -160,8 +166,13 @@ export class Parkour2DGameEngine {
     if (!ctx) throw new Error('Could not acquire 2D context');
     this.ctx = ctx;
 
-    // 2. Load Level 01 Rooftop Introduction
-    this.levelData = buildLevel01RooftopIntro();
+    // 2. Load Level: Mega Ramp (99) vs Rooftop Intro (1)
+    if (this.selectedLevel === 99) {
+      this.levelData = buildLevelMegaRamp();
+    } else {
+      this.levelData = buildLevel01RooftopIntro();
+    }
+    this.enemies = (this.levelData.enemies || []).map((e) => ({ ...e }));
     this.runner = new ParkourRunner2D(this.levelData.spawnPoint.x, this.levelData.spawnPoint.y);
     this.camera = new ParkourCamera2D(1280, 720);
 
@@ -264,6 +275,7 @@ export class Parkour2DGameEngine {
     if (state.vx !== undefined) pr.vx = state.vx;
     if (state.vy !== undefined) pr.vy = state.vy;
     if (state.facing !== undefined) pr.facing = state.facing;
+    if (state.isCrouching !== undefined) pr.isCrouching = !!state.isCrouching;
     if (state.isSliding !== undefined) pr.isSliding = !!state.isSliding;
     if (state.isClimbing !== undefined) pr.isClimbing = !!state.isClimbing;
     if (state.isLedgeGrabbing !== undefined) pr.isLedgeGrabbing = !!state.isLedgeGrabbing;
@@ -544,8 +556,141 @@ export class Parkour2DGameEngine {
       }
     }
 
+    // 3.5. Update Interactive Enemies (Sentinel Drones & Cyborg Enforcers)
+    if (this.enemies && this.enemies.length > 0) {
+      for (const enemy of this.enemies) {
+        if (!enemy.alive) {
+          if (enemy.defeatedTimer !== undefined) {
+            enemy.defeatedTimer += dt;
+          }
+          continue;
+        }
+
+        // Enemy movement patrol
+        if (enemy.type === 'drone') {
+          const base = enemy.baseY ?? enemy.y;
+          enemy.y = base + Math.sin(this.levelTimer * 3 + enemy.x * 0.02) * 16;
+          enemy.x += enemy.facing * enemy.speed * dt;
+          if (enemy.x > enemy.endX) enemy.facing = -1;
+          else if (enemy.x < enemy.startX) enemy.facing = 1;
+        } else if (enemy.type === 'cyborg') {
+          enemy.x += enemy.facing * enemy.speed * dt;
+          if (enemy.x > enemy.endX) enemy.facing = -1;
+          else if (enemy.x < enemy.startX) enemy.facing = 1;
+        }
+
+        // Check collision with Local Runner
+        const isColliding = this.runner.checkAABB(
+          this.runner.x,
+          this.runner.y,
+          this.runner.width,
+          this.runner.currentHeight,
+          enemy.x,
+          enemy.y,
+          enemy.w,
+          enemy.h
+        );
+
+        if (isColliding && enemy.alive) {
+          const isStomp =
+            this.runner.vy > 0 &&
+            this.runner.y + this.runner.currentHeight <= enemy.y + enemy.h * 0.65 + 14;
+
+          const isCrouchDuck = this.runner.isCrouching && enemy.type === 'drone';
+          const isCrouchSweep = this.runner.isCrouching && enemy.type === 'cyborg' && Math.abs(this.runner.vx) > 80;
+
+          if (isStomp) {
+            enemy.alive = false;
+            enemy.defeatedTimer = 0;
+            this.runner.vy = -620;
+            this.runner.canDoubleJump = true;
+            this.runner.hasDoubleJumped = false;
+            this.coinsCollected += 5;
+            duoAudio.playExplosion();
+            this.camera.triggerShake(7, 0.16);
+            this.bannerNotification = '⚡ STOMP ELIMINATION (+5 COINS)';
+            this.bannerTimer = 2.0;
+
+            // Explosion sparks
+            for (let i = 0; i < 16; i++) {
+              this.particles.push({
+                x: enemy.x + enemy.w * 0.5,
+                y: enemy.y + enemy.h * 0.5,
+                vx: (Math.random() - 0.5) * 220,
+                vy: (Math.random() - 0.5) * 220,
+                color: Math.random() > 0.5 ? '#ef4444' : '#f59e0b',
+                size: 3.5 + Math.random() * 3,
+                life: 0.4,
+                maxLife: 0.4,
+              });
+            }
+          } else if (isCrouchSweep) {
+            enemy.alive = false;
+            enemy.defeatedTimer = 0;
+            this.coinsCollected += 5;
+            duoAudio.playExplosion();
+            this.camera.triggerShake(6, 0.15);
+            this.bannerNotification = '💥 LOW SWEEP KNOCKOUT (+5 COINS)';
+            this.bannerTimer = 2.0;
+
+            // Sparks
+            for (let i = 0; i < 14; i++) {
+              this.particles.push({
+                x: enemy.x + enemy.w * 0.5,
+                y: enemy.y + enemy.h * 0.5,
+                vx: (Math.random() - 0.5) * 200,
+                vy: (Math.random() - 0.5) * 160,
+                color: '#38bdf8',
+                size: 3.5,
+                life: 0.35,
+                maxLife: 0.35,
+              });
+            }
+          } else if (isCrouchDuck) {
+            // Sits down / ducks cleanly under the hovering drone
+          } else if (this.runner.invincibleTimer <= 0) {
+            // Direct Hit Knockback
+            const knockDir = this.runner.x < enemy.x ? -1 : 1;
+            this.runner.vx = knockDir * 400;
+            this.runner.vy = -340;
+            this.runner.invincibleTimer = 1.0;
+            duoAudio.playPlayerHit();
+            this.camera.triggerShake(8, 0.2);
+            this.bannerNotification = '⚠️ ENEMY STRIKE!';
+            this.bannerTimer = 1.5;
+          }
+        }
+
+        // Check collision with Partner Runner (in multiplayer)
+        if (this.partnerRunner && enemy.alive) {
+          const isPartnerColliding = this.partnerRunner.checkAABB(
+            this.partnerRunner.x,
+            this.partnerRunner.y,
+            this.partnerRunner.width,
+            this.partnerRunner.currentHeight,
+            enemy.x,
+            enemy.y,
+            enemy.w,
+            enemy.h
+          );
+          if (isPartnerColliding) {
+            const partnerStomp =
+              this.partnerRunner.vy > 0 &&
+              this.partnerRunner.y + this.partnerRunner.currentHeight <= enemy.y + enemy.h * 0.65 + 14;
+            const partnerSweep = this.partnerRunner.isCrouching;
+            if (partnerStomp || partnerSweep) {
+              enemy.alive = false;
+              enemy.defeatedTimer = 0;
+              duoAudio.playExplosion();
+            }
+          }
+        }
+      }
+    }
+
     // 4. Pit Fall & Hazard Detection (Instant Respawn < 2 seconds)
-    if (this.runner.y > 1050) {
+    const pitFallThreshold = this.levelData.worldHeight ? this.levelData.worldHeight - 200 : 1050;
+    if (this.runner.y > pitFallThreshold) {
       duoAudio.playPlayerHit();
       const respawnX = this.activeCheckpoint ? this.activeCheckpoint.x : this.levelData.spawnPoint.x;
       const respawnY = this.activeCheckpoint ? this.activeCheckpoint.y - this.runner.standingHeight : this.levelData.spawnPoint.y;
@@ -731,8 +876,11 @@ export class Parkour2DGameEngine {
     // A. Render Rooftop Environment Props (Water Tanks, Clotheslines, Antennas, Neon Signs)
     parkourRenderer.renderRooftopDoodads(ctx, this.levelData.skylineDoodads, this.levelTimer);
 
-    // B. Render Architectural Platforms (Rooftop slabs, brick masonry, ladders, slide ducts)
-    parkourRenderer.renderWorldPlatforms(ctx, this.levelData.platforms);
+    // B. Render Architectural Platforms (Rooftop slabs, brick masonry, ladders, slide ducts, boost pads)
+    parkourRenderer.renderWorldPlatforms(ctx, this.levelData.platforms, this.levelTimer);
+
+    // B2. Render Interactive Enemies (Sentinel Drones & Cyborg Enforcers)
+    parkourRenderer.renderEnemies(ctx, this.enemies, this.levelTimer);
 
     // C. Render In-World Contextual Holographic Movement Glyphs (Non-intrusive)
     parkourRenderer.renderTutorialGlyphs(ctx, this.levelData.tutorialSigns, this.runner.x);
@@ -945,13 +1093,25 @@ export class Parkour2DGameEngine {
         ctx.fillRect(wallContactX, y + 22, 8, 8);
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(x + 6, y + h - 16, w - 12, 16);
-      } else if (r.isVaulting || r.isSliding) {
+      } else if (r.isVaulting) {
         ctx.fillStyle = mainColor;
         ctx.fillRect(x, y + 8, w + 12, h - 8);
         ctx.fillStyle = '#0f172a';
         ctx.beginPath();
         ctx.arc(r.facing > 0 ? x + w + 4 : x - 4, y + 16, 10, 0, Math.PI * 2);
         ctx.fill();
+      } else if (r.isCrouching) {
+        // Sitting down / crouching low pose
+        ctx.fillStyle = mainColor;
+        ctx.fillRect(x + 2, y + 10, w - 4, h - 10);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(x + 4, y + h - 14, w - 8, 14);
+        ctx.fillStyle = '#020617';
+        ctx.beginPath();
+        ctx.arc(x + w * 0.5 + r.facing * 4, y + 8, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = bandanaColor;
+        ctx.fillRect(x + w * 0.5 - 6, y + 6, 14, 3);
       } else {
         ctx.fillStyle = mainColor;
         ctx.fillRect(x + 4, y + 20, w - 8, h - 34);

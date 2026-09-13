@@ -48,6 +48,23 @@ export interface LevelFinishGate {
   h: number;
 }
 
+export interface ParkourEnemy {
+  id: string;
+  type: 'drone' | 'cyborg';
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  startX: number;
+  endX: number;
+  speed: number;
+  facing: number;
+  alive: boolean;
+  baseY?: number;
+  bobOffset?: number;
+  defeatedTimer?: number;
+}
+
 export interface DhakaParkourLevelData {
   id: string;
   levelNumber: number;
@@ -63,6 +80,7 @@ export interface DhakaParkourLevelData {
   checkpoints: LevelCheckpoint[];
   tutorialSigns: LevelTutorialSign[];
   finishGate: LevelFinishGate;
+  enemies?: ParkourEnemy[];
   skylineDoodads: Array<{
     type: 'water_tank' | 'clothesline' | 'antenna' | 'neon_sign' | 'tin_shed' | 'billboard';
     x: number;
@@ -179,10 +197,10 @@ export function buildLevel01RooftopIntro(): DhakaParkourLevelData {
     id: 'tut_slide',
     x: 1390,
     y: 690,
-    action: 'SLIDE UNDER DUCTS',
-    instruction: 'While running, press [S] to slide under low gaps',
+    action: 'CROUCH DOWN',
+    instruction: 'Hold [S] or [↓] to crouch down and pass under low ducts',
     desktopKey: 'S / DOWN',
-    icon: '▼',
+    icon: '🧎',
   });
 
   // Coins inside slide tunnel
