@@ -305,7 +305,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
   };
 
   return (
-    <div className="relative w-full h-[100dvh] max-h-[100dvh] bg-black overflow-hidden select-none touch-none">
+    <div className={`relative w-full h-[100dvh] max-h-[100dvh] bg-black overflow-hidden select-none ${screen === 'playing' ? 'touch-none' : 'touch-auto'}`}>
       {/* Three.js Canvas Container (Active when playing) */}
       <div
         ref={canvasContainerRef}
