@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { PlayerStats, DuoComboState, WaveState, TouchControlsState } from '@/game/duo-rampage/types';
 import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
+import { VirtualJoystick } from '@/components/ui/VirtualJoystick';
 
 interface DuoRampageHUDProps {
   player1: PlayerStats | null;
@@ -87,10 +88,6 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
       window.removeEventListener('touchstart', handleTouchStartGlobal);
     };
   }, []);
-  const joystickBaseRef = useRef<HTMLDivElement>(null);
-  const joystickStickRef = useRef<HTMLDivElement>(null);
-  const touchIdRef = useRef<number | null>(null);
-  const joystickOrigin = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Internal controls state
   const controlsRef = useRef<TouchControlsState>({
@@ -225,60 +222,6 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
       window.removeEventListener('wheel', handleWheel);
     };
   }, [onControlsChange, onSwitchWeapon]);
-
-  // Virtual Joystick Touch Handlers
-  const handleJoystickTouchStart = (e: React.TouchEvent) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    touchIdRef.current = touch.identifier;
-    const base = joystickBaseRef.current;
-    if (!base) return;
-
-    const rect = base.getBoundingClientRect();
-    joystickOrigin.current = {
-      x: rect.left + rect.width / 2,
-      y: rect.top + rect.height / 2,
-    };
-  };
-
-  const handleJoystickTouchMove = (e: React.TouchEvent) => {
-    e.preventDefault();
-    if (touchIdRef.current === null) return;
-
-    for (let i = 0; i < e.touches.length; i++) {
-      const touch = e.touches[i];
-      if (touch.identifier === touchIdRef.current) {
-        const dx = touch.clientX - joystickOrigin.current.x;
-        const dy = touch.clientY - joystickOrigin.current.y;
-        const maxDist = 38;
-        const dist = Math.hypot(dx, dy);
-
-        const clampedDist = Math.min(dist, maxDist);
-        const angle = Math.atan2(dy, dx);
-        const stickX = Math.cos(angle) * clampedDist;
-        const stickY = Math.sin(angle) * clampedDist;
-
-        if (joystickStickRef.current) {
-          joystickStickRef.current.style.transform = `translate(${stickX}px, ${stickY}px)`;
-        }
-
-        updateControls({
-          moveX: stickX / maxDist,
-          moveZ: stickY / maxDist,
-        });
-        break;
-      }
-    }
-  };
-
-  const handleJoystickTouchEnd = (e: React.TouchEvent) => {
-    e.preventDefault();
-    touchIdRef.current = null;
-    if (joystickStickRef.current) {
-      joystickStickRef.current.style.transform = `translate(0px, 0px)`;
-    }
-    updateControls({ moveX: 0, moveZ: 0 });
-  };
 
   const myPlayer = player2 ? (myRole === 'assault' ? player1 : player2) : player1;
   const partnerPlayer = player2 ? (myRole === 'assault' ? player2 : player1) : null;
@@ -498,18 +441,12 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
       {isTouchMode ? (
         /* MOBILE TOUCH CONTROLS (Only visible on touch / mobile devices) */
         <div className="absolute bottom-2.5 xs:bottom-3 sm:bottom-4 inset-x-0 px-2 xs:px-4 sm:px-6 flex items-end justify-between pointer-events-none safe-bottom animate-in fade-in duration-150">
-          {/* Left: Compact Translucent Movement Joystick */}
-          <div
-            ref={joystickBaseRef}
-            onTouchStart={handleJoystickTouchStart}
-            onTouchMove={handleJoystickTouchMove}
-            onTouchEnd={handleJoystickTouchEnd}
-            onTouchCancel={handleJoystickTouchEnd}
-            className="w-20 h-20 xs:w-22 xs:h-22 sm:w-24 sm:h-24 rounded-full bg-slate-950/35 border border-white/20 backdrop-blur-xs pointer-events-auto flex items-center justify-center relative touch-none shadow-xl active:border-cyan-400/70 transition-colors"
-          >
-            <div
-              ref={joystickStickRef}
-              className="w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-cyan-500/80 to-sky-400/80 border border-white/70 shadow-md pointer-events-none transition-transform duration-75"
+          {/* Left: Global Mobile Movement Joystick */}
+          <div className="pointer-events-auto select-none touch-none ml-1 sm:ml-2 mb-1 sm:mb-2">
+            <VirtualJoystick
+              size={125}
+              onMove={({ x, y }) => updateControls({ moveX: x, moveZ: y })}
+              onEnd={() => updateControls({ moveX: 0, moveZ: 0 })}
             />
           </div>
 

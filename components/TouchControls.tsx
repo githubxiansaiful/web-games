@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useRef, useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUp, RotateCcw } from 'lucide-react';
+import { ArrowUp, RotateCcw } from 'lucide-react';
+import { VirtualJoystick } from '@/components/ui/VirtualJoystick';
 
 interface TouchControlsProps {
   onDirectionPress: (dir: 'left' | 'right', pressed: boolean) => void;
@@ -124,65 +125,32 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
 
   return (
     <div className="absolute inset-x-0 bottom-0 pointer-events-none z-30 select-none pb-4 sm:pb-6 px-3 sm:px-8 safe-bottom safe-left safe-right flex justify-between items-end touch-none">
-      {/* Left side: D-PAD Controls */}
-      <div className="flex items-center gap-2.5 sm:gap-3 pointer-events-auto">
-        {/* Left Arrow Button */}
-        <button
-          onTouchStart={handleLeftTouchStart}
-          onTouchEnd={handleLeftTouchEnd}
-          onMouseDown={() => {
-            setLeftActive(true);
-            onDirectionPress('left', true);
-            triggerHaptic(10);
-          }}
-          onMouseUp={() => {
-            setLeftActive(false);
-            onDirectionPress('left', false);
-          }}
-          onMouseLeave={() => {
-            if (leftActive) {
-              setLeftActive(false);
+      {/* Left side: Global Mobile Virtual Joystick */}
+      <div className="pointer-events-auto select-none touch-none ml-1 sm:ml-2 mb-1 sm:mb-2">
+        <VirtualJoystick
+          size={135}
+          onMove={({ x, y }) => {
+            if (x < -0.2) {
+              onDirectionPress('left', true);
+              onDirectionPress('right', false);
+            } else if (x > 0.2) {
+              onDirectionPress('right', true);
               onDirectionPress('left', false);
-            }
-          }}
-          className={`w-15 h-15 sm:w-18 sm:h-18 rounded-2xl backdrop-blur-md border flex items-center justify-center transition-all active:scale-95 shadow-lg select-none touch-none ${
-            leftActive
-              ? 'bg-indigo-600/90 border-indigo-300 text-white shadow-indigo-500/40 scale-95'
-              : 'bg-slate-950/35 hover:bg-slate-900/50 border-white/20 text-white/80'
-          }`}
-          aria-label="Run Left"
-        >
-          <ArrowLeft className="w-7 h-7 sm:w-8 sm:h-8" />
-        </button>
-
-        {/* Right Arrow Button */}
-        <button
-          onTouchStart={handleRightTouchStart}
-          onTouchEnd={handleRightTouchEnd}
-          onMouseDown={() => {
-            setRightActive(true);
-            onDirectionPress('right', true);
-            triggerHaptic(10);
-          }}
-          onMouseUp={() => {
-            setRightActive(false);
-            onDirectionPress('right', false);
-          }}
-          onMouseLeave={() => {
-            if (rightActive) {
-              setRightActive(false);
+            } else {
+              onDirectionPress('left', false);
               onDirectionPress('right', false);
             }
+
+            if (y < -0.45) {
+              onJumpPress(true);
+            }
           }}
-          className={`w-15 h-15 sm:w-18 sm:h-18 rounded-2xl backdrop-blur-md border flex items-center justify-center transition-all active:scale-95 shadow-lg select-none touch-none ${
-            rightActive
-              ? 'bg-indigo-600/90 border-indigo-300 text-white shadow-indigo-500/40 scale-95'
-              : 'bg-slate-950/35 hover:bg-slate-900/50 border-white/20 text-white/80'
-          }`}
-          aria-label="Run Right"
-        >
-          <ArrowRight className="w-7 h-7 sm:w-8 sm:h-8" />
-        </button>
+          onEnd={() => {
+            onDirectionPress('left', false);
+            onDirectionPress('right', false);
+            onJumpPress(false);
+          }}
+        />
       </div>
 
       {/* Right side: Action Buttons (Quick Respawn + Big Jump) */}

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
 import { ParkourInput } from '@/game/duo-rampage/parkour/character/ParkourRunner2D';
+import { VirtualJoystick } from '@/components/ui/VirtualJoystick';
 
 interface ParkourHUDProps {
   telemetry: {
@@ -150,27 +151,7 @@ export const ParkourHUD: React.FC<ParkourHUDProps> = ({
   // ===========================================================================
   // MOBILE POINTER BUTTON HANDLERS (Multi-Touch Friendly)
   // ===========================================================================
-  const handleLeftDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    leftPressed.current = true;
-    onInputChange({ moveX: rightPressed.current ? 0 : -1 });
-  };
-  const handleLeftUp = (e: React.PointerEvent) => {
-    e.preventDefault();
-    leftPressed.current = false;
-    onInputChange({ moveX: rightPressed.current ? 1 : 0 });
-  };
 
-  const handleRightDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    rightPressed.current = true;
-    onInputChange({ moveX: leftPressed.current ? 0 : 1 });
-  };
-  const handleRightUp = (e: React.PointerEvent) => {
-    e.preventDefault();
-    rightPressed.current = false;
-    onInputChange({ moveX: leftPressed.current ? -1 : 0 });
-  };
 
   const handleJumpDown = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -372,29 +353,30 @@ export const ParkourHUD: React.FC<ParkourHUDProps> = ({
            (NO desktop keyboard details shown)
            =================================================================== */
         <div className="w-full flex items-end justify-between pointer-events-none pb-1.5 px-1">
-          {/* Left Side: Crystal-Clear Directional Buttons (LEFT & RIGHT) */}
-          <div className="flex items-center gap-2.5 pointer-events-auto select-none touch-none">
-            {/* Move Left Button */}
-            <button
-              onPointerDown={handleLeftDown}
-              onPointerUp={handleLeftUp}
-              onPointerCancel={handleLeftUp}
-              onPointerLeave={handleLeftUp}
-              className="w-14 h-14 xs:w-16 xs:h-16 rounded-2xl bg-slate-950/70 active:bg-cyan-600/80 border-2 border-white/30 active:border-cyan-300 backdrop-blur-md text-white font-black flex items-center justify-center shadow-xl transition active:scale-95 touch-none cursor-pointer"
-            >
-              <span className="text-2xl leading-none">◀</span>
-            </button>
-
-            {/* Move Right Button */}
-            <button
-              onPointerDown={handleRightDown}
-              onPointerUp={handleRightUp}
-              onPointerCancel={handleRightUp}
-              onPointerLeave={handleRightUp}
-              className="w-14 h-14 xs:w-16 xs:h-16 rounded-2xl bg-slate-950/70 active:bg-cyan-600/80 border-2 border-white/30 active:border-cyan-300 backdrop-blur-md text-white font-black flex items-center justify-center shadow-xl transition active:scale-95 touch-none cursor-pointer"
-            >
-              <span className="text-2xl leading-none">▶</span>
-            </button>
+          {/* Left Side: Global Mobile Virtual Joystick */}
+          <div className="pointer-events-auto select-none touch-none ml-1 sm:ml-2 mb-1">
+            <VirtualJoystick
+              size={125}
+              onMove={({ x, y }) => {
+                onInputChange({
+                  moveX: x,
+                  sprintHeld: Math.abs(x) > 0.75,
+                });
+                if (y < -0.6) {
+                  onInputChange({ jumpPressed: true, jumpHeld: true, moveY: -1 });
+                } else if (y > 0.6) {
+                  onInputChange({ slidePressed: true, moveY: 1 });
+                }
+              }}
+              onEnd={() => {
+                onInputChange({
+                  moveX: 0,
+                  moveY: 0,
+                  jumpHeld: false,
+                  sprintHeld: false,
+                });
+              }}
+            />
           </div>
 
           {/* Right Side: Action Cluster (SPRINT, SLIDE, JUMP) */}

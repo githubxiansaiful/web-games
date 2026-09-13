@@ -49,7 +49,7 @@ export const DuoModeSelectionSlider: React.FC<DuoModeSelectionSliderProps> = ({
   };
 
   return (
-    <div className="w-full select-none z-20 overflow-hidden py-1">
+    <div className="w-full relative bottom-[-15px] select-none z-20 overflow-hidden py-1">
       <div className="flex items-center justify-center gap-3 sm:gap-4 md:gap-6 px-2 sm:px-4">
         {MODES.map((item) => {
           const isSelected = selectedMode === item.id;
@@ -58,7 +58,7 @@ export const DuoModeSelectionSlider: React.FC<DuoModeSelectionSliderProps> = ({
             <div
               key={item.id}
               onClick={() => handleSelect(item.id)}
-              className={`relative shrink-0 w-40 h-20 xs:w-48 xs:h-24 sm:w-60 sm:h-30 md:w-72 md:h-36 rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 group select-none ${
+              className={`relative shrink-0 w-40 h-20 xs:w-48 xs:h-24 sm:w-60 sm:h-20 md:w-72 md:h-25 rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 group select-none ${
                 isSelected
                   ? item.id === 'parkour'
                     ? 'ring-2 ring-cyan-400 border border-cyan-300 shadow-[0_0_28px_rgba(6,182,212,0.85)] scale-105 opacity-100 z-10'

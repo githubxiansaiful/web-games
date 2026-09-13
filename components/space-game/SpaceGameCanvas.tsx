@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Play, RotateCcw, Volume2, VolumeX, Home, Trophy, Shield, Bomb, Zap, Sparkles, ArrowLeft } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useAuth } from '@/context/AuthContext';
+import { VirtualJoystick } from '@/components/ui/VirtualJoystick';
 
 interface Particle {
   x: number;
@@ -890,6 +891,25 @@ export const SpaceGameCanvas: React.FC<SpaceGameCanvasProps> = ({ onGoHome }) =>
         onTouchEnd={handleTouchEnd}
         className="w-full h-full block cursor-crosshair touch-none select-none"
       />
+
+      {/* Mobile Touch Controls */}
+      <div className="sm:hidden absolute bottom-5 left-5 z-20 pointer-events-auto">
+        <VirtualJoystick
+          size={120}
+          onMove={({ x, y }) => {
+            keysRef.current.left = x < -0.15;
+            keysRef.current.right = x > 0.15;
+            keysRef.current.up = y < -0.15;
+            keysRef.current.down = y > 0.15;
+          }}
+          onEnd={() => {
+            keysRef.current.left = false;
+            keysRef.current.right = false;
+            keysRef.current.up = false;
+            keysRef.current.down = false;
+          }}
+        />
+      </div>
 
       {/* Mobile Bomb Button */}
       <div className="sm:hidden absolute bottom-6 right-6 z-20 flex gap-3 pointer-events-auto">
