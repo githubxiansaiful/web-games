@@ -230,8 +230,8 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
     updateControls({ moveX: 0, moveZ: 0 });
   };
 
-  const myPlayer = myRole === 'assault' ? player1 : player2;
-  const partnerPlayer = myRole === 'assault' ? player2 : player1;
+  const myPlayer = player2 ? (myRole === 'assault' ? player1 : player2) : player1;
+  const partnerPlayer = player2 ? (myRole === 'assault' ? player2 : player1) : null;
 
   return (
     <div className="absolute inset-0 pointer-events-none select-none overflow-hidden font-sans z-30">
@@ -288,22 +288,22 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
             className="h-8 sm:h-11 w-auto drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] hidden xs:block"
           />
 
-          {/* Player 1 Card (Assault Hero) */}
+          {/* Player 1 Card (Solo or Co-op P1) */}
           <div className="flex items-center gap-2 bg-slate-950/85 backdrop-blur-md p-1.5 sm:p-2 rounded-2xl border border-red-500/50 shadow-2xl">
             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden border-2 border-red-500 bg-slate-900 shadow-md shrink-0 relative">
               <img
-                src={player1?.avatar || '/images/duo-rampage/player1.png'}
-                alt="P1"
+                src={player1?.avatar || (player1?.role === 'heavy' ? '/images/duo-rampage/player2_hologram.png' : '/images/duo-rampage/player1.png')}
+                alt={player2 ? 'P1' : 'HERO'}
                 className="w-full h-full object-cover"
                 style={{ objectPosition: '45% 18%', transform: 'scale(1.4)' }}
               />
               <span className="absolute top-0.5 left-0.5 px-1 bg-red-600/90 rounded text-[9px] font-black text-white leading-tight">
-                P1
+                {player2 ? 'P1' : 'HERO'}
               </span>
             </div>
             <div className="w-24 sm:w-36">
               <div className="flex items-center justify-between text-[11px] font-black tracking-wide text-red-400">
-                <span className="truncate">{player1 ? player1.name : 'HERO 1'}</span>
+                <span className="truncate">{player1 ? player1.name : 'HERO'}</span>
                 <span className="text-white text-[10px]">{player1 ? `${Math.round(player1.health)}` : '100'}</span>
               </div>
               {/* HP Bar */}
@@ -352,40 +352,42 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
 
         {/* Right: Player 2 (Heavy Hero) & Controls */}
         <div className="flex items-center gap-2">
-          {/* Player 2 Card */}
-          <div className="flex items-center gap-2 bg-slate-950/85 backdrop-blur-md p-1.5 sm:p-2 rounded-2xl border border-sky-500/50 shadow-2xl">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden border-2 border-sky-400 bg-slate-900 shadow-md shrink-0 relative">
-              <img
-                src={player2?.avatar || '/images/duo-rampage/player2_hologram.png'}
-                alt="P2"
-                className="w-full h-full object-cover"
-                style={{ objectPosition: '50% 20%', transform: 'scale(1.4)' }}
-              />
-              <span className="absolute top-0.5 right-0.5 px-1 bg-sky-600/90 rounded text-[9px] font-black text-white leading-tight">
-                P2
-              </span>
-            </div>
-            <div className="w-24 sm:w-36">
-              <div className="flex items-center justify-between text-[11px] font-black tracking-wide text-sky-400">
-                <span className="truncate">{player2 ? player2.name : 'HERO 2'}</span>
-                <span className="text-white text-[10px]">{player2 ? `${Math.round(player2.health)}` : '100'}</span>
-              </div>
-              {/* HP Bar */}
-              <div className="w-full h-3 bg-slate-900 rounded-sm overflow-hidden mt-0.5 border border-sky-900/60 relative">
-                <div
-                  className="h-full bg-gradient-to-r from-sky-500 to-cyan-400 transition-all duration-150"
-                  style={{ width: `${player2 ? (player2.health / player2.maxHealth) * 100 : 100}%` }}
+          {/* Player 2 Card (Co-op only) */}
+          {player2 && (
+            <div className="flex items-center gap-2 bg-slate-950/85 backdrop-blur-md p-1.5 sm:p-2 rounded-2xl border border-sky-500/50 shadow-2xl">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden border-2 border-sky-400 bg-slate-900 shadow-md shrink-0 relative">
+                <img
+                  src={player2.avatar || '/images/duo-rampage/player2_hologram.png'}
+                  alt="P2"
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: '50% 20%', transform: 'scale(1.4)' }}
                 />
+                <span className="absolute top-0.5 right-0.5 px-1 bg-sky-600/90 rounded text-[9px] font-black text-white leading-tight">
+                  P2
+                </span>
               </div>
-              {/* Ammo Bar */}
-              <div className="w-full h-1.5 bg-slate-950 rounded-sm overflow-hidden mt-0.5 border border-slate-800">
-                <div
-                  className="h-full bg-gradient-to-r from-amber-400 to-yellow-500"
-                  style={{ width: `${player2 ? (player2.ammo / player2.maxAmmo) * 100 : 100}%` }}
-                />
+              <div className="w-24 sm:w-36">
+                <div className="flex items-center justify-between text-[11px] font-black tracking-wide text-sky-400">
+                  <span className="truncate">{player2.name}</span>
+                  <span className="text-white text-[10px]">{Math.round(player2.health)}</span>
+                </div>
+                {/* HP Bar */}
+                <div className="w-full h-3 bg-slate-900 rounded-sm overflow-hidden mt-0.5 border border-sky-900/60 relative">
+                  <div
+                    className="h-full bg-gradient-to-r from-sky-500 to-cyan-400 transition-all duration-150"
+                    style={{ width: `${(player2.health / player2.maxHealth) * 100}%` }}
+                  />
+                </div>
+                {/* Ammo Bar */}
+                <div className="w-full h-1.5 bg-slate-950 rounded-sm overflow-hidden mt-0.5 border border-slate-800">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-400 to-yellow-500"
+                    style={{ width: `${(player2.ammo / player2.maxAmmo) * 100}%` }}
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Sound & Exit Buttons */}
           <div className="flex flex-col gap-1.5 pointer-events-auto">
@@ -470,20 +472,23 @@ export const DuoRampageHUD: React.FC<DuoRampageHUDProps> = ({
               </span>
             </button>
 
-            {/* Revive Button (Highlights if partner down) */}
-            <button
-              onTouchStart={() => updateControls({ isReviving: true })}
-              onTouchEnd={() => updateControls({ isReviving: false })}
-              onMouseDown={() => updateControls({ isReviving: true })}
-              onMouseUp={() => updateControls({ isReviving: false })}
-              className={`w-12 h-12 rounded-2xl border flex items-center justify-center font-black text-xs shadow-lg transition active:scale-95 cursor-pointer ${
-                partnerPlayer?.isDown
-                  ? 'bg-emerald-500 border-emerald-300 text-white animate-bounce shadow-emerald-500/40'
-                  : 'bg-slate-900/80 border-slate-700 text-slate-400'
-              }`}
-            >
-              <Heart className="w-5 h-5 fill-current" />
-            </button>
+            {/* Revive Button (Highlights if partner down, co-op only) */}
+            {partnerPlayer && (
+              <button
+                onTouchStart={() => updateControls({ isReviving: true })}
+                onTouchEnd={() => updateControls({ isReviving: false })}
+                onMouseDown={() => updateControls({ isReviving: true })}
+                onMouseUp={() => updateControls({ isReviving: false })}
+                className={`w-12 h-12 rounded-2xl border flex items-center justify-center font-black text-xs shadow-lg transition active:scale-95 cursor-pointer ${
+                  partnerPlayer?.isDown
+                    ? 'bg-emerald-500 border-emerald-300 text-white animate-bounce shadow-emerald-500/40'
+                    : 'bg-slate-900/80 border-slate-700 text-slate-400'
+                }`}
+                title="Revive Teammate (E)"
+              >
+                <Heart className="w-5 h-5 fill-current" />
+              </button>
+            )}
 
             {/* Dash Button */}
             <button

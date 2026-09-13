@@ -100,6 +100,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
     duoNetwork.onRemotePlayerState = (state) => {
       if (!engineRef.current || isSoloRef.current) return;
       const remote = myRoleRef.current === 'assault' ? engineRef.current.player2 : engineRef.current.player1;
+      if (!remote) return;
       remote.state.x = state.x;
       remote.state.y = state.z;
       remote.state.facing = state.facing;
@@ -113,6 +114,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
     duoNetwork.onRemoteShoot = (data) => {
       if (!engineRef.current || isSoloRef.current) return;
       const remote = myRoleRef.current === 'assault' ? engineRef.current.player2 : engineRef.current.player1;
+      if (!remote) return;
       const facing = data.dir.x >= 0 ? 1 : -1;
       const aimAngle = Math.atan2(data.dir.y || 0, data.dir.x || facing);
       engineRef.current.weapons.fireWeapon(
@@ -132,7 +134,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
     duoNetwork.onRemoteRevived = () => {
       if (!engineRef.current) return;
       const me = myRoleRef.current === 'assault' ? engineRef.current.player1 : engineRef.current.player2;
-      if (me.state.isDowned) me.reviveSuccess();
+      if (me && me.state.isDowned) me.reviveSuccess();
     };
 
     return () => {
@@ -147,6 +149,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
     const interval = setInterval(() => {
       if (!engineRef.current) return;
       const me = myRole === 'assault' ? engineRef.current.player1 : engineRef.current.player2;
+      if (!me) return;
       duoNetwork.sendPlayerState({
         x: me.state.x,
         z: me.state.y,
@@ -182,7 +185,7 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
       {
         onUpdateStats: (p1, p2, combo, wave, bossHp, warning) => {
           setPlayer1Stats({ ...p1 });
-          setPlayer2Stats({ ...p2 });
+          setPlayer2Stats(p2 ? { ...p2 } : null);
           setComboState({ ...combo });
           setWaveState({ ...wave });
           setWarningStayTogether(!!warning);
@@ -363,8 +366,8 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
           onControlsChange={handleControlsChange}
           onSwitchWeapon={() => {
             if (engineRef.current) {
-              const active = myRole === 'assault' ? engineRef.current.player1 : engineRef.current.player2;
-              active.switchWeapon();
+              const active = isSolo ? engineRef.current.player1 : (myRole === 'assault' ? engineRef.current.player1 : engineRef.current.player2);
+              if (active) active.switchWeapon();
             }
           }}
           onExit={() => setScreen('menu')}

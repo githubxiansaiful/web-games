@@ -1,4 +1,4 @@
-import { CharacterRole, PlayerAnimState, PlayerState2D, WeaponKind } from '../Duo2DTypes';
+import { CharacterRole, PlayerState2D, WeaponKind } from '../Duo2DTypes';
 import { PlatformManager } from '../world/PlatformManager';
 import { ParticleEngine2D } from '../effects/ParticleEngine2D';
 import { duoAudio } from '../../audio/DuoAudioEngine';

@@ -15,7 +15,7 @@ import { duoAudio } from '../../audio/DuoAudioEngine';
 export interface Duo2DCallbacks {
   onUpdateStats: (
     p1: PlayerStats,
-    p2: PlayerStats,
+    p2: PlayerStats | null,
     combo: DuoComboState,
     wave: WaveState,
     bossHp?: { current: number; max: number; name: string } | null,
@@ -47,7 +47,7 @@ export class Duo2DGameEngine {
 
   // Entities
   public player1: PlayerCharacter2D;
-  public player2: PlayerCharacter2D;
+  public player2: PlayerCharacter2D | null = null;
   public enemies: Enemy2D[] = [];
 
   // Configuration
@@ -101,9 +101,16 @@ export class Duo2DGameEngine {
     this.waveSys = new WaveSystem2D();
     this.camera = new DuoCamera2D(1920, 1080);
 
-    // Initialize Players
-    this.player1 = new PlayerCharacter2D('p1', 'assault', 'Assault Hero', '/images/duo-rampage/player1.png', 480);
-    this.player2 = new PlayerCharacter2D('p2', 'heavy', 'Heavy Heroine', '/images/duo-rampage/player2_hologram.png', 560);
+    // Initialize Players (Solo mode = exactly 1 player, no second player)
+    if (this.isSolo) {
+      const heroName = myRole === 'assault' ? 'Assault Hero' : 'Heavy Heroine';
+      const heroAvatar = myRole === 'assault' ? '/images/duo-rampage/player1.png' : '/images/duo-rampage/player2_hologram.png';
+      this.player1 = new PlayerCharacter2D('p1', myRole, heroName, heroAvatar, 600);
+      this.player2 = null;
+    } else {
+      this.player1 = new PlayerCharacter2D('p1', 'assault', 'Assault Hero', '/images/duo-rampage/player1.png', 480);
+      this.player2 = new PlayerCharacter2D('p2', 'heavy', 'Heavy Heroine', '/images/duo-rampage/player2_hologram.png', 560);
+    }
 
     // Initial controls
     this.localControls = {
@@ -152,13 +159,12 @@ export class Duo2DGameEngine {
     this.particles.update(dt);
 
     // 2. Local Player Input Processing
-    const localPlayer = this.myRole === 'assault' ? this.player1 : this.player2;
-    const partner = this.myRole === 'assault' ? this.player2 : this.player1;
-
-    // Solo Bot AI for partner if in solo mode
-    if (this.isSolo) {
-      this.updatePartnerBot(dt, partner, localPlayer);
-    }
+    const localPlayer = this.isSolo
+      ? this.player1
+      : (this.myRole === 'assault' ? this.player1 : this.player2!);
+    const partner = this.isSolo
+      ? null
+      : (this.myRole === 'assault' ? this.player2 : this.player1);
 
     const localInput = {
       moveX: this.localControls.moveX,
@@ -213,46 +219,70 @@ export class Duo2DGameEngine {
       this.callbacks.onGrenadeBroadcast?.(localPlayer.state.x, localPlayer.state.y, localPlayer.state.facing);
     }
 
-    // 5. Co-op Synergy ("Stay Together" 2x Rampage Boost)
-    const playerDist = Math.hypot(this.player1.state.x - this.player2.state.x, this.player1.state.y - this.player2.state.y);
-    const prevRampage = this.isRampage;
-    this.isRampage = playerDist <= 280 && !this.player1.state.isDowned && !this.player2.state.isDowned;
+    // 5. Rampage Mode & Co-op Synergy
+    if (this.isSolo || !partner) {
+      // Solo Mode: Kill combo triggers Rampage Boost!
+      const prevRampage = this.isRampage;
+      this.isRampage = this.comboCount >= 5;
 
-    if (this.isRampage && !prevRampage) {
-      duoAudio.playRampageMode();
-      this.particles.spawnDamageText('RAMPAGE BOOST x2!', (this.player1.state.x + this.player2.state.x) * 0.5, this.player1.state.y - 40, '#f97316', true, 28);
-    }
-
-    // 6. Revive Interaction
-    if (partner.state.isDowned && !localPlayer.state.isDowned && playerDist < 120 && localInput.revive) {
-      this.reviveTimer += dt;
-      partner.state.reviveProgress = Math.min(1, this.reviveTimer / 2.2);
-
-      // Medical Energy Healing Particles
-      this.particles.spawnHitSparks(partner.state.x + partner.state.w * 0.5, partner.state.y + 20, '#34d399', 3);
-
-      if (this.reviveTimer >= 2.2) {
-        partner.reviveSuccess();
-        this.reviveTimer = 0;
-        this.callbacks.onReviveSuccessBroadcast?.();
-        this.particles.spawnDamageText('HERO REVIVED!', partner.state.x + partner.state.w * 0.5, partner.state.y - 30, '#34d399', true, 30);
+      if (this.isRampage && !prevRampage) {
+        duoAudio.playRampageMode();
+        this.particles.spawnDamageText('SOLO RAMPAGE x2!', this.player1.state.x + this.player1.state.w * 0.5, this.player1.state.y - 40, '#f97316', true, 28);
       }
     } else {
-      this.reviveTimer = 0;
-      if (partner.state.isDowned) {
-        partner.state.reviveProgress = 0;
+      // Co-op Mode: Proximity synergy
+      const playerDist = Math.hypot(this.player1.state.x - partner.state.x, this.player1.state.y - partner.state.y);
+      const prevRampage = this.isRampage;
+      this.isRampage = playerDist <= 280 && !this.player1.state.isDowned && !partner.state.isDowned;
+
+      if (this.isRampage && !prevRampage) {
+        duoAudio.playRampageMode();
+        this.particles.spawnDamageText('RAMPAGE BOOST x2!', (this.player1.state.x + partner.state.x) * 0.5, this.player1.state.y - 40, '#f97316', true, 28);
+      }
+
+      // 6. Revive Interaction (Co-op only)
+      if (partner.state.isDowned && !localPlayer.state.isDowned && playerDist < 120 && localInput.revive) {
+        this.reviveTimer += dt;
+        partner.state.reviveProgress = Math.min(1, this.reviveTimer / 2.2);
+
+        // Medical Energy Healing Particles
+        this.particles.spawnHitSparks(partner.state.x + partner.state.w * 0.5, partner.state.y + 20, '#34d399', 3);
+
+        if (this.reviveTimer >= 2.2) {
+          partner.reviveSuccess();
+          this.reviveTimer = 0;
+          this.callbacks.onReviveSuccessBroadcast?.();
+          this.particles.spawnDamageText('HERO REVIVED!', partner.state.x + partner.state.w * 0.5, partner.state.y - 30, '#34d399', true, 30);
+        }
+      } else {
+        this.reviveTimer = 0;
+        if (partner.state.isDowned) {
+          partner.state.reviveProgress = 0;
+        }
       }
     }
 
-    // Check Game Over (Both Downed)
-    if (this.player1.state.isDowned && this.player2.state.isDowned) {
-      this.callbacks.onGameOver(false, {
-        score: this.totalScore,
-        kills: this.totalKills,
-        maxCombo: this.maxCombo,
-        wave: this.waveSys.currentWave,
-      });
-      return;
+    // Check Game Over
+    if (this.isSolo || !partner) {
+      if (this.player1.state.isDowned) {
+        this.callbacks.onGameOver(false, {
+          score: this.totalScore,
+          kills: this.totalKills,
+          maxCombo: this.maxCombo,
+          wave: this.waveSys.currentWave,
+        });
+        return;
+      }
+    } else {
+      if (this.player1.state.isDowned && partner.state.isDowned) {
+        this.callbacks.onGameOver(false, {
+          score: this.totalScore,
+          kills: this.totalKills,
+          maxCombo: this.maxCombo,
+          wave: this.waveSys.currentWave,
+        });
+        return;
+      }
     }
 
     // 7. Update Weapons & Grenade Detonations
@@ -332,14 +362,14 @@ export class Duo2DGameEngine {
       } else {
         // Enemy bullet vs Players
         const p1 = this.player1.state;
-        const p2 = this.player2.state;
+        const p2 = this.player2?.state;
 
         if (b.x >= p1.x && b.x <= p1.x + p1.w && b.y >= p1.y && b.y <= p1.y + p1.h) {
           this.player1.takeDamage(b.damage, this.particles);
           this.weapons.bullets.splice(bIdx, 1);
           this.camera.addShake(4, 0.15);
-        } else if (b.x >= p2.x && b.x <= p2.x + p2.w && b.y >= p2.y && b.y <= p2.y + p2.h) {
-          this.player2.takeDamage(b.damage, this.particles);
+        } else if (p2 && b.x >= p2.x && b.x <= p2.x + p2.w && b.y >= p2.y && b.y <= p2.y + p2.h) {
+          this.player2!.takeDamage(b.damage, this.particles);
           this.weapons.bullets.splice(bIdx, 1);
           this.camera.addShake(4, 0.15);
         }
@@ -370,14 +400,22 @@ export class Duo2DGameEngine {
       }
     }
 
-    // 10. Update Enemies
-    const primaryTarget = !this.player1.state.isDowned ? this.player1.state : this.player2.state;
+    // 10. Update Enemies (Target closest alive player)
+    const getTarget = (ex: number, ey: number) => {
+      if (!this.player2 || this.player2.state.isDowned) return this.player1.state;
+      if (this.player1.state.isDowned) return this.player2.state;
+      const d1 = Math.hypot(this.player1.state.x - ex, this.player1.state.y - ey);
+      const d2 = Math.hypot(this.player2.state.x - ex, this.player2.state.y - ey);
+      return d1 <= d2 ? this.player1.state : this.player2.state;
+    };
+
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
+      const target = getTarget(e.stats.x, e.stats.y);
       const alive = e.update(
         dt,
-        primaryTarget.x,
-        primaryTarget.y,
+        target.x,
+        target.y,
         this.platformMgr,
         this.particles,
         (type, ex, ey, facing) => {
@@ -419,8 +457,10 @@ export class Duo2DGameEngine {
             // Melee swing
             const p1Dist = Math.hypot(this.player1.state.x - ex, this.player1.state.y - ey);
             if (p1Dist < 60) this.player1.takeDamage(22, this.particles);
-            const p2Dist = Math.hypot(this.player2.state.x - ex, this.player2.state.y - ey);
-            if (p2Dist < 60) this.player2.takeDamage(22, this.particles);
+            if (this.player2) {
+              const p2Dist = Math.hypot(this.player2.state.x - ex, this.player2.state.y - ey);
+              if (p2Dist < 60) this.player2.takeDamage(22, this.particles);
+            }
           }
         }
       );
@@ -443,16 +483,20 @@ export class Duo2DGameEngine {
       dt,
       this.player1.state.x,
       this.player1.state.y,
-      this.player2.state.x,
-      this.player2.state.y,
+      this.player2 ? this.player2.state.x : undefined,
+      this.player2 ? this.player2.state.y : undefined,
       this.platformMgr.worldWidth,
       this.platformMgr.worldHeight
     );
 
     // 12. Send HUD Callbacks
+    const playerDist = this.player2
+      ? Math.hypot(this.player1.state.x - this.player2.state.x, this.player1.state.y - this.player2.state.y)
+      : 0;
+
     this.callbacks.onUpdateStats(
       this.toPlayerStats(this.player1.state),
-      this.toPlayerStats(this.player2.state),
+      this.player2 ? this.toPlayerStats(this.player2.state) : null,
       {
         count: this.comboCount,
         multiplier: this.isRampage ? 2.0 : 1.0,
@@ -471,7 +515,7 @@ export class Duo2DGameEngine {
         waveAnnounceText: this.waveSys.waveAnnounceTimer > 0 ? this.waveSys.waveAnnounceText : '',
       },
       this.bossStats,
-      playerDist > 400
+      this.player2 !== null && playerDist > 400
     );
   }
 
@@ -506,53 +550,6 @@ export class Duo2DGameEngine {
     }
   }
 
-  private updatePartnerBot(dt: number, bot: PlayerCharacter2D, leader: PlayerCharacter2D) {
-    const distToLeader = Math.hypot(leader.state.x - bot.state.x, leader.state.y - bot.state.y);
-    let moveX = 0;
-    let jump = false;
-
-    if (distToLeader > 160) {
-      moveX = leader.state.x > bot.state.x ? 1 : -1;
-    }
-
-    if (leader.state.y < bot.state.y - 60 && bot.state.isGrounded) {
-      jump = true;
-    }
-
-    bot.update(
-      dt,
-      {
-        moveX,
-        moveY: 0,
-        jump,
-        dropDown: false,
-        dash: false,
-        melee: false,
-        shoot: false,
-        revive: leader.state.isDowned && distToLeader < 100,
-      },
-      this.platformMgr,
-      this.particles
-    );
-
-    // Bot shoots nearest enemy
-    if (this.enemies.length > 0 && Math.random() < 0.05) {
-      const nearest = this.enemies[0];
-      bot.state.facing = nearest.stats.x > bot.state.x ? 1 : -1;
-      this.weapons.fireWeapon(
-        bot.state.weapon,
-        bot.state.x + (bot.state.facing === 1 ? bot.state.w : 0),
-        bot.state.y + 30,
-        bot.state.facing,
-        bot.state.facing === 1 ? 0 : Math.PI,
-        true,
-        bot.state.id,
-        this.isRampage,
-        this.particles
-      );
-    }
-  }
-
   private render() {
     const ctx = this.ctx;
     const w = this.canvas.width;
@@ -577,12 +574,12 @@ export class Duo2DGameEngine {
     this.propsMgr.render(ctx);
 
     // Co-op "Stay Together" Plasma Energy Tether (When Rampage is active)
-    if (this.isRampage) {
+    if (this.isRampage && this.player2) {
       this.drawCoopTether(ctx);
     }
 
-    // Revive Channel Beam
-    if (this.player1.state.isDowned || this.player2.state.isDowned) {
+    // Revive Channel Beam (Co-op only)
+    if (this.player2 && (this.player1.state.isDowned || this.player2.state.isDowned)) {
       this.drawReviveBeam(ctx);
     }
 
@@ -592,8 +589,10 @@ export class Duo2DGameEngine {
     }
 
     // Players
-    this.player1.render(ctx, this.myRole === 'assault', this.isRampage);
-    this.player2.render(ctx, this.myRole === 'heavy', this.isRampage);
+    this.player1.render(ctx, this.isSolo ? true : this.myRole === 'assault', this.isRampage);
+    if (this.player2) {
+      this.player2.render(ctx, this.myRole === 'heavy', this.isRampage);
+    }
 
     // Bullets & Grenades
     this.weapons.render(ctx);
@@ -605,6 +604,7 @@ export class Duo2DGameEngine {
   }
 
   private drawCoopTether(ctx: CanvasRenderingContext2D) {
+    if (!this.player2) return;
     const p1 = this.player1.state;
     const p2 = this.player2.state;
     const p1Center = { x: p1.x + p1.w * 0.5, y: p1.y + 35 };
@@ -631,6 +631,7 @@ export class Duo2DGameEngine {
   }
 
   private drawReviveBeam(ctx: CanvasRenderingContext2D) {
+    if (!this.player2) return;
     const downed = this.player1.state.isDowned ? this.player1.state : this.player2.state;
     const reviver = this.player1.state.isDowned ? this.player2.state : this.player1.state;
 
