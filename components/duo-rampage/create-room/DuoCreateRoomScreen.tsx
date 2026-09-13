@@ -123,11 +123,6 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   };
 
   const handleConnect = async () => {
-    if (!user) {
-      openAuthModal('login');
-      showToast('Login required to join squad');
-      return;
-    }
     const clean = inputCode.trim().replace(/[^0-9A-Za-z]/g, '').toUpperCase();
     if (clean.length < 4) {
       showToast('Please enter a valid 6-digit room PIN');
@@ -153,17 +148,8 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
   };
 
   const handleStart = () => {
-    if (!user) {
-      openAuthModal('login');
-      showToast('Login required to start mission');
-      return;
-    }
     if (!isHost) {
       showToast('Only the squad leader can launch the mission');
-      return;
-    }
-    if (!isPlayer2Joined) {
-      showToast(`Waiting for Player 2 to join with PIN ${activeCode}`);
       return;
     }
     duoAudio.playCountdown(0);
@@ -1035,7 +1021,7 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
             {isHost ? (
               <button
                 type="button"
-                className={`duo-start-btn ${isPlayer2Joined ? 'ready' : 'disabled'}`}
+                className="duo-start-btn ready"
                 onClick={handleStart}
               >
                 <span className="duo-play-triangle">▶</span>
@@ -1046,7 +1032,7 @@ export const DuoCreateRoomScreen: React.FC<DuoCreateRoomScreenProps> = ({
                       ? effectiveGameMode === 'parkour'
                         ? `LAUNCH SECTOR #${effectiveLevel} CO-OP RUN`
                         : 'LAUNCH 2-PLAYER SQUAD DROP'
-                      : 'Waiting for partner to join...'}
+                      : 'LAUNCH MISSION (OR WAIT FOR SQUAD MATE)'}
                   </small>
                 </span>
               </button>

@@ -22,6 +22,7 @@ import {
 } from '@/game/duo-rampage/types';
 import { duoAudio } from '@/game/duo-rampage/audio/DuoAudioEngine';
 import { useAuth } from '@/context/AuthContext';
+import { AuthModal } from '@/components/auth/AuthModal';
 
 interface DuoRampageGameProps {
   onExit: () => void;
@@ -219,12 +220,8 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
 
   // Handlers
   const handleCreateRoom = async (chosenMode?: DuoGameMode, level?: number) => {
-    if (!user) {
-      openAuthModal('login');
-      return;
-    }
-    const myName = user.name || 'RAMPAGE#001';
-    const myAvatar = user.avatar;
+    const myName = user?.name || (typeof window !== 'undefined' ? localStorage.getItem('runner_player_name') : null) || 'RAMPAGE#001';
+    const myAvatar = user?.avatar || undefined;
     const effectiveMode = chosenMode || gameMode;
     const effectiveLevel = level || selectedParkourLevel;
     setGameMode(effectiveMode);
@@ -248,14 +245,14 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
       setMyRole('assault');
       setRoom({
         code: String(Math.floor(100000 + Math.random() * 900000)),
-        hostId: user.id || 'local-host',
+        hostId: user?.id || 'local-host',
         status: 'lobby',
         countdownTimer: 0,
         players: [
           {
-            id: user.id || 'local-host',
+            id: user?.id || 'local-host',
             name: myName,
-            avatar: myAvatar,
+            avatar: myAvatar || undefined,
             role: 'assault',
             isReady: true,
             isHost: true,
@@ -272,21 +269,13 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
   };
 
   const handleOpenJoinRoom = () => {
-    if (!user) {
-      openAuthModal('login');
-      return;
-    }
     setCreateRoomMode('join');
     setScreen('create_room');
   };
 
   const handleJoinRoom = async (code: string) => {
-    if (!user) {
-      openAuthModal('login');
-      return;
-    }
-    const myName = user.name || 'Hero 2';
-    const myAvatar = user.avatar;
+    const myName = user?.name || (typeof window !== 'undefined' ? localStorage.getItem('runner_player_name') : null) || 'Hero 2';
+    const myAvatar = user?.avatar || undefined;
 
     await duoNetwork.connect();
     const joinedRoom = await duoNetwork.joinRoom(code, myName, myAvatar);
@@ -441,6 +430,9 @@ export const DuoRampageGame: React.FC<DuoRampageGameProps> = ({ onExit }) => {
           onExit={() => setScreen('menu')}
         />
       )}
+
+      {/* 5. Auth Modal (If user clicks Login in profile/menus) */}
+      <AuthModal />
     </div>
   );
 };
